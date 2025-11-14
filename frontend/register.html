@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Innocence Found – Register</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- NAVBAR -->
+  <header>
+    <nav>
+      <a href="#" class="logo" data-page="home">Innocence Found</a>
+      <ul class="nav-links">
+        <li><a href="#">Home</a></li>
+        <li><a href="#">About</a></li>
+        <li><a href="#">Contact</a></li>
+        <li><a href="#">Login</a></li>
+      </ul>
+
+      <div class="user-menu" id="userMenu" style="display: none;">
+        <span id="userNameNav"></span>
+        <a href="#" id="logoutLink">Sign Out</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="page-wrapper">
+    <div class="form-container">
+      <h1>Create Your Account</h1>
+
+      <form id="registrationForm">
+        <!-- Name -->
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" name="name" required />
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required />
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+          />
+          <small>At least 8 characters and 1 number.</small>
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password</label>
+          <input
+            type="password"
+            id="confirmPassword"
+            name="confirmPassword"
+            required
+          />
+        </div>
+
+        <!-- Error message placeholder -->
+        <p id="errorMessage"></p>
+
+        <!-- Submit button -->
+        <button type="submit">Register</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- FOOTER (bottom bar like the home mockup) -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-columns">
+        <div class="footer-column">
+          <h3>Innocence Found</h3>
+          <p>
+            Promoting wholesome, educational storytelling. Thank you for
+            reading with us.
+          </p>
+          <p class="footer-copy">
+            © 2025 Innocence Found. All rights reserved.
+          </p>
+        </div>
+
+        <div class="footer-column">
+          <h4>Contact</h4>
+          <p>Email: hello@innocencefound.org</p>
+          <p>Media: press@innocencefound.org</p>
+          <p>Sacramento, CA</p>
+        </div>
+
+        <div class="footer-column">
+          <h4>Stay in Touch</h4>
+          <p>Newsletter · Instagram · Pinterest</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Validation logic -->
+  <script src="script.js"></script>
+</body>
+</html>

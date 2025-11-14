@@ -1,0 +1,228 @@
+/* ==== RESET ==== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* ==== PAGE BACKGROUND ==== */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #5a3b2e;
+  background-color: #f4e4c9; /* base parchment */
+
+  background-image: url("./images/forest-stipple.jpg");
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+
+
+/* ==== NAVBAR ==== */
+header {
+  background-color: #8a5a33;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+nav {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fdf5e6;
+  text-decoration: none;
+}
+
+.nav-links {
+  list-style: none;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.nav-links a {
+  color: #fdf5e6;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.nav-links a:hover {
+  text-decoration: underline;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fdf5e6;
+  font-size: 14px;
+}
+
+.user-menu a {
+  color: #fdf5e6;
+  text-decoration: none;
+}
+
+/* ==== LAYOUT WRAPPER ==== */
+.page-wrapper {
+  min-height: calc(100vh - 56px); /* full height minus navbar */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px 72px;
+}
+
+/* ==== REGISTRATION CARD ==== */
+.form-container {
+  background-color: rgba(250, 242, 230, 0.96); /* slightly see-through */
+  max-width: 540px;
+  width: 100%;
+  padding: 40px 56px 32px;
+  border-radius: 8px;
+  border: 2px solid #d8a96c;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+}
+
+.form-container h1 {
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: 28px;
+  text-align: center;
+  margin-bottom: 26px;
+  color: #5a3b2e;
+}
+
+/* ==== FORM ELEMENTS ==== */
+.form-group {
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 3px;
+  border: 1px solid #d8a96c;
+  background-color: #fff8ed;
+  font-size: 14px;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  outline: none;
+  border-color: #c27b32;
+  box-shadow: 0 0 0 2px rgba(194, 123, 50, 0.25);
+}
+
+small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #7b5c3f;
+}
+
+/* error message under fields */
+#errorMessage {
+  min-height: 18px;
+  font-size: 13px;
+  color: #b3261e;
+  margin-top: 4px;
+  margin-bottom: 14px;
+}
+
+/* ==== BUTTON ==== */
+button[type="submit"] {
+  width: 100%;
+  padding: 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  background-color: #d18a2b;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 15px;
+  box-shadow: 0 4px 0 #b6731a;
+  transition: background-color 0.15s ease, transform 0.08s ease,
+    box-shadow 0.08s ease;
+}
+
+button[type="submit"]:hover {
+  background-color: #e39833;
+}
+
+button[type="submit"]:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #b6731a;
+}
+/* =========================
+   FOOTER (BOTTOM BAR)
+   ========================= */
+.site-footer {
+  background-color: #5a3b2e; /* dark cocoa */
+  color: #fdf5e6;
+  margin-top: 48px;
+}
+
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 32px 18px;
+}
+
+.footer-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-size: 13px;
+}
+
+.footer-column h3,
+.footer-column h4 {
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.footer-column p {
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.footer-copy {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* mobile footer layout */
+@media (max-width: 768px) {
+  .footer-columns {
+    flex-direction: column;
+    gap: 20px;
+  }
+}
