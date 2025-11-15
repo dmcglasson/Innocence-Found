@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Innocence Found</title>
+  <link rel="stylesheet" href="readerstyles.css" />
+  <!-- <link rel="stylesheet" href="stylers-test.css" /> -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js" defer></script>
+  <script src="readerscript.js" defer></script>
+  <!-- <script src="scripter-test.js" defer></script> -->
+</head>
+<body>
+  <header class="navbar">
+    <div class="logo">
+      <img src="images/logo.png" alt="Innocence Found logo" />
+      <span>Innocence Found</span>
+    </div>
+    <nav>
+      <a href="#">Home</a>
+      <a href="#">About</a>
+      <a href="#">Login/Signup</a>
+    </nav>
+  </header>
+
+  <main class="background-area">
+    <div class="book-container">
+    <div class="book">
+      <div class="page left-page">
+        <canvas id="leftPage"></canvas>
+      </div>
+      <div class="page right-page">
+        <canvas id="rightPage"></canvas>
+      </div>
+    </div>
+
+    <div>
+      <div class="controls">
+      <button id="prevPage">⟵ Previous</button>
+      <span id="pageInfo">Page 1–2</span>
+      <button id="nextPage">Next ⟶</button>
+    </div>
+    </div>
+  </main>
+
+
+</body>
+</html>
