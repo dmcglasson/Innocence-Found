@@ -75,13 +75,32 @@ function setupEventListeners() {
     }
   });
 
-  // Logout button
+    // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
-    if (e.target.id === 'logoutBtn' || (e.target.closest && e.target.closest('#logoutBtn'))) {
+    const target = e.target;
+
+    // Logout button
+    if (target.id === 'logoutBtn' || (target.closest && target.closest('#logoutBtn'))) {
       e.preventDefault();
       await handleLogout();
+      return;
+    }
+
+    // Switch to signup form
+    if (target.id === 'signupSwitchLink' || (target.closest && target.closest('#signupSwitchLink'))) {
+      e.preventDefault();
+      toggleAuthForm('signup');
+      return;
+    }
+
+    // Switch to login form
+    if (target.id === 'loginSwitchLink' || (target.closest && target.closest('#loginSwitchLink'))) {
+      e.preventDefault();
+      toggleAuthForm('login');
+      return;
     }
   });
+
 }
 
 /**
@@ -162,7 +181,12 @@ async function handleSignup(form) {
     {
       name: { required: true, minLength: 2 },
       email: { required: true, type: 'email' },
-      password: { required: true, type: 'password', minLength: 6 }
+      password: { 
+        required: true, 
+        type: 'password', 
+        minLength: 8,
+        pattern: /\d/ // must include at least one number
+      }
     }
   );
 
@@ -215,9 +239,13 @@ async function handleLogout() {
  * Initialize screen-specific logic after screen loads
  * @param {string} pageId - ID of the loaded page
  */
+/**
+ * Initialize screen-specific logic after screen loads
+ * @param {string} pageId - ID of the loaded page
+ */
 async function initializeScreen(pageId) {
+  // Dashboard screen
   if (pageId === 'dashboard') {
-    // Wait for dashboard elements to load
     try {
       await waitForElement('#userName', 1000);
       await waitForElement('#userEmail', 1000);
@@ -230,7 +258,35 @@ async function initializeScreen(pageId) {
       console.warn('Dashboard elements not found:', error);
     }
   }
+
+  // Login / Signup screen
+  if (pageId === 'login') {
+    try {
+      // Wait for the auth boxes to exist
+      await waitForElement('#loginBox', 1000);
+
+      const signupLink = document.getElementById('signupSwitchLink');
+      const loginLink  = document.getElementById('loginSwitchLink');
+
+      if (signupLink) {
+        signupLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          toggleAuthForm('signup');
+        });
+      }
+
+      if (loginLink) {
+        loginLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          toggleAuthForm('login');
+        });
+      }
+    } catch (error) {
+      console.warn('Auth screen elements not found:', error);
+    }
+  }
 }
+
 
 /**
  * Set up screen initialization callback for navigation
@@ -283,4 +339,3 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
-
