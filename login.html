@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login / Signup – Innocence Found</title>
+
+  <!-- shared site styles -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- page-only styles (auth card + policy UI) -->
+  <style>
+    .wrap { max-width: 420px; margin: 60px auto; background:#F9EDD7; border:1px solid #E1CFB1; border-radius:14px; padding:22px; }
+    h1 { margin: 0 0 12px; font-size: 24px; }
+    label { display:block; margin: 12px 0 6px; }
+    input { width:100%; padding:10px 12px; border:1px solid #BFA98A; border-radius:10px; background:#fff; }
+    button { margin-top:12px; width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
+    button.secondary { background:transparent; color:var(--accent); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .row { display:flex; gap:10px; }
+    .muted { color:var(--ink-soft); font-size:13px; margin-top:8px; }
+    .msg { margin-top:12px; padding:10px; border-radius:10px; display:none; }
+    .msg.ok { display:block; background:#eaf6ea; border:1px solid #b8e0b8; }
+    .msg.err { display:block; background:#fde8e8; border:1px solid #f5b5b5; }
+    .links { margin-top:16px; text-align:center; }
+    a { color:var(--accent); }
+
+    /* password policy UI */
+    .policy { margin:10px 0 8px; padding-left:18px; font-size:13px; color:var(--ink-soft); }
+    .policy li { margin:4px 0; }
+    .policy li.ok { color:#156f2e; }
+
+    .meter { height:8px; background:#e9e5dc; border-radius:8px; overflow:hidden; margin:8px 0 4px; }
+    #pw-meter { height:100%; width:0%; background:#c24b2a; transition:width .2s ease, background .2s ease; border-radius:8px; }
+  </style>
+</head>
+
+<body>
+  <!-- Top Navigation -->
+  <nav class="nav">
+    <div class="container">
+      <a class="brand" href="index.html"><span class="brand-mark">Innocence Found</span></a>
+      <ul class="links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="stories.html">Stories</a></li>
+        <li><a href="worksheets.html">Worksheets</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a id="nav-auth" class="btn" href="login.html">Login/Signup</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Auth card -->
+  <div class="wrap">
+    <h1>Login / Signup</h1>
+
+    <div class="row">
+      <button id="tab-login" class="secondary" type="button">Login</button>
+      <button id="tab-signup" type="button">Sign up</button>
+    </div>
+
+    <!-- LOGIN -->
+    <form id="login" autocomplete="on">
+      <label>Email</label>
+      <input id="login-email" type="email" placeholder="you@example.com" required />
+      <label>Password</label>
+      <input id="login-pass" type="password" placeholder="Your password" required />
+      <button type="submit">Log In</button>
+    </form>
+
+    <!-- SIGNUP with enforced policy -->
+    <form id="signup" style="display:none;" autocomplete="on">
+      <label>Email</label>
+      <input id="signup-email" type="email" placeholder="you@example.com" required />
+
+      <label>Password</label>
+      <input id="signup-pass" type="password" placeholder="Create a strong password" required />
+
+      <ul id="pw-rules" class="policy">
+        <li data-rule="len">At least <b>12 characters</b></li>
+        <li data-rule="lower">Has a <b>lowercase</b> letter</li>
+        <li data-rule="upper">Has an <b>uppercase</b> letter</li>
+        <li data-rule="digit">Has a <b>number</b></li>
+        <li data-rule="symbol">Has a <b>symbol</b> (e.g., ! @ # $ %)</li>
+        <li data-rule="common">Avoid very common words (e.g., “password”, “innocence”, “found”)</li>
+        <li data-rule="email">Doesn’t contain your <b>email name</b></li>
+        <li data-rule="score">Overall strength is <b>Good</b> or better</li>
+      </ul>
+
+      <div class="meter"><div id="pw-meter"></div></div>
+
+      <div class="muted">Tip: use a long passphrase, e.g. “MapleRiver! owl 1986”.</div>
+      <button id="signup-submit" type="submit" disabled>Create Account</button>
+    </form>
+
+    <div id="msg" class="msg"></div>
+
+    <div class="links">
+      <a href="index.html">← Back to Home</a>
+      <div class="muted">Already logged in? Refresh this page to check your session.</div>
+    </div>
+  </div>
+
+  <!-- Supabase + password policy logic -->
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+    import zxcvbn from "https://esm.sh/zxcvbn";
+
+    // Public values (safe in browser)
+    const SUPABASE_URL  = "https://khiwkbnqjjycmwonbhqu.supabase.co";
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaXdrYm5xamp5Y213b25iaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjM1NDYsImV4cCI6MjA3ODI5OTU0Nn0.SHCSkMuUl3IY-A76cGXwLRXQNcLF-hOa19Tu8jOSWaU";
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    // elements
+    const loginForm  = document.getElementById("login");
+    const signupForm = document.getElementById("signup");
+    const tabLogin   = document.getElementById("tab-login");
+    const tabSignup  = document.getElementById("tab-signup");
+    const msg        = document.getElementById("msg");
+    const navAuth    = document.getElementById("nav-auth");
+
+    const signupEmailEl = document.getElementById("signup-email");
+    const signupPassEl  = document.getElementById("signup-pass");
+    const rulesList     = document.getElementById("pw-rules");
+    const meterBar      = document.getElementById("pw-meter");
+    const signupBtn     = document.getElementById("signup-submit");
+
+    const show = (el) => el.style.display = "block";
+    const hide = (el) => el.style.display = "none";
+    const info = (t) => { msg.className = "msg ok";  msg.textContent = t; };
+    const errorMsg = (t) => { msg.className = "msg err"; msg.textContent = t; };
+
+    // tabs
+    tabLogin.addEventListener("click", () => { show(loginForm); hide(signupForm); info("Login selected."); });
+    tabSignup.addEventListener("click", () => { show(signupForm); hide(loginForm); info("Signup selected."); evaluateNow(); });
+
+    // login
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.className = "msg"; msg.textContent = "";
+
+      const email = document.getElementById("login-email").value.trim();
+      const password = document.getElementById("login-pass").value;
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return errorMsg(error.message);
+
+      info("Logged in! Redirecting…");
+      setTimeout(() => window.location.href = "index.html", 600);
+    });
+
+    // password policy
+    const COMMON = [/password/i, /qwerty/i, /12345/, /innocence/i, /found/i];
+
+    function evaluate(pw, emailName){
+      const rules = {
+        len: pw.length >= 12,
+        lower: /[a-z]/.test(pw),
+        upper: /[A-Z]/.test(pw),
+        digit: /[0-9]/.test(pw),
+        symbol: /[^A-Za-z0-9]/.test(pw),
+        common: !COMMON.some(r => r.test(pw)),
+        email: emailName ? !pw.toLowerCase().includes(emailName.toLowerCase()) : true,
+        score: zxcvbn(pw, emailName ? [emailName] : []).score >= 3
+      };
+
+      // checklist UI
+      Object.entries(rules).forEach(([key, ok]) => {
+        const li = rulesList.querySelector(`[data-rule="${key}"]`);
+        if (li) li.classList.toggle("ok", ok);
+      });
+
+      // meter UI (0..4 -> 0/25/50/75/100)
+      const s = zxcvbn(pw, emailName ? [emailName] : []);
+      const pct = [0, 25, 50, 75, 100][s.score];
+      meterBar.style.width = pct + "%";
+      meterBar.style.background = s.score >= 3 ? "#2f5d3f" : "#c24b2a";
+
+      const allOk = Object.values(rules).every(Boolean);
+      signupBtn.disabled = !allOk;
+      return allOk;
+    }
+
+    function evaluateNow(){
+      const emailName = (signupEmailEl.value.trim().split("@")[0] || "");
+      evaluate(signupPassEl.value, emailName);
+    }
+
+    // live validation
+    signupEmailEl.addEventListener("input", evaluateNow);
+    signupPassEl.addEventListener("input", evaluateNow);
+
+    // signup
+    signupForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.className = "msg"; msg.textContent = "";
+
+      const email = signupEmailEl.value.trim();
+      const pw    = signupPassEl.value;
+      const emailName = (email.split("@")[0] || "");
+
+      if (!evaluate(pw, emailName)) {
+        return errorMsg("Please meet all password rules (green checks) before creating your account.");
+      }
+
+      const { error } = await supabase.auth.signUp({ email, password: pw });
+      if (error) return errorMsg(error.message);
+
+      info("Account created. Check your email to verify, then log in.");
+    });
+
+    // nav auth state
+    async function refreshNav(){
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        navAuth.textContent = "Logout";
+        navAuth.href = "#";
+        navAuth.onclick = async (e) => {
+          e.preventDefault();
+          await supabase.auth.signOut();
+          alert("Logged out");
+          window.location.href = "login.html";
+        };
+      } else {
+        navAuth.textContent = "Login/Signup";
+        navAuth.href = "login.html";
+        navAuth.onclick = null;
+      }
+    }
+    await refreshNav();
+    supabase.auth.onAuthStateChange(() => refreshNav());
+  </script>
+</body>
+</html>

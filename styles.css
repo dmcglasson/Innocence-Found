@@ -1,0 +1,65 @@
+/* ---- Global theme ---- */
+:root{
+  --paper:#F5E6CE;       /* warm cream */
+  --ink:#3B2F2F;         /* sepia/dark brown */
+  --ink-soft:#6c574b;
+  --accent:#2F5D3F;      /* deep green */
+  --line:#E1CFB1;
+  --radius:14px;
+  --shadow:0 6px 24px rgba(0,0,0,.08);
+  --font-serif: "Georgia", ui-serif, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+*{ box-sizing: border-box; }
+html,body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-sans); }
+html{ scroll-behavior: smooth; }
+
+.container{
+  max-width:1120px;
+  margin:0 auto;
+  padding:0 16px;
+}
+
+/* ---- Top Navigation (used on ALL pages) ---- */
+.nav{
+  position:sticky; top:0; z-index:10;
+  background:#F9EDD7;
+  border-bottom:1px solid var(--line);
+}
+.nav .container{
+  height:64px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.brand{ text-decoration:none; color:var(--ink); display:flex; align-items:center; gap:10px; }
+.brand-mark{
+  font-family:var(--font-serif);
+  font-size:22px;
+  letter-spacing:.2px;
+}
+.links{ list-style:none; display:flex; gap:24px; margin:0; padding:0; align-items:center; }
+.links a{ color:var(--ink); text-decoration:none; font-size:15px; }
+.links a:hover{ text-decoration:underline; }
+
+.btn{
+  border:1px solid var(--ink);
+  padding:8px 12px; border-radius:var(--radius);
+  background:transparent; cursor:pointer;
+}
+.btn.solid{
+  background:var(--accent); color:#fff; border-color:var(--accent);
+  box-shadow:var(--shadow);
+}
+.btn:hover{ opacity:.9; }
+
+/* ---- Home page bits (safe to keep) ---- */
+.hero{ padding:56px 0; }
+.hero h1{
+  font-family:var(--font-serif);
+  font-size:40px; line-height:1.15; margin:0 0 12px;
+}
+.hero p{ color:var(--ink-soft); max-width:680px; margin:0 0 20px; }
+.cta{ display:flex; gap:12px; }
+.section { padding: 64px 0; border-top: 1px solid var(--line); margin-top: 32px; }

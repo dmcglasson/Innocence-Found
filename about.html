@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>About – Innocence Found</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <nav class="nav">
+    <div class="container">
+      <a class="brand" href="index.html"><span class="brand-mark">Innocence Found</span></a>
+      <ul class="links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="stories.html">Stories</a></li>
+        <li><a href="worksheets.html">Worksheets</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a id="nav-auth" class="btn" href="login.html">Login/Signup</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main class="container section">
+    <h1>About</h1>
+    <p>Welcome to Innocence Found — a place for wholesome stories, learning, and connection.</p>
+  </main>
+
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+    const supabase = createClient(
+      "https://khiwkbnqjjycmwonbhqu.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaXdrYm5xamp5Y213b25iaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjM1NDYsImV4cCI6MjA3ODI5OTU0Nn0.SHCSkMuUl3IY-A76cGXwLRXQNcLF-hOa19Tu8jOSWaU"
+    );
+
+    const navAuth = document.getElementById("nav-auth");
+    async function refreshNav(){
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        navAuth.textContent = "Logout";
+        navAuth.href = "#";
+        navAuth.onclick = async (e) => {
+          e.preventDefault();
+          await supabase.auth.signOut();
+          window.location.href = "login.html";
+        };
+      } else {
+        navAuth.textContent = "Login/Signup";
+        navAuth.href = "login.html";
+        navAuth.onclick = null;
+      }
+    }
+    refreshNav();
+    supabase.auth.onAuthStateChange(() => refreshNav());
+  </script>
+</body>
+</html>

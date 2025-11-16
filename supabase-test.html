@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <body>
+    <pre id="out">Testing Supabase…</pre>
+
+    <script type="module">
+      import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+      // TEMP: put your values here just to test locally (DO NOT COMMIT)
+      const url = "https://khiwkbnqjjycmwonbhqu.supabase.co";
+      const anon = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaXdrYm5xamp5Y213b25iaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjM1NDYsImV4cCI6MjA3ODI5OTU0Nn0.SHCSkMuUl3IY-A76cGXwLRXQNcLF-hOa19Tu8jOSWaU";
+
+      const supabase = createClient(url, anon);
+
+      const { data, error } = await supabase.auth.getSession();
+
+      const out = document.getElementById("out");
+      out.textContent = JSON.stringify({ ok: !error, error, dataPresent: !!data }, null, 2);
+    </script>
+  </body>
+</html>

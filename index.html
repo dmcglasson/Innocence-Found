@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Innocence Found</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="nav">
+    <div class="container">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">Innocence Found</span>
+      </a>
+      <ul class="links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="stories.html">Stories</a></li>
+        <li><a href="worksheets.html">Worksheets</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="about.html">About</a></li>
+        <!-- this text changes to "Logout" when logged in -->
+        <li><a id="nav-auth" class="btn" href="login.html">Login/Signup</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Page content -->
+  <main class="container">
+    <section class="hero">
+      <h1>Stories that spark imagination and family connection</h1>
+      <p>Read wholesome tales, explore learning activities, and join a community of leaders.</p>
+      <div class="cta">
+        <!-- Go straight to Stories page -->
+        <a class="btn solid" href="stories.html">Start Reading</a>
+        <!-- Use login page as the subscribe entry for now -->
+        <a class="btn" href="login.html">Subscribe Now</a>
+      </div>
+    </section>
+
+    <!-- Optional: sections for future content -->
+    <section id="stories" class="section">
+      <h2>Featured Stories</h2>
+      <p>Coming soon…</p>
+    </section>
+
+    <section id="subscribe" class="section">
+      <h2>Subscribe</h2>
+      <p>Join the newsletter and weekly reading list.</p>
+    </section>
+  </main>
+
+  <!-- Auth-aware nav: switches Login/Signup <-> Logout -->
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    // Your public Supabase values
+    const SUPABASE_URL  = "https://khiwkbnqjjycmwonbhqu.supabase.co";
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaXdrYm5xamp5Y213b25iaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjM1NDYsImV4cCI6MjA3ODI5OTU0Nn0.SHCSkMuUl3IY-A76cGXwLRXQNcLF-hOa19Tu8jOSWaU";
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+    const navAuth = document.getElementById("nav-auth");
+
+    async function refreshNav() {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        navAuth.textContent = "Logout";
+        navAuth.href = "#";
+        navAuth.onclick = async (e) => {
+          e.preventDefault();
+          await supabase.auth.signOut();
+          alert("Logged out");
+          window.location.href = "login.html";
+        };
+      } else {
+        navAuth.textContent = "Login/Signup";
+        navAuth.href = "login.html";
+        navAuth.onclick = null;
+      }
+    }
+
+    // Run on load
+    refreshNav();
+
+    // Update if auth state changes (e.g., after login/logout)
+    supabase.auth.onAuthStateChange(() => refreshNav());
+  </script>
+<!-- Page-turn sound effect -->
+<script type="module">
+  import { Howl } from "https://esm.sh/howler";
+
+  // Load the page-turn sound
+  const pageTurn = new Howl({
+    src: ["./sounds/turn.mp3"],
+    volume: 0.5
+  });
+
+  // Play sound when any button is clicked
+  document.querySelectorAll(".btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      pageTurn.play();
+    });
+  });
+</script>
+</body>
+</html>
