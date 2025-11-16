@@ -1,28 +1,42 @@
 /**
  * Main Application Entry Point
- * 
+ *
  * This file initializes the application and sets up all modules.
  * It coordinates between different modules and handles the application lifecycle.
  */
 
-import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
-import { initPageFromHash, showPage } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
-import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
-import { waitForElement } from './utils/dom.js';
-import { validateForm, sanitizeString } from './utils/validators.js';
+import { getSupabaseClient, isSupabaseInitialized } from "./modules/supabase.js";
+import { initPageFromHash, showPage } from "./modules/navigation.js";
+import {
+  checkAuthState,
+  initAuthStateListener,
+  signIn,
+  signUp,
+  signOut,
+  getCurrentSession,
+} from "./modules/auth.js";
+import {
+  initUI,
+  toggleAuthForm,
+  showMessage,
+  updateDashboardUserInfo,
+} from "./modules/ui.js";
+import { waitForElement } from "./utils/dom.js";
+import { validateForm, sanitizeString } from "./utils/validators.js";
 
 /**
  * Initialize the application
  */
 async function init() {
   // Wait a moment for env vars to be available
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
   // Check Supabase initialization
   const client = getSupabaseClient();
   if (!client) {
-    console.error("Failed to initialize Supabase client. Check your .env file or config.");
+    console.error(
+      "Failed to initialize Supabase client. Check your .env file or config."
+    );
     // Show user-friendly error
     const pageContainer = document.getElementById("pageContainer");
     if (pageContainer) {
@@ -56,7 +70,7 @@ async function init() {
   // Set up event listeners
   setupEventListeners();
 
-  // Set up screen initialization callback
+  // Set up screen initialization + auth guard
   setupScreenInitialization();
 }
 
@@ -64,20 +78,23 @@ async function init() {
  * Set up all event listeners
  */
 function setupEventListeners() {
-  // Login form
-  document.addEventListener('submit', async (e) => {
-    if (e.target.id === 'loginForm') {
+  // Login / signup forms
+  document.addEventListener("submit", async (e) => {
+    if (e.target.id === "loginForm") {
       e.preventDefault();
       await handleLogin(e.target);
-    } else if (e.target.id === 'signupForm') {
+    } else if (e.target.id === "signupForm") {
       e.preventDefault();
       await handleSignup(e.target);
     }
   });
 
-  // Logout button
-  document.addEventListener('click', async (e) => {
-    if (e.target.id === 'logoutBtn' || (e.target.closest && e.target.closest('#logoutBtn'))) {
+  // (Optional) logout button somewhere else in the DOM
+  document.addEventListener("click", async (e) => {
+    if (
+      e.target.id === "logoutBtn" ||
+      (e.target.closest && e.target.closest("#logoutBtn"))
+    ) {
       e.preventDefault();
       await handleLogout();
     }
@@ -89,10 +106,10 @@ function setupEventListeners() {
  * @param {HTMLFormElement} form - Login form element
  */
 async function handleLogin(form) {
-  const emailInput = form.querySelector('#loginEmail');
-  const passwordInput = form.querySelector('#loginPassword');
-  const loginBtn = form.querySelector('#loginBtn');
-  const loginMsg = document.getElementById('loginMessage');
+  const emailInput = form.querySelector("#loginEmail");
+  const passwordInput = form.querySelector("#loginPassword");
+  const loginBtn = form.querySelector("#loginBtn");
+  const loginMsg = document.getElementById("loginMessage");
 
   if (!emailInput || !passwordInput || !loginBtn) return;
 
@@ -104,34 +121,38 @@ async function handleLogin(form) {
   const validation = validateForm(
     { email, password },
     {
-      email: { required: true, type: 'email' },
-      password: { required: true, type: 'password', minLength: 6 }
+      email: { required: true, type: "email" },
+      password: { required: true, type: "password", minLength: 6 },
     }
   );
 
   if (!validation.isValid) {
-    showMessage('loginMessage', Object.values(validation.errors)[0], 'error');
+    showMessage("loginMessage", Object.values(validation.errors)[0], "error");
     return;
   }
 
   // Update UI
   loginBtn.disabled = true;
   loginBtn.textContent = "Signing in...";
-  showMessage('loginMessage', '', 'success');
+  showMessage("loginMessage", "", "success");
 
   try {
     const result = await signIn(email, password);
 
     if (result.success) {
-      showMessage('loginMessage', result.message, 'success');
+      showMessage("loginMessage", result.message, "success");
       setTimeout(() => {
-        showPage('dashboard');
+        showPage("dashboard");
       }, 1000);
     } else {
-      showMessage('loginMessage', result.message, 'error');
+      showMessage("loginMessage", result.message, "error");
     }
   } catch (error) {
-    showMessage('loginMessage', error.message || 'Failed to sign in', 'error');
+    showMessage(
+      "loginMessage",
+      error.message || "Failed to sign in",
+      "error"
+    );
   } finally {
     loginBtn.disabled = false;
     loginBtn.textContent = "Sign In";
@@ -143,11 +164,11 @@ async function handleLogin(form) {
  * @param {HTMLFormElement} form - Signup form element
  */
 async function handleSignup(form) {
-  const nameInput = form.querySelector('#signupName');
-  const emailInput = form.querySelector('#signupEmail');
-  const passwordInput = form.querySelector('#signupPassword');
-  const signupBtn = form.querySelector('#signupBtn');
-  const signupMsg = document.getElementById('signupMessage');
+  const nameInput = form.querySelector("#signupName");
+  const emailInput = form.querySelector("#signupEmail");
+  const passwordInput = form.querySelector("#signupPassword");
+  const signupBtn = form.querySelector("#signupBtn");
+  const signupMsg = document.getElementById("signupMessage");
 
   if (!nameInput || !emailInput || !passwordInput || !signupBtn) return;
 
@@ -161,35 +182,39 @@ async function handleSignup(form) {
     { name, email, password },
     {
       name: { required: true, minLength: 2 },
-      email: { required: true, type: 'email' },
-      password: { required: true, type: 'password', minLength: 6 }
+      email: { required: true, type: "email" },
+      password: { required: true, type: "password", minLength: 6 },
     }
   );
 
   if (!validation.isValid) {
-    showMessage('signupMessage', Object.values(validation.errors)[0], 'error');
+    showMessage("signupMessage", Object.values(validation.errors)[0], "error");
     return;
   }
 
   // Update UI
   signupBtn.disabled = true;
   signupBtn.textContent = "Creating account...";
-  showMessage('signupMessage', '', 'success');
+  showMessage("signupMessage", "", "success");
 
   try {
     const result = await signUp(email, password, name);
 
     if (result.success) {
-      showMessage('signupMessage', result.message, 'success');
+      showMessage("signupMessage", result.message, "success");
       form.reset();
       setTimeout(() => {
-        toggleAuthForm('login');
+        toggleAuthForm("login");
       }, 2000);
     } else {
-      showMessage('signupMessage', result.message, 'error');
+      showMessage("signupMessage", result.message, "error");
     }
   } catch (error) {
-    showMessage('signupMessage', error.message || 'Failed to create account', 'error');
+    showMessage(
+      "signupMessage",
+      error.message || "Failed to create account",
+      "error"
+    );
   } finally {
     signupBtn.disabled = false;
     signupBtn.textContent = "Create Account";
@@ -205,7 +230,7 @@ async function handleLogout() {
     if (!result.success) {
       alert("Error signing out: " + result.message);
     }
-    // Navigation is handled by auth state listener
+    // Navigation is handled by auth state listener (initAuthStateListener)
   } catch (error) {
     alert("Error signing out: " + error.message);
   }
@@ -216,48 +241,85 @@ async function handleLogout() {
  * @param {string} pageId - ID of the loaded page
  */
 async function initializeScreen(pageId) {
-  if (pageId === 'dashboard') {
-    // Wait for dashboard elements to load
-    try {
-      await waitForElement('#userName', 1000);
-      await waitForElement('#userEmail', 1000);
-      
-      const session = await getCurrentSession();
-      if (session && session.user) {
-        updateDashboardUserInfo(session.user);
-      }
-    } catch (error) {
-      console.warn('Dashboard elements not found:', error);
+  if (pageId !== "dashboard") return;
+
+  try {
+    // Get current session/user from Supabase
+    const session = await getCurrentSession();
+    const user = session?.user;
+
+    const nameEl = document.getElementById("userName");
+    const emailEl = document.getElementById("userEmail");
+
+    if (!user) {
+      console.warn("No user session found for dashboard.");
+      return;
     }
+
+    if (nameEl) {
+      const meta = user.user_metadata || {};
+      nameEl.textContent =
+        meta.name ||
+        meta.full_name ||
+        meta.display_name ||
+        user.email ||
+        "Friend";
+    }
+
+    if (emailEl) {
+      emailEl.textContent = user.email || "";
+    }
+  } catch (error) {
+    console.warn("Error initializing dashboard screen:", error);
   }
 }
 
+
 /**
  * Set up screen initialization callback for navigation
+ * and add auth guard for protected pages
  */
 function setupScreenInitialization() {
-  // Wrap showPage to include screen initialization
+  // Wrap showPage to include screen initialization AND auth guard
   const originalShowPage = showPage;
+
+  // Pages that require login
+  const protectedPages = ["dashboard"]; // add more later if needed
+
   const wrappedShowPage = async (pageId) => {
+    // If this page is protected, check auth
+    if (protectedPages.includes(pageId)) {
+      const session = await getCurrentSession();
+      if (!session) {
+        // Not logged in → send to login screen
+        await originalShowPage("login", initializeScreen);
+
+        // Make sure login form is visible (not signup)
+        setTimeout(() => toggleAuthForm("login"), 100);
+        return;
+      }
+    }
+
+    // Normal navigation
     await originalShowPage(pageId, initializeScreen);
   };
-  
+
   // Expose globally for onclick handlers and navigation
   window.showPage = wrappedShowPage;
-  
+
   // Set up navigation event delegation
-  document.addEventListener('click', (e) => {
-    const pageLink = e.target.closest('[data-page]');
+  document.addEventListener("click", (e) => {
+    const pageLink = e.target.closest("[data-page]");
     if (pageLink) {
       e.preventDefault();
-      const pageId = pageLink.getAttribute('data-page');
+      const pageId = pageLink.getAttribute("data-page");
       if (pageId) {
         wrappedShowPage(pageId);
       }
     }
-    
-    // Handle logout link
-    if (e.target.id === 'logoutLink' || e.target.closest('#logoutLink')) {
+
+    // Handle logout link in nav
+    if (e.target.id === "logoutLink" || e.target.closest("#logoutLink")) {
       e.preventDefault();
       handleLogout();
     }
@@ -266,21 +328,22 @@ function setupScreenInitialization() {
 
 // Global functions for programmatic access
 window.showLogin = () => {
-  showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('login'), 100);
+  showPage("login").then(() => {
+    setTimeout(() => toggleAuthForm("login"), 100);
   });
 };
+
 window.showSignup = () => {
-  showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('signup'), 100);
+  showPage("login").then(() => {
+    setTimeout(() => toggleAuthForm("signup"), 100);
   });
 };
+
 window.handleLogout = handleLogout;
 
 // Initialize app when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
 } else {
   init();
 }
-
