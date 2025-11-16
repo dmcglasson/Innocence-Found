@@ -12,6 +12,7 @@
 import { getSupabaseClient } from './supabase.js';
 import { showPage } from './navigation.js';
 import { updateNavForLoggedIn, updateNavForLoggedOut } from './ui.js';
+import { hashPassword } from '../utils/password-encryption.js';   // <-- ADDED
 
 let authStateListeners = [];
 
@@ -95,9 +96,12 @@ export async function signUp(email, password, name) {
   }
 
   try {
+    // 🔐 Hash the password BEFORE sending to Supabase
+    const hashedPassword = await hashPassword(password);
+
     const { data, error } = await supabase.auth.signUp({
       email,
-      password,
+      password: hashedPassword,
       options: {
         data: {
           name: name,
@@ -163,4 +167,3 @@ export function initAuthStateListener(callback) {
     }
   });
 }
-
