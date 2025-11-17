@@ -1,70 +1,91 @@
 /**
  * Main Application Entry Point
- * 
- * This file initializes the application and sets up all modules.
- * It coordinates between different modules and handles the application lifecycle.
+ *
+ * Initializes the SPA: navigation, auth, UI, and sound.
  */
 
-import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
+// --- SOUND SETUP ---
+import { initSound, playClick } from './modules/sound.js';
+
+// --- CORE MODULES ---
+import { getSupabaseClient } from './modules/supabase.js';
 import { initPageFromHash, showPage } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
-import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
+import {
+  checkAuthState,
+  initAuthStateListener,
+  signIn,
+  signUp,
+  signOut,
+  getCurrentSession,
+} from './modules/auth.js';
+import {
+  initUI,
+  toggleAuthForm,
+  showMessage,
+  updateDashboardUserInfo,
+} from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
+
+// --- Global click sound handler (links, buttons, .btn) ---
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('a, button, .btn');
+  if (!el) return;
+  if (el.getAttribute('aria-disabled') === 'true' || el.disabled) return;
+  playClick();
+});
 
 /**
  * Initialize the application
  */
 async function init() {
-  // Wait a moment for env vars to be available
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
-  // Check Supabase initialization
-  const client = getSupabaseClient();
-  if (!client) {
-    console.error("Failed to initialize Supabase client. Check your .env file or config.");
-    // Show user-friendly error
-    const pageContainer = document.getElementById("pageContainer");
-    if (pageContainer) {
-      pageContainer.innerHTML = `
-        <div class="content-section">
-          <h2>Configuration Error</h2>
-          <p>Supabase credentials not configured. Please:</p>
-          <ol>
-            <li>Create a <code>.env</code> file (copy from <code>.env.example</code>)</li>
-            <li>Add your <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code></li>
-            <li>Refresh this page</li>
-          </ol>
-        </div>
-      `;
-    }
-    return;
-  }
+  // Give env-loader a moment to populate window.ENV (defensive)
+  await new Promise((r) => setTimeout(r, 50));
 
-  // Initialize UI
+  // 1) Base UI hooks (nav, refs)
   initUI();
 
-  // Initialize page from URL hash
+  // 2) Sound (after DOM ready)
+  try {
+    initSound();
+  } catch (e) {
+    console.warn('Sound init failed:', e);
+  }
+
+  // 3) Backend (non-blocking if not configured)
+  const client = getSupabaseClient();
+  if (!client) {
+    console.warn('Supabase not configured – continuing without backend.');
+    const pageContainer = document.getElementById('pageContainer');
+    if (pageContainer) {
+      const banner = document.createElement('div');
+      banner.style.cssText =
+        'background:#fff7d6;border:1px solid #e7cf77;padding:10px;margin:10px 0;font-size:14px;';
+      banner.textContent =
+        '⚠️ Supabase credentials not set. Navigation works; connect backend later.';
+      pageContainer.before(banner);
+    }
+  }
+
+  // 4) First screen load from #hash (defaults to home)
   await initPageFromHash();
 
-  // Check authentication state
-  await checkAuthState();
+  // 5) Auth state (if backend exists)
+  if (client) {
+    await checkAuthState();
+    initAuthStateListener();
+  }
 
-  // Initialize auth state listener
-  initAuthStateListener();
-
-  // Set up event listeners
+  // 6) Global listeners (forms, logout, nav wrapper)
   setupEventListeners();
-
-  // Set up screen initialization callback
   setupScreenInitialization();
 }
 
 /**
- * Set up all event listeners
+ * Global event listeners
  */
 function setupEventListeners() {
-  // Login form
+  // Login/Signup (event delegation)
   document.addEventListener('submit', async (e) => {
     if (e.target.id === 'loginForm') {
       e.preventDefault();
@@ -75,7 +96,7 @@ function setupEventListeners() {
     }
   });
 
-  // Logout button
+  // Logout
   document.addEventListener('click', async (e) => {
     if (e.target.id === 'logoutBtn' || (e.target.closest && e.target.closest('#logoutBtn'))) {
       e.preventDefault();
@@ -85,202 +106,176 @@ function setupEventListeners() {
 }
 
 /**
- * Handle login form submission
- * @param {HTMLFormElement} form - Login form element
+ * Login handler
  */
 async function handleLogin(form) {
   const emailInput = form.querySelector('#loginEmail');
   const passwordInput = form.querySelector('#loginPassword');
   const loginBtn = form.querySelector('#loginBtn');
-  const loginMsg = document.getElementById('loginMessage');
-
   if (!emailInput || !passwordInput || !loginBtn) return;
 
-  // Sanitize and get input values
   const email = sanitizeString(emailInput.value);
-  const password = passwordInput.value; // Don't sanitize password, but validate length
+  const password = passwordInput.value;
 
-  // Validate form
   const validation = validateForm(
     { email, password },
     {
       email: { required: true, type: 'email' },
-      password: { required: true, type: 'password', minLength: 6 }
+      password: { required: true, type: 'password', minLength: 6 },
     }
   );
-
   if (!validation.isValid) {
     showMessage('loginMessage', Object.values(validation.errors)[0], 'error');
     return;
   }
 
-  // Update UI
   loginBtn.disabled = true;
-  loginBtn.textContent = "Signing in...";
+  loginBtn.textContent = 'Signing in...';
   showMessage('loginMessage', '', 'success');
 
   try {
-    const result = await signIn(email, password);
-
-    if (result.success) {
-      showMessage('loginMessage', result.message, 'success');
-      setTimeout(() => {
-        showPage('dashboard');
-      }, 1000);
+    const { success, message } = await signIn(email, password);
+    if (success) {
+      showMessage('loginMessage', message, 'success');
+      setTimeout(() => showPage('dashboard'), 800);
     } else {
-      showMessage('loginMessage', result.message, 'error');
+      showMessage('loginMessage', message, 'error');
     }
-  } catch (error) {
-    showMessage('loginMessage', error.message || 'Failed to sign in', 'error');
+  } catch (err) {
+    showMessage('loginMessage', err.message || 'Failed to sign in', 'error');
   } finally {
     loginBtn.disabled = false;
-    loginBtn.textContent = "Sign In";
+    loginBtn.textContent = 'Sign In';
   }
 }
 
 /**
- * Handle signup form submission
- * @param {HTMLFormElement} form - Signup form element
+ * Signup handler
  */
 async function handleSignup(form) {
   const nameInput = form.querySelector('#signupName');
   const emailInput = form.querySelector('#signupEmail');
   const passwordInput = form.querySelector('#signupPassword');
   const signupBtn = form.querySelector('#signupBtn');
-  const signupMsg = document.getElementById('signupMessage');
-
   if (!nameInput || !emailInput || !passwordInput || !signupBtn) return;
 
-  // Sanitize and get input values
   const name = sanitizeString(nameInput.value);
   const email = sanitizeString(emailInput.value);
-  const password = passwordInput.value; // Don't sanitize password, but validate
+  const password = passwordInput.value;
 
-  // Validate form
   const validation = validateForm(
     { name, email, password },
     {
       name: { required: true, minLength: 2 },
       email: { required: true, type: 'email' },
-      password: { required: true, type: 'password', minLength: 6 }
+      password: { required: true, type: 'password', minLength: 6 },
     }
   );
-
   if (!validation.isValid) {
     showMessage('signupMessage', Object.values(validation.errors)[0], 'error');
     return;
   }
 
-  // Update UI
   signupBtn.disabled = true;
-  signupBtn.textContent = "Creating account...";
+  signupBtn.textContent = 'Creating account...';
   showMessage('signupMessage', '', 'success');
 
   try {
-    const result = await signUp(email, password, name);
-
-    if (result.success) {
-      showMessage('signupMessage', result.message, 'success');
+    const { success, message } = await signUp(email, password, name);
+    if (success) {
+      showMessage('signupMessage', message, 'success');
       form.reset();
-      setTimeout(() => {
-        toggleAuthForm('login');
-      }, 2000);
+      setTimeout(() => toggleAuthForm('login'), 1200);
     } else {
-      showMessage('signupMessage', result.message, 'error');
+      showMessage('signupMessage', message, 'error');
     }
-  } catch (error) {
-    showMessage('signupMessage', error.message || 'Failed to create account', 'error');
+  } catch (err) {
+    showMessage('signupMessage', err.message || 'Failed to create account', 'error');
   } finally {
     signupBtn.disabled = false;
-    signupBtn.textContent = "Create Account";
+    signupBtn.textContent = 'Create Account';
   }
 }
 
 /**
- * Handle logout
+ * Logout handler
  */
 async function handleLogout() {
   try {
-    const result = await signOut();
-    if (!result.success) {
-      alert("Error signing out: " + result.message);
-    }
-    // Navigation is handled by auth state listener
-  } catch (error) {
-    alert("Error signing out: " + error.message);
+    const { success, message } = await signOut();
+    if (!success) alert('Error signing out: ' + message);
+    // auth-state listener will re-route as needed
+  } catch (err) {
+    alert('Error signing out: ' + err.message);
   }
 }
 
 /**
- * Initialize screen-specific logic after screen loads
- * @param {string} pageId - ID of the loaded page
+ * Screen-specific initialization hook
  */
 async function initializeScreen(pageId) {
   if (pageId === 'dashboard') {
-    // Wait for dashboard elements to load
     try {
       await waitForElement('#userName', 1000);
       await waitForElement('#userEmail', 1000);
-      
       const session = await getCurrentSession();
-      if (session && session.user) {
-        updateDashboardUserInfo(session.user);
-      }
-    } catch (error) {
-      console.warn('Dashboard elements not found:', error);
+      if (session?.user) updateDashboardUserInfo(session.user);
+    } catch (e) {
+      console.warn('Dashboard elements not found or session unavailable:', e);
     }
   }
 }
 
 /**
- * Set up screen initialization callback for navigation
+ * Wrap showPage to run initializeScreen after each load & wire nav clicks
  */
 function setupScreenInitialization() {
-  // Wrap showPage to include screen initialization
   const originalShowPage = showPage;
+
   const wrappedShowPage = async (pageId) => {
-    await originalShowPage(pageId, initializeScreen);
+    await originalShowPage(pageId, initializeScreen); // navigation.js should call cb(pageId) after load
   };
-  
-  // Expose globally for onclick handlers and navigation
+
+  // Expose globally if needed by inline handlers
   window.showPage = wrappedShowPage;
-  
-  // Set up navigation event delegation
+
+  // Delegate nav clicks (elements with data-page)
   document.addEventListener('click', (e) => {
     const pageLink = e.target.closest('[data-page]');
-    if (pageLink) {
-      e.preventDefault();
-      const pageId = pageLink.getAttribute('data-page');
-      if (pageId) {
-        wrappedShowPage(pageId);
-      }
+    if (!pageLink) return;
+
+    const pageId = pageLink.getAttribute('data-page');
+    if (!pageId) return;
+
+    // Keep URL & history in sync; hashchange listener will load the page
+    e.preventDefault();
+    if (location.hash.replace(/^#/, '') !== pageId) {
+      location.hash = pageId;
+    } else {
+      // If already on that hash (e.g., clicking active link), force load
+      wrappedShowPage(pageId);
     }
-    
-    // Handle logout link
-    if (e.target.id === 'logoutLink' || e.target.closest('#logoutLink')) {
-      e.preventDefault();
-      handleLogout();
-    }
+  });
+
+  // Hash route support
+  window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.slice(1) || 'home';
+    wrappedShowPage(hash);
   });
 }
 
-// Global functions for programmatic access
+// Convenience globals for switching auth panels
 window.showLogin = () => {
-  showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('login'), 100);
-  });
+  showPage('login').then(() => setTimeout(() => toggleAuthForm('login'), 50));
 };
 window.showSignup = () => {
-  showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('signup'), 100);
-  });
+  showPage('login').then(() => setTimeout(() => toggleAuthForm('signup'), 50));
 };
 window.handleLogout = handleLogout;
 
-// Initialize app when DOM is ready
+// --- Boot app ---
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
 }
-

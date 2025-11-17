@@ -1,53 +1,63 @@
 /**
  * Supabase Client Module
- * 
- * Handles initialization and management of the Supabase client.
- * This module provides a singleton instance of the Supabase client.
+ * ----------------------------------------------------
+ * Handles initialization and management of a singleton Supabase client.
+ * Uses ES Module import for @supabase/supabase-js directly from CDN.
+ *
+ * This automatically connects using credentials from config.js.
+ * If config.js is missing or misconfigured, a console error will appear.
  */
 
-import { SUPABASE_CONFIG } from '../config.js';
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+import { SUPABASE_CONFIG } from "./config.js";
 
+// Keep a single shared instance
 let supabaseClient = null;
 
 /**
- * Initialize and return the Supabase client
- * @returns {Object|null} Supabase client instance or null if initialization fails
+ * Get or initialize the Supabase client.
+ * If already initialized, returns the existing client.
  */
 export function getSupabaseClient() {
-  if (supabaseClient) {
-    return supabaseClient;
+  // Return existing instance if already created
+  if (supabaseClient) return supabaseClient;
+
+  // Validate configuration
+  const url = SUPABASE_CONFIG?.URL?.trim();
+  const anonKey = SUPABASE_CONFIG?.ANON_KEY?.trim();
+
+  if (!url || !anonKey) {
+    console.error(
+      "[Supabase] Missing configuration — please check your config.js or environment variables."
+    );
+    return null;
   }
 
+  // Initialize new client
   try {
-    // Check if config has valid values
-    if (SUPABASE_CONFIG.URL === "YOUR_SUPABASE_URL" || 
-        SUPABASE_CONFIG.ANON_KEY === "YOUR_SUPABASE_ANON_KEY") {
-      console.error("Supabase credentials not configured. Check .env file or js/config.js");
-      return null;
-    }
+    supabaseClient = createClient(url, anonKey, {
+      auth: { persistSession: true, autoRefreshToken: true },
+    });
 
-    const supabaseLib = window.supabase || supabase;
-    if (supabaseLib && typeof supabaseLib.createClient === "function") {
-      supabaseClient = supabaseLib.createClient(
-        SUPABASE_CONFIG.URL,
-        SUPABASE_CONFIG.ANON_KEY
-      );
-      return supabaseClient;
-    } else {
-      console.error("Supabase library not found. Make sure the CDN script is loaded.");
-      return null;
-    }
+    console.log("Supabase initialized successfully:", url);
+    return supabaseClient;
   } catch (error) {
-    console.error("Error initializing Supabase:", error);
+    console.error("[Supabase] Initialization failed:", error);
     return null;
   }
 }
 
 /**
- * Check if Supabase client is initialized
- * @returns {boolean}
+ * Check if Supabase client is already initialized.
  */
 export function isSupabaseInitialized() {
-  return supabaseClient !== null;
+  return !!supabaseClient;
 }
 
+/**
+ * Reset Supabase client (useful for hot reload or config changes)
+ */
+export function resetSupabaseClient() {
+  supabaseClient = null;
+  console.log("Supabase client reset.");
+}
