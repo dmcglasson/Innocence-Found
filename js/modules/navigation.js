@@ -1,175 +1,98 @@
 /**
- * Navigation Module
- * 
- * Handles page navigation, screen loading, and URL routing.
- * This module manages the single-page application routing.
+ * navigation.js
+ * Simple hash router that loads /screens/<page>.html into #pageContainer
  */
 
-import { APP_CONFIG } from '../config.js';
+const CONTAINER_ID = 'pageContainer';
+const SR_ANNOUNCER_ID = 'sr-announcer';
 
-// Cache for loaded screens
-const screenCache = {};
+function container() {
+  const el = document.getElementById(CONTAINER_ID);
+  if (!el) throw new Error(`#${CONTAINER_ID} not found in index.html`);
+  return el;
+}
 
-/**
- * Sanitize HTML to prevent XSS attacks
- * Removes script tags and dangerous attributes
- * @param {string} html - HTML string to sanitize
- * @returns {string} Sanitized HTML
- */
-function sanitizeHTML(html) {
-  if (!html || typeof html !== 'string') {
-    return '';
-  }
-  
-  try {
-    // Use DOMParser for better control
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    
-    // Remove script tags
-    const scripts = doc.querySelectorAll('script');
-    scripts.forEach(script => script.remove());
-    
-    // Remove iframe tags (potential XSS vector)
-    const iframes = doc.querySelectorAll('iframe');
-    iframes.forEach(iframe => iframe.remove());
-    
-    // Remove dangerous event handlers from all elements
-    const allElements = doc.querySelectorAll('*');
-    const dangerousAttrs = [
-      'onclick', 'onerror', 'onload', 'onmouseover', 'onfocus', 'onblur',
-      'onchange', 'onsubmit', 'onreset', 'onselect', 'onunload',
-      'onabort', 'onkeydown', 'onkeypress', 'onkeyup', 'onmousedown',
-      'onmousemove', 'onmouseout', 'onmouseup'
-    ];
-    
-    allElements.forEach(el => {
-      // Remove event handler attributes
-      dangerousAttrs.forEach(attr => {
-        if (el.hasAttribute(attr)) {
-          el.removeAttribute(attr);
-        }
-      });
-      
-      // Remove javascript: protocol from href/src
-      ['href', 'src', 'action'].forEach(attr => {
-        const value = el.getAttribute(attr);
-        if (value && value.toLowerCase().startsWith('javascript:')) {
-          el.removeAttribute(attr);
-        }
-      });
-    });
-    
-    return doc.body.innerHTML;
-  } catch (error) {
-    console.error('Error sanitizing HTML:', error);
-    // Fallback: escape HTML if parsing fails
-    const temp = document.createElement('div');
-    temp.textContent = html;
-    return temp.innerHTML;
+function srAnnouncer() {
+  return document.getElementById(SR_ANNOUNCER_ID);
+}
+
+// Resolve a page fragment URL relative to index.html (works from any subpath)
+function pageUrl(pageId) {
+  return new URL(`screens/${pageId}.html`, window.location.href).toString();
+}
+
+// Fetch HTML safely
+async function fetchFragment(url) {
+  const res = await fetch(url, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`Failed to load ${url} (${res.status})`);
+  return await res.text();
+}
+
+// Very small sanitizer for fragments (removes <script> tags)
+function sanitize(html) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  tpl.content.querySelectorAll('script').forEach(s => s.remove());
+  return tpl.innerHTML;
+}
+
+function setActiveNav(pageId) {
+  document.querySelectorAll('[data-page]').forEach(a => {
+    if (a.getAttribute('data-page') === pageId) {
+      a.classList.add('active');
+      a.setAttribute('aria-current', 'page');
+    } else {
+      a.classList.remove('active');
+      a.removeAttribute('aria-current');
+    }
+  });
+}
+
+function announce(pageId) {
+  const sr = srAnnouncer();
+  if (sr) {
+    sr.textContent = `Loaded ${pageId} page`;
+    // Clear after a tick to re-announce next time
+    setTimeout(() => (sr.textContent = ''), 250);
   }
 }
 
 /**
- * Load a screen HTML file
- * @param {string} screenName - Name of the screen to load
- * @returns {Promise<string>} HTML content of the screen
+ * Loads a page fragment and inserts it into #pageContainer.
+ * @param {string} pageId
+ * @param {(pageId:string)=>void} [afterLoad] optional callback after insertion
  */
-export async function loadScreen(screenName) {
-  // Validate screen name to prevent path traversal
-  if (!/^[a-zA-Z0-9_-]+$/.test(screenName)) {
-    throw new Error('Invalid screen name');
-  }
-
-  // Check cache first if enabled
-  if (APP_CONFIG.CACHE_ENABLED && screenCache[screenName]) {
-    return screenCache[screenName];
-  }
-
+export async function showPage(pageId, afterLoad) {
   try {
-    const response = await fetch(`${APP_CONFIG.SCREENS_PATH}${screenName}.html`);
-    if (!response.ok) {
-      throw new Error(`Failed to load screen: ${screenName}`);
+    const html = await fetchFragment(pageUrl(pageId));
+    container().innerHTML = sanitize(html);
+    setActiveNav(pageId);
+    announce(pageId);
+    if (typeof afterLoad === 'function') {
+      await afterLoad(pageId);
     }
-    const html = await response.text();
-    
-    // Sanitize HTML before caching/using
-    const sanitizedHtml = sanitizeHTML(html);
-    
-    // Cache the screen if caching is enabled
-    if (APP_CONFIG.CACHE_ENABLED) {
-      screenCache[screenName] = sanitizedHtml;
-    }
-    
-    return sanitizedHtml;
-  } catch (error) {
-    console.error(`Error loading screen ${screenName}:`, error);
-    return `<div class="content-section"><p>Error loading page. Please try again.</p></div>`;
+  } catch (err) {
+    console.error('[router] showPage error:', err);
+    container().innerHTML = `
+      <div class="error">
+        <h2>Page not found</h2>
+        <p>Could not load <code>${pageId}</code>. (${err.message})</p>
+      </div>`;
   }
 }
 
 /**
- * Show a page by loading its screen
- * @param {string} pageId - ID of the page to show
- * @param {Function} onLoadCallback - Optional callback after screen loads
- * @returns {Promise<void>}
- */
-export async function showPage(pageId, onLoadCallback = null) {
-  const pageContainer = document.getElementById("pageContainer");
-  if (!pageContainer) {
-    console.error("Page container not found");
-    return;
-  }
-
-  // Validate pageId
-  if (!pageId || typeof pageId !== 'string') {
-    console.error('Invalid page ID');
-    return;
-  }
-
-  // Show loading state
-  pageContainer.textContent = 'Loading...'; // Use textContent instead of innerHTML for safety
-  pageContainer.classList.add("active");
-
-  // Update URL hash
-  window.location.hash = pageId;
-
-  try {
-    // Load the screen
-    const screenHtml = await loadScreen(pageId);
-    pageContainer.innerHTML = screenHtml;
-
-    // Call the callback if provided (for initializing screen-specific logic)
-    if (onLoadCallback && typeof onLoadCallback === 'function') {
-      await onLoadCallback(pageId);
-    }
-  } catch (error) {
-    console.error("Error showing page:", error);
-    pageContainer.textContent = 'Error loading page.'; // Use textContent for safety
-  }
-}
-
-/**
- * Initialize page from URL hash
+ * Reads window.location.hash and loads the matching page.
+ * Defaults to "home" if no hash.
  */
 export async function initPageFromHash() {
-  const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash to prevent XSS
-  const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+  const hash = (window.location.hash || '').replace(/^#/, '');
+  const pageId = hash || 'home';
+  await showPage(pageId);
 }
 
-/**
- * Clear the screen cache (useful for development)
- */
-export function clearScreenCache() {
-  Object.keys(screenCache).forEach(key => delete screenCache[key]);
-}
-
-// Listen for hash changes
-window.addEventListener("hashchange", async () => {
-  const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash
-  const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+// Listen for hash changes (in case main.js doesn’t already)
+window.addEventListener('hashchange', () => {
+  const hash = (window.location.hash || '').replace(/^#/, '') || 'home';
+  showPage(hash);
 });

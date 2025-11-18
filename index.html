@@ -1,89 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co;">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-    <!-- Note: X-Frame-Options and frame-ancestors must be set via HTTP headers, not meta tags -->
-    <title>Innocence Found</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- CSP: safe but dev-friendly -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    font-src 'self' data:;
+    connect-src 'self' https://*.supabase.co ws: wss:;
+    media-src 'self' data:;
+  ">
+<!-- Force default route so the router loads /screens/home.html -->
+<script>
+  if (!location.hash) location.hash = 'home';
+</script>
+
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <title>Innocence Found</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <header>
-        <nav>
-            <a href="#" class="logo" data-page="home">Innocence Found</a>
-            <ul class="nav-links">
-                <li><a href="#" data-page="home">Home</a></li>
-                <li><a href="#" data-page="about">About</a></li>
-                <li><a href="#" data-page="contact">Contact</a></li>
-                <li id="authNavItem">
-                    <a href="#" data-page="login" id="loginNavLink">Login</a>
-                </li>
-            </ul>
-            <div class="user-menu" id="userMenu" style="display: none;">
-                <span id="userNameNav"></span>
-                <a href="#" id="logoutLink">Sign Out</a>
-            </div>
-        </nav>
-    </header>
 
-    <main>
-        <div id="pageContainer" class="page active">
-            <!-- Screens will be loaded here dynamically -->
-        </div>
-    </main>
+<header>
+  <nav>
+    <a href="#home" class="logo" data-page="home">Innocence Found</a>
+    <ul class="nav-links">
+      <li><a href="#home"    data-page="home">Home</a></li>
+      <li><a href="#about"   data-page="about">About</a></li>
+      <li><a href="#contact" data-page="contact">Contact</a></li>
+      <li id="authNavItem">
+        <a href="#login" data-page="login" id="loginNavLink">Login</a>
+      </li>
+    </ul>
+    <div class="user-menu" id="userMenu" style="display:none;">
+      <span id="userNameNav"></span>
+      <a href="#" id="logoutLink">Sign Out</a>
+    </div>
+  </nav>
+</header>
 
-    <footer>
-        <p>&copy; 2024 Innocence Found. All rights reserved.</p>
-    </footer>
+<main>
+  <div id="sr-announcer" aria-live="polite" class="sr-only"></div>
+  <div id="pageContainer" class="page active"></div>
+</main>
 
-    <!-- Supabase JS Client Library -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    
-    <!-- Set environment variables (load from .env or set here for local dev) -->
-    <!-- For production, set these via your hosting platform's environment variables -->
-    <script>
-        // Load from .env file if available, or set directly here for local development
-        // This script runs before modules load, so config.js can access window.ENV
-        (async function() {
-            try {
-                const response = await fetch('.env');
-                if (response.ok) {
-                    const text = await response.text();
-                    window.ENV = window.ENV || {};
-                    text.split('\n').forEach(line => {
-                        line = line.trim();
-                        if (line && !line.startsWith('#')) {
-                            const match = line.match(/^([^=]+)=(.*)$/);
-                            if (match) {
-                                let value = match[2].trim();
-                                if ((value.startsWith('"') && value.endsWith('"')) || 
-                                    (value.startsWith("'") && value.endsWith("'"))) {
-                                    value = value.slice(1, -1);
-                                }
-                                window.ENV[match[1].trim()] = value;
-                            }
-                        }
-                    });
-                }
-            } catch (e) {
-                // .env not accessible, will use window.ENV if set manually
-                console.log('Loading credentials from .env or window.ENV...');
-            }
-        })();
-    </script>
-    
-    <!-- Load environment variables and initialize app -->
-    <script type="module">
-        import { initEnv } from './js/utils/env-loader.js';
-        
-        // Load environment variables first
-        await initEnv();
-        
-        // Then load main application
-        await import('./js/main.js');
-    </script>
-</body>
+<footer>
+  <p>&copy; 2024 Innocence Found. All rights reserved.</p>
+</footer>
+
+<!-- Supabase UMD (OK to keep) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- (Optional) Howler.js if your sound module expects a global Howler -->
+<script src="https://cdn.jsdelivr.net/npm/howler@2.2.4/dist/howler.min.js"></script>
+
+<!-- One module that loads env, then the app -->
+<script type="module">
+  // IMPORTANT: keep paths relative to index.html
+  import { initEnv } from './js/utils/env-loader.js';
+
+  await initEnv();              // Loads .env → window.ENV (if accessible)
+  await import('./js/main.js'); // Boots the app
+</script>
 </html>
