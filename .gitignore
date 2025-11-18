@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+
+# Environment variables - NEVER commit these!
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+# But keep .env.example for reference
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs (if you add a build step later)
+dist/
+build/
+*.map
+
+# Security: Never commit these
+# service_role keys
+# private keys
+# passwords
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Config files with actual keys (if any exist)
+config.local.js
+js/config.local.js
+*.local.js
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Test files (if you add tests later)
+coverage/
+.nyc_output/
+test-results/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,0 +1,92 @@
+<div class="auth-box" id="loginBox">
+    <h1>Welcome</h1>
+    <p class="subtitle">Sign in to your account</p>
+    
+    <form id="loginForm">
+        <div class="form-group">
+            <label for="loginEmail">Email</label>
+            <input 
+                type="email" 
+                id="loginEmail" 
+                placeholder="Enter your email" 
+                required
+                autocomplete="email"
+            >
+        </div>
+        
+        <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input 
+                type="password" 
+                id="loginPassword" 
+                placeholder="Enter your password" 
+                required
+                autocomplete="current-password"
+            >
+        </div>
+        
+        <button type="submit" class="btn btn-primary" id="loginBtn">
+            Sign In
+        </button>
+    </form>
+    
+    <div class="message" id="loginMessage"></div>
+    
+    <p class="switch-text">
+        Don't have an account? 
+        <a href="#" onclick="showSignup(); return false;">Create one</a>
+    </p>
+</div>
+
+<div class="auth-box" id="signupBox" style="display: none;">
+    <h1>Create Account</h1>
+    <p class="subtitle">Sign up to get started</p>
+    
+    <form id="signupForm">
+        <div class="form-group">
+            <label for="signupName">Name</label>
+            <input 
+                type="text" 
+                id="signupName" 
+                placeholder="Enter your name" 
+                required
+                autocomplete="name"
+            >
+        </div>
+        
+        <div class="form-group">
+            <label for="signupEmail">Email</label>
+            <input 
+                type="email" 
+                id="signupEmail" 
+                placeholder="Enter your email" 
+                required
+                autocomplete="email"
+            >
+        </div>
+        
+        <div class="form-group">
+            <label for="signupPassword">Password</label>
+            <input 
+                type="password" 
+                id="signupPassword" 
+                placeholder="Create a password (min. 6 characters)" 
+                required
+                minlength="6"
+                autocomplete="new-password"
+            >
+        </div>
+        
+        <button type="submit" class="btn btn-primary" id="signupBtn">
+            Create Account
+        </button>
+    </form>
+    
+    <div class="message" id="signupMessage"></div>
+    
+    <p class="switch-text">
+        Already have an account? 
+        <a href="#" onclick="showLogin(); return false;">Sign in</a>
+    </p>
+</div>
+
