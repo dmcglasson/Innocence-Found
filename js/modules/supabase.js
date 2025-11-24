@@ -1,11 +1,11 @@
 /**
  * Supabase Client Module
- * 
+ *
  * Handles initialization and management of the Supabase client.
- * This module provides a singleton instance of the Supabase client.
+ * Provides a singleton Supabase client instance.
  */
 
-import { SUPABASE_CONFIG } from '../config.js';
+import { SUPABASE_CONFIG } from "../config.js";
 
 let supabaseClient = null;
 
@@ -19,22 +19,26 @@ export function getSupabaseClient() {
   }
 
   try {
-    // Check if config has valid values
-    if (SUPABASE_CONFIG.URL === "YOUR_SUPABASE_URL" || 
-        SUPABASE_CONFIG.ANON_KEY === "YOUR_SUPABASE_ANON_KEY") {
-      console.error("Supabase credentials not configured. Check .env file or js/config.js");
+    // Basic check: do we actually have credentials?
+    if (!SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.ANON_KEY) {
+      console.error(
+        "Supabase credentials not configured. Check .env file or js/config.js"
+      );
       return null;
     }
 
-    const supabaseLib = window.supabase || supabase;
+    const supabaseLib = window.supabase || window.supabase;
     if (supabaseLib && typeof supabaseLib.createClient === "function") {
       supabaseClient = supabaseLib.createClient(
         SUPABASE_CONFIG.URL,
         SUPABASE_CONFIG.ANON_KEY
       );
+      console.log("Supabase client initialized.");
       return supabaseClient;
     } else {
-      console.error("Supabase library not found. Make sure the CDN script is loaded.");
+      console.error(
+        "Supabase library not found. Make sure the CDN script is loaded."
+      );
       return null;
     }
   } catch (error) {
@@ -50,4 +54,3 @@ export function getSupabaseClient() {
 export function isSupabaseInitialized() {
   return supabaseClient !== null;
 }
-
