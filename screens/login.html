@@ -34,7 +34,7 @@
     
     <p class="switch-text">
         Don't have an account? 
-        <a href="#" onclick="showSignup(); return false;">Create one</a>
+        <a href="#" id="signupSwitchLink">Create one</a>
     </p>
 </div>
 
@@ -70,9 +70,9 @@
             <input 
                 type="password" 
                 id="signupPassword" 
-                placeholder="Create a password (min. 6 characters)" 
+                    placeholder="Create a password (min. 8 characters, include a number)" 
                 required
-                minlength="6"
+                minlength="8"
                 autocomplete="new-password"
             >
         </div>
@@ -86,7 +86,7 @@
     
     <p class="switch-text">
         Already have an account? 
-        <a href="#" onclick="showLogin(); return false;">Sign in</a>
+        <a href="#" id="loginSwitchLink">Sign in</a>
     </p>
 </div>
 
