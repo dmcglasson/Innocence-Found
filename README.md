@@ -4,8 +4,11 @@
 ---
 
 ### Project Title & Logo
-**Innocence Found** is a storytelling platform designed for families, children, and educators.  
-The logo/banner (to be added) represents the warm, family-focused nature of the project—emphasizing reading, imagination, and learning.
+**Innocence Found** is a storytelling platform designed for families, children, and educators.
+
+![Logo](images/logo.png)  
+
+The logo represents the warm, family-focused nature of the project—emphasizing reading, imagination, and learning.
 
 ---
 
@@ -71,36 +74,19 @@ The platform solves the challenge of offering:
 
 ## ERD / System Architecture
 
+![ERD Diagram](images/ERD.png)
+
 ---
 
 ## Developer Instructions *(CSC 191 Placeholder)*
 
-Topics to be added:
-- Coding conventions  
-- Branch strategy  
-- Contribution guidelines  
-- Commit message formatting  
-
 ---
 
-## Testing *(CSC 191 Placeholder)*
-
-Planned testing structure:
-- Unit tests  
-- Integration tests  
-- UI/UX flow tests  
-- Supabase API mock tests  
-- Tooling/frameworks to be added in CSC 191  
+## Testing *(CSC 191 Placeholder)* 
 
 ---
 
 ## Deployment *(CSC 191 Placeholder)*
-
-To be expanded in CSC 191:
-- Deployment plan  
-- Hosting details  
-- CI/CD workflow (GitHub → Vercel)  
-- Environment variable management  
 
 ---
 
@@ -138,12 +124,26 @@ To be expanded in CSC 191:
 
 ### Figma Design
 
+#### Homepage
+![Homepage](images/home.jpg)
+
+#### Admin Dashboard
+![Admin Dashboard](images/admin-dash.png)
+
+#### Chapter Reader
+![Chapter Reader](images/chapter-reader.jpg)
+
+## Prototype
+#### Homepage Title and Content
+![Homepage Title](images/home-proto-ss.png)
+
+![Homepage Content](images/home-proto-ss2.png)
 
 ## Team Members
 
 | Name | Role | Email |
 |------|------|--------|
-| **David McGlasson** | Team Leader | mcglasson@csus.edu |
+| **David McGlasson** | Team Leader/Developer | mcglasson@csus.edu |
 | **Iftekhar Ahmad** | Developer | iahmad@csus.edu |
 | **Mandee Jauregui** | Developer | mandeejauregu@csus.edu |
 | **Mohammad Mustafa Shams** | Developer | mshams@csus.edu |
