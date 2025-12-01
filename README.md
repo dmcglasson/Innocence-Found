@@ -25,6 +25,20 @@ The platform solves the challenge of offering:
 
 ---
 
+## Table of Contents
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [ERD / System Architecture](#erd--system-architecture)
+- [Setup Instructions](#setup-instructions)
+- [Developer Instructions (CSC 191 Placeholder)](#developer-instructions-csc-191-placeholder)
+- [Testing (CSC 191 Placeholder)](#testing-csc-191-placeholder)
+- [Deployment (CSC 191 Placeholder)](#deployment-csc-191-placeholder)
+- [Timeline / Milestones](#timeline--milestones)
+- [Screenshots / Prototypes](#screenshots--prototypes)
+- [Team Members](#team-members)
+- [Client Information](#client-information)
+---
+
 ## Features
 
 ### Interactive Reading Viewer
@@ -77,6 +91,25 @@ The platform solves the challenge of offering:
 ![ERD Diagram](images/ERD.png)
 
 ---
+
+## Setup Instructions
+
+1. **Clone the Repository**  
+   ```bash
+   git clone https://github.com/dmcglasson/Innocence-Found.git
+   ```
+   ```bash 
+   cd Innocence-Found
+    ```
+2. **Request Environment Variables**  
+   Contact the team lead to obtain the necessary environment variables for Supabase and other services.
+
+3. **Run the Server**  
+   ```bash
+   python3 -m http.server <port>
+    ```
+4. **Access the Application**  
+   Open your web browser and navigate to `http://localhost:<port>`.
 
 ## Developer Instructions *(CSC 191 Placeholder)*
 
@@ -139,7 +172,7 @@ The platform solves the challenge of offering:
 
 ![Homepage Content](images/home-proto-ss2.png)
 
-## Team Members
+## Team ByteBusters
 
 | Name | Role | Email |
 |------|------|--------|
@@ -158,14 +191,15 @@ The platform solves the challenge of offering:
 
 **Cynthia Davies — Author and Educator**
 
+Cynthia Davies is an author focused on creating engaging and educational stories for children and families. Her work emphasizes moral lessons, self-reflection, and community values.
+
 Innocence Found is a developing digital storytelling platform designed to guide young readers through meaningful and reflective stories.
 
 The platform encourages:
 - **Self-reflection**  
 - **Dialogue**  
-- **Emotional awareness**  
 - **Community engagement**
+- **Interactive Learning**
 
-The long-term goal is to provide a space where readers can learn, reflect, and participate in a supportive storytelling experience.
-
+The long-term goal is to provide a space where readers can learn, reflect, and participate in a supportive storytelling experience as well as a safe learning environment.
 
