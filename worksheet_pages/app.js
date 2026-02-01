@@ -4,6 +4,9 @@ const worksheets = [
     title: "Finding Evidence in the Text",
     subject: "ELA",
     grade: 4,
+    chapter: "Close Reading",
+    ageRange: "9-10",
+    topic: "Text Evidence",
     duration: 30,
     skills: ["citing evidence", "inference"],
     format: "PDF + Google Doc",
@@ -15,6 +18,9 @@ const worksheets = [
     title: "Fractions in Word Problems",
     subject: "Math",
     grade: 5,
+    chapter: "Fractions",
+    ageRange: "10-11",
+    topic: "Fraction Operations",
     duration: 35,
     skills: ["modeling", "number sense"],
     format: "PDF + Jamboard",
@@ -26,6 +32,9 @@ const worksheets = [
     title: "Evidence of Plate Tectonics",
     subject: "Science",
     grade: 6,
+    chapter: "Earth Systems",
+    ageRange: "11-12",
+    topic: "Plate Tectonics",
     duration: 40,
     skills: ["data analysis", "CER writing"],
     format: "PDF + slide deck",
@@ -37,6 +46,9 @@ const worksheets = [
     title: "Evaluating Primary Sources",
     subject: "Social Studies",
     grade: 7,
+    chapter: "Historical Thinking",
+    ageRange: "12-13",
+    topic: "Primary Sources",
     duration: 30,
     skills: ["sourcing", "corroboration"],
     format: "PDF + editable doc",
@@ -48,6 +60,9 @@ const worksheets = [
     title: "Argument Writing Planner",
     subject: "ELA",
     grade: 8,
+    chapter: "Writing Workshop",
+    ageRange: "13-14",
+    topic: "Argument Writing",
     duration: 25,
     skills: ["argument structure", "drafting"],
     format: "PDF + fillable form",
@@ -59,6 +74,9 @@ const worksheets = [
     title: "Multi Step Word Problems",
     subject: "Math",
     grade: 3,
+    chapter: "Problem Solving",
+    ageRange: "8-9",
+    topic: "Word Problems",
     duration: 20,
     skills: ["problem solving", "modeling"],
     format: "PDF + printable cards",
@@ -70,6 +88,9 @@ const worksheets = [
     title: "Energy Transfer Scenarios",
     subject: "Science",
     grade: 5,
+    chapter: "Matter & Energy",
+    ageRange: "10-11",
+    topic: "Energy",
     duration: 28,
     skills: ["cause and effect", "data tables"],
     format: "PDF + lab sheet",
@@ -81,6 +102,9 @@ const worksheets = [
     title: "Context Clues Sprint",
     subject: "ELA",
     grade: 3,
+    chapter: "Vocabulary",
+    ageRange: "8-9",
+    topic: "Context Clues",
     duration: 18,
     skills: ["vocabulary", "context clues"],
     format: "PDF",
@@ -92,12 +116,16 @@ const worksheets = [
 const state = {
   subject: "all",
   grade: "all",
+  chapter: "all",
+  ageRange: "all",
+  topic: "all",
   duration: "all",
   sort: "grade-asc",
   search: "",
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+  populateDynamicFilters();
   wireFilters();
   render(worksheets);
   wireHowTo();
@@ -108,7 +136,10 @@ function wireFilters() {
   const chipRow = document.getElementById("subjectChips");
   const searchInput = document.getElementById("searchInput");
   const gradeSelect = document.getElementById("gradeSelect");
+  const chapterSelect = document.getElementById("chapterSelect");
+  const ageSelect = document.getElementById("ageSelect");
   const durationSelect = document.getElementById("durationSelect");
+  const topicSelect = document.getElementById("topicSelect");
   const sortSelect = document.getElementById("sortSelect");
   const clearBtn = document.getElementById("clearFilters");
 
@@ -131,8 +162,23 @@ function wireFilters() {
     applyFilters();
   });
 
+  chapterSelect.addEventListener("change", (e) => {
+    state.chapter = e.target.value;
+    applyFilters();
+  });
+
+  ageSelect.addEventListener("change", (e) => {
+    state.ageRange = e.target.value;
+    applyFilters();
+  });
+
   durationSelect.addEventListener("change", (e) => {
     state.duration = e.target.value;
+    applyFilters();
+  });
+
+  topicSelect.addEventListener("change", (e) => {
+    state.topic = e.target.value;
     applyFilters();
   });
 
@@ -147,13 +193,19 @@ function wireFilters() {
 function resetFilters() {
   state.subject = "all";
   state.grade = "all";
+  state.chapter = "all";
+  state.ageRange = "all";
+  state.topic = "all";
   state.duration = "all";
   state.sort = "grade-asc";
   state.search = "";
 
   document.getElementById("searchInput").value = "";
   document.getElementById("gradeSelect").value = "all";
+  document.getElementById("chapterSelect").value = "all";
+  document.getElementById("ageSelect").value = "all";
   document.getElementById("durationSelect").value = "all";
+  document.getElementById("topicSelect").value = "all";
   document.getElementById("sortSelect").value = "grade-asc";
   document.querySelectorAll("#subjectChips .chip").forEach((chip) => {
     chip.classList.toggle("active", chip.dataset.subject === "all");
@@ -166,7 +218,10 @@ function applyFilters() {
   const filtered = worksheets
     .filter(matchesSubject)
     .filter(matchesGrade)
+    .filter(matchesChapter)
+    .filter(matchesAgeRange)
     .filter(matchesDuration)
+    .filter(matchesTopic)
     .filter(matchesSearch)
     .sort(applySort);
 
@@ -181,6 +236,14 @@ function matchesGrade(item) {
   return state.grade === "all" || String(item.grade) === state.grade;
 }
 
+function matchesChapter(item) {
+  return state.chapter === "all" || item.chapter === state.chapter;
+}
+
+function matchesAgeRange(item) {
+  return state.ageRange === "all" || item.ageRange === state.ageRange;
+}
+
 function matchesDuration(item) {
   const dur = item.duration;
   switch (state.duration) {
@@ -193,6 +256,10 @@ function matchesDuration(item) {
     default:
       return true;
   }
+}
+
+function matchesTopic(item) {
+  return state.topic === "all" || item.topic === state.topic;
 }
 
 function matchesSearch(item) {
@@ -246,11 +313,16 @@ function render(list) {
       <h3>${item.title}</h3>
       <p>${item.description}</p>
       <ul class="meta-list">
+        <li>Chapter: ${item.chapter}</li>
+        <li>Age range: ${item.ageRange}</li>
         <li>Time: ${item.duration} min</li>
         <li>Skills: ${item.skills.join(", ")}</li>
         <li>Format: ${item.format}</li>
+        <li>Topic: ${item.topic}</li>
       </ul>
       <div class="tags">
+        <span class="pill outline">${item.topic}</span>
+        <span class="pill outline">Chapter: ${item.chapter}</span>
         ${item.skills.map((skill) => `<span class="pill outline">${skill}</span>`).join("")}
       </div>
       <div class="card-actions">
@@ -302,9 +374,12 @@ function openPreview(item) {
   const metaList = document.getElementById("previewMeta");
   metaList.innerHTML = "";
   const metaItems = [
+    `Chapter: ${item.chapter}`,
+    `Age range: ${item.ageRange}`,
     `Time: ${item.duration} min`,
     `Skills: ${item.skills.join(", ")}`,
     `Format: ${item.format}`,
+    `Topic: ${item.topic}`,
   ];
   metaItems.forEach((text) => {
     const li = document.createElement("li");
@@ -346,5 +421,36 @@ function wireHowTo() {
     const isHidden = panel.hidden;
     panel.hidden = !isHidden;
     toggle.textContent = isHidden ? "Hide steps" : "How it works";
+  });
+}
+
+function populateDynamicFilters() {
+  const chapterSelect = document.getElementById("chapterSelect");
+  const ageSelect = document.getElementById("ageSelect");
+  const topicSelect = document.getElementById("topicSelect");
+
+  const chapters = Array.from(new Set(worksheets.map((w) => w.chapter))).sort();
+  const ages = Array.from(new Set(worksheets.map((w) => w.ageRange))).sort();
+  const topics = Array.from(new Set(worksheets.map((w) => w.topic))).sort();
+
+  chapters.forEach((chapter) => {
+    const opt = document.createElement("option");
+    opt.value = chapter;
+    opt.textContent = chapter;
+    chapterSelect.appendChild(opt);
+  });
+
+  ages.forEach((age) => {
+    const opt = document.createElement("option");
+    opt.value = age;
+    opt.textContent = age;
+    ageSelect.appendChild(opt);
+  });
+
+  topics.forEach((topic) => {
+    const opt = document.createElement("option");
+    opt.value = topic;
+    opt.textContent = topic;
+    topicSelect.appendChild(opt);
   });
 }
