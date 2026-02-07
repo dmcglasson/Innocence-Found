@@ -152,10 +152,15 @@ export function initAuthStateListener(callback) {
 /* ===============================
    Secure Password Update Helpers
 ================================ */
-
 function needsReauth(error) {
   const msg = String(error?.message || "").toLowerCase();
-  return msg.includes("recent") || msg.includes("reauth") || msg.includes("login");
+
+  return (
+    msg.includes("recent") ||
+    msg.includes("reauth") ||
+    msg.includes("re-auth") ||
+    (msg.includes("login") && msg.includes("required"))
+  );
 }
 
 function friendlyAuthError(error) {
