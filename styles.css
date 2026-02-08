@@ -240,7 +240,25 @@ input {
     color: #000000;
 }
 
+select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #cccccc;
+    border-radius: 0;
+    font-size: 15px;
+    transition: all 0.2s;
+    font-family: 'Georgia', serif;
+    background: #ffffff;
+    color: #000000;
+}
+
 input:focus {
+    outline: none;
+    border-color: #d4af37;
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15);
+}
+
+select:focus {
     outline: none;
     border-color: #d4af37;
     box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15);
@@ -293,6 +311,11 @@ input::placeholder {
 }
 
 .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn[aria-disabled="true"] {
     opacity: 0.6;
     cursor: not-allowed;
 }

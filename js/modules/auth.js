@@ -87,9 +87,10 @@ export async function signIn(email, password) {
  * @param {string} email - User email
  * @param {string} password - User password
  * @param {string} name - User name
+ * @param {string} role - User role
  * @returns {Promise<Object>} Result object with success status and message
  */
-export async function signUp(email, password, name) {
+export async function signUp(email, password, name, role) {
   const supabase = getSupabaseClient();
   if (!supabase) {
     return { success: false, message: "Supabase client not initialized" };
@@ -105,6 +106,7 @@ export async function signUp(email, password, name) {
       options: {
         data: {
           name: name,
+          role: role,
         },
       },
     });

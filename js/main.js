@@ -12,6 +12,59 @@ import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
 
+const PRIVILEGED_ROLES = new Set(["parent", "teacher"]);
+
+function normalizeRole(role) {
+  if (!role) return "";
+  return String(role).trim().toLowerCase();
+}
+
+function isParentOrTeacher(user) {
+  const role = normalizeRole(user?.user_metadata?.role);
+  return PRIVILEGED_ROLES.has(role);
+}
+
+function setAnswerKeyButtonState(downloadBtn, isAllowed) {
+  if (!downloadBtn) return;
+  downloadBtn.setAttribute("aria-disabled", isAllowed ? "false" : "true");
+  downloadBtn.dataset.access = isAllowed ? "allowed" : "restricted";
+}
+
+async function updateAnswerKeyAccess(user) {
+  const downloadBtn = document.getElementById("answerKeyDownload");
+  const messageId = "answerKeyMessage";
+  if (!downloadBtn) return;
+
+  if (!user) {
+    setAnswerKeyButtonState(downloadBtn, false);
+    showMessage(messageId, "Sign in with a parent or teacher account to access answer keys.", "error");
+    return;
+  }
+
+  if (isParentOrTeacher(user)) {
+    setAnswerKeyButtonState(downloadBtn, true);
+    showMessage(messageId, "Parent/teacher access verified. Download is available.", "success");
+  } else {
+    setAnswerKeyButtonState(downloadBtn, false);
+    showMessage(messageId, "Answer keys are restricted to parent/teacher accounts.", "error");
+  }
+}
+
+async function handleAnswerKeyDownload(event) {
+  const downloadBtn = document.getElementById("answerKeyDownload");
+  if (!downloadBtn) return;
+
+  const session = await getCurrentSession();
+  if (!session?.user || !isParentOrTeacher(session.user)) {
+    event.preventDefault();
+    showMessage("answerKeyMessage", "Access restricted. Parent/teacher verification required.", "error");
+    return;
+  }
+
+  setAnswerKeyButtonState(downloadBtn, true);
+  showMessage("answerKeyMessage", "Preparing your download...", "success");
+}
+
 /**
  * Initialize the application
  */
@@ -163,23 +216,26 @@ async function handleLogin(form) {
  */
 async function handleSignup(form) {
   const nameInput = form.querySelector('#signupName');
+  const roleInput = form.querySelector('#signupRole');
   const emailInput = form.querySelector('#signupEmail');
   const passwordInput = form.querySelector('#signupPassword');
   const signupBtn = form.querySelector('#signupBtn');
   const signupMsg = document.getElementById('signupMessage');
 
-  if (!nameInput || !emailInput || !passwordInput || !signupBtn) return;
+  if (!nameInput || !roleInput || !emailInput || !passwordInput || !signupBtn) return;
 
   // Sanitize and get input values
   const name = sanitizeString(nameInput.value);
+  const role = sanitizeString(roleInput.value);
   const email = sanitizeString(emailInput.value);
   const password = passwordInput.value; // Don't sanitize password, but validate
 
   // Validate form
   const validation = validateForm(
-    { name, email, password },
+    { name, role, email, password },
     {
       name: { required: true, minLength: 2 },
+      role: { required: true },
       email: { required: true, type: 'email' },
       password: { 
         required: true, 
@@ -201,7 +257,7 @@ async function handleSignup(form) {
   showMessage('signupMessage', '', 'success');
 
   try {
-    const result = await signUp(email, password, name);
+    const result = await signUp(email, password, name, role);
 
     if (result.success) {
       showMessage('signupMessage', result.message, 'success');
@@ -249,10 +305,20 @@ async function initializeScreen(pageId) {
     try {
       await waitForElement('#userName', 1000);
       await waitForElement('#userEmail', 1000);
+      await waitForElement('#answerKeyDownload', 1000);
       
       const session = await getCurrentSession();
       if (session && session.user) {
         updateDashboardUserInfo(session.user);
+      }
+      await updateAnswerKeyAccess(session?.user || null);
+
+      const downloadBtn = document.getElementById("answerKeyDownload");
+      if (downloadBtn) {
+        if (!downloadBtn.dataset.bound) {
+          downloadBtn.addEventListener("click", handleAnswerKeyDownload);
+          downloadBtn.dataset.bound = "true";
+        }
       }
     } catch (error) {
       console.warn('Dashboard elements not found:', error);
