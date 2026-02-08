@@ -7,6 +7,22 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <header class="site-header">
+    <nav class="site-nav">
+      <a class="site-logo" href="../index.html#home">Innocence Found</a>
+      <ul class="site-nav-links">
+        <li><a href="../index.html#home">Home</a></li>
+        <li><a href="../index.html#about">About</a></li>
+        <li><a href="../index.html#worksheets">Worksheets</a></li>
+        <li><a href="../index.html#contact">Contact</a></li>
+        <li><a href="../index.html#dashboard">Dashboard</a></li>
+      </ul>
+      <div class="site-user-menu">
+        <a class="site-login" href="../index.html#login">Login</a>
+      </div>
+    </nav>
+  </header>
+
   <header class="topbar">
     <div class="shell">
       <p class="eyebrow">Innocence Found</p>
@@ -81,6 +97,14 @@
           </select>
         </label>
         <label>
+          <span>Access</span>
+          <select id="accessSelect">
+            <option value="all">All access levels</option>
+            <option value="free">Free</option>
+            <option value="locked">Locked</option>
+          </select>
+        </label>
+        <label>
           <span>Sort</span>
           <select id="sortSelect">
             <option value="grade-asc">Grade (low to high)</option>
@@ -88,6 +112,9 @@
             <option value="title">Title A-Z</option>
           </select>
         </label>
+        <div class="filter-actions">
+          <button class="btn ghost" type="button" data-clear-filters>Clear filters</button>
+        </div>
       </div>
     </section>
 
@@ -110,7 +137,7 @@
       <div id="worksheetList" class="cards-grid"></div>
       <div id="emptyState" class="empty-state" hidden>
         <p>No worksheets match these filters.</p>
-        <button class="btn secondary" id="clearFilters" type="button">Clear filters</button>
+        <button class="btn secondary" type="button" data-clear-filters>Clear filters</button>
       </div>
     </section>
 
@@ -130,6 +157,7 @@
       <button class="modal-close" id="closePreview" aria-label="Close preview">x</button>
       <p class="pill" id="previewSubject"></p>
       <p class="pill outline" id="previewGrade"></p>
+      <p class="pill access" id="previewAccess"></p>
       <h3 id="previewTitle"></h3>
       <p class="preview-desc" id="previewDescription"></p>
       <ul class="meta-list" id="previewMeta"></ul>
@@ -139,6 +167,10 @@
       </div>
     </div>
   </div>
+
+  <footer class="site-footer">
+    <p>&copy; 2024 Innocence Found. All rights reserved.</p>
+  </footer>
 
   <script src="app.js"></script>
 </body>

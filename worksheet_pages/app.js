@@ -12,6 +12,7 @@ const worksheets = [
     format: "PDF + Google Doc",
     description: "Short passages with scaffolds that guide students to cite and explain textual evidence.",
     file: "ela-evidence.pdf",
+    access: "free",
   },
   {
     id: "math-fractions",
@@ -26,6 +27,7 @@ const worksheets = [
     format: "PDF + Jamboard",
     description: "Real world scenarios that ask students to model and solve fraction addition and subtraction.",
     file: "math-fractions.pdf",
+    access: "locked",
   },
   {
     id: "science-tectonics",
@@ -40,6 +42,7 @@ const worksheets = [
     format: "PDF + slide deck",
     description: "Data tables, maps, and diagrams for students to analyze patterns in earthquakes and volcanoes.",
     file: "science-tectonics.pdf",
+    access: "locked",
   },
   {
     id: "history-sources",
@@ -54,6 +57,7 @@ const worksheets = [
     format: "PDF + editable doc",
     description: "Source sets with guiding questions that ask students to evaluate credibility and perspective.",
     file: "history-sources.pdf",
+    access: "free",
   },
   {
     id: "ela-argument",
@@ -68,6 +72,7 @@ const worksheets = [
     format: "PDF + fillable form",
     description: "Graphic organizers that guide claim, evidence, and reasoning with mentor sentence stems.",
     file: "ela-argument.pdf",
+    access: "locked",
   },
   {
     id: "math-word-problems",
@@ -82,6 +87,7 @@ const worksheets = [
     format: "PDF + printable cards",
     description: "Visual models and scaffolds for two step problems using the four operations.",
     file: "math-word-problems.pdf",
+    access: "free",
   },
   {
     id: "science-energy",
@@ -96,6 +102,7 @@ const worksheets = [
     format: "PDF + lab sheet",
     description: "Short scenarios that ask students to identify the direction of energy flow and support claims.",
     file: "science-energy.pdf",
+    access: "free",
   },
   {
     id: "ela-context-clues",
@@ -110,6 +117,7 @@ const worksheets = [
     format: "PDF",
     description: "Quick passages where students use nearby words to infer meaning of bolded terms.",
     file: "ela-context-clues.pdf",
+    access: "locked",
   },
 ];
 
@@ -120,6 +128,7 @@ const state = {
   ageRange: "all",
   topic: "all",
   duration: "all",
+  access: "all",
   sort: "grade-asc",
   search: "",
 };
@@ -140,8 +149,8 @@ function wireFilters() {
   const ageSelect = document.getElementById("ageSelect");
   const durationSelect = document.getElementById("durationSelect");
   const topicSelect = document.getElementById("topicSelect");
+  const accessSelect = document.getElementById("accessSelect");
   const sortSelect = document.getElementById("sortSelect");
-  const clearBtn = document.getElementById("clearFilters");
 
   chipRow.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-subject]");
@@ -182,12 +191,19 @@ function wireFilters() {
     applyFilters();
   });
 
+  accessSelect.addEventListener("change", (e) => {
+    state.access = e.target.value;
+    applyFilters();
+  });
+
   sortSelect.addEventListener("change", (e) => {
     state.sort = e.target.value;
     applyFilters();
   });
 
-  clearBtn.addEventListener("click", resetFilters);
+  document.querySelectorAll("[data-clear-filters]").forEach((btn) => {
+    btn.addEventListener("click", resetFilters);
+  });
 }
 
 function resetFilters() {
@@ -197,6 +213,7 @@ function resetFilters() {
   state.ageRange = "all";
   state.topic = "all";
   state.duration = "all";
+  state.access = "all";
   state.sort = "grade-asc";
   state.search = "";
 
@@ -206,6 +223,7 @@ function resetFilters() {
   document.getElementById("ageSelect").value = "all";
   document.getElementById("durationSelect").value = "all";
   document.getElementById("topicSelect").value = "all";
+  document.getElementById("accessSelect").value = "all";
   document.getElementById("sortSelect").value = "grade-asc";
   document.querySelectorAll("#subjectChips .chip").forEach((chip) => {
     chip.classList.toggle("active", chip.dataset.subject === "all");
@@ -222,6 +240,7 @@ function applyFilters() {
     .filter(matchesAgeRange)
     .filter(matchesDuration)
     .filter(matchesTopic)
+    .filter(matchesAccess)
     .filter(matchesSearch)
     .sort(applySort);
 
@@ -260,6 +279,10 @@ function matchesDuration(item) {
 
 function matchesTopic(item) {
   return state.topic === "all" || item.topic === state.topic;
+}
+
+function matchesAccess(item) {
+  return state.access === "all" || item.access === state.access;
 }
 
 function matchesSearch(item) {
@@ -309,6 +332,9 @@ function render(list) {
       <header>
         <span class="pill">${item.subject}</span>
         <span class="pill outline">Grade ${item.grade}</span>
+        <span class="pill access ${item.access}">
+          ${item.access === "free" ? "Free" : "Locked"}
+        </span>
       </header>
       <h3>${item.title}</h3>
       <p>${item.description}</p>
@@ -368,6 +394,9 @@ function openPreview(item) {
   const modal = document.getElementById("previewModal");
   document.getElementById("previewSubject").textContent = item.subject;
   document.getElementById("previewGrade").textContent = `Grade ${item.grade}`;
+  const accessEl = document.getElementById("previewAccess");
+  accessEl.textContent = item.access === "free" ? "Free" : "Locked";
+  accessEl.className = `pill access ${item.access}`;
   document.getElementById("previewTitle").textContent = item.title;
   document.getElementById("previewDescription").textContent = item.description;
 

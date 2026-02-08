@@ -26,6 +26,95 @@ body {
   line-height: 1.6;
 }
 
+.site-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 18px 0;
+  position: sticky;
+  top: 0;
+  z-index: 120;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.site-nav {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.site-logo {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: 0.6px;
+}
+
+.site-logo:hover {
+  color: var(--accent-dark);
+}
+
+.site-nav-links {
+  display: flex;
+  list-style: none;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+}
+
+.site-nav-links a {
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  position: relative;
+  padding-bottom: 4px;
+}
+
+.site-nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 1px;
+  background: var(--accent-dark);
+  transition: width 0.2s ease;
+}
+
+.site-nav-links a:hover {
+  color: var(--accent-dark);
+}
+
+.site-nav-links a:hover::after {
+  width: 100%;
+}
+
+.site-user-menu {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.site-login {
+  color: var(--accent-dark);
+  text-decoration: none;
+  border: 1px solid var(--accent);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff8ec;
+}
+
+.site-login:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 .shell {
   max-width: 1180px;
   margin: 0 auto;
@@ -88,6 +177,24 @@ body {
   background: var(--paper);
   border: 1px solid var(--line);
   color: var(--ink);
+}
+
+.pill.access {
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.pill.access.free {
+  background: #e9f7ef;
+  border: 1px solid #c1e6cf;
+  color: #1f6f46;
+}
+
+.pill.access.locked {
+  background: #fff2ed;
+  border: 1px solid #f5c9b8;
+  color: #a43d1f;
 }
 
 .btn {
@@ -173,6 +280,15 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.filter-actions .btn {
+  width: 100%;
 }
 
 .filter-controls label {
@@ -367,9 +483,26 @@ body {
   color: var(--muted);
 }
 
+.site-footer {
+  background: #f9f9f9;
+  border-top: 1px solid #e5e5e5;
+  padding: 26px 20px;
+  text-align: center;
+  color: #666666;
+  font-size: 14px;
+  font-style: italic;
+}
+
 @media (max-width: 640px) {
   .topbar h1 {
     font-size: 32px;
+  }
+  .site-nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .site-nav-links {
+    flex-wrap: wrap;
   }
   .filter-controls {
     grid-template-columns: 1fr;
