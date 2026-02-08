@@ -29,6 +29,13 @@ export const APP_CONFIG = {
   CACHE_ENABLED: true,
 };
 
+// Worksheets Settings
+export const WORKSHEETS_CONFIG = {
+  TABLE: "worksheets",
+  BUCKET: envVars.SUPABASE_WORKSHEETS_BUCKET || "worksheets",
+  SIGNED_URL_EXPIRES_IN: 60 * 5, // 5 minutes
+};
+
 // Validation for debugging (does not break the app)
 if (!SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.ANON_KEY) {
   console.error("❌ Missing Supabase credentials in config.js or window.ENV");
