@@ -428,3 +428,47 @@ footer p {
         font-size: 32px;
     }
 }
+/* =========================
+   Worksheets Section
+   ========================= */
+
+#worksheetsSection {
+  margin-top: 30px;
+  text-align: left;
+}
+
+#worksheetsSection h2 {
+  font-size: 24px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.worksheet-item {
+  padding: 14px 16px;
+  border: 1px solid #e5e5e5;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.worksheet-item:hover {
+  background-color: #f9f9f9;
+  border-color: #d4af37;
+}
+
+.worksheet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.worksheet-row strong {
+  font-size: 15px;
+  color: #000000;
+}
+
+.worksheet-row small {
+  font-size: 13px;
+  color: #666666;
+  font-style: italic;
+}

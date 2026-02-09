@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
+import { fetchWorksheets } from './modules/supabase.js';
 import { initPageFromHash, showPage } from './modules/navigation.js';
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
@@ -83,6 +84,13 @@ function setupEventListeners() {
     if (target.id === 'logoutBtn' || (target.closest && target.closest('#logoutBtn'))) {
       e.preventDefault();
       await handleLogout();
+      return;
+    }
+        // Worksheet click
+    const worksheetEl = target.closest && target.closest('.worksheet-item');
+    if (worksheetEl) {
+      const worksheetId = worksheetEl.getAttribute('data-id');
+      alert('Worksheet clicked: ' + worksheetId);
       return;
     }
 
@@ -239,20 +247,44 @@ async function handleLogout() {
  * Initialize screen-specific logic after screen loads
  * @param {string} pageId - ID of the loaded page
  */
-/**
- * Initialize screen-specific logic after screen loads
- * @param {string} pageId - ID of the loaded page
- */
 async function initializeScreen(pageId) {
   // Dashboard screen
   if (pageId === 'dashboard') {
     try {
       await waitForElement('#userName', 1000);
       await waitForElement('#userEmail', 1000);
-      
+
       const session = await getCurrentSession();
       if (session && session.user) {
         updateDashboardUserInfo(session.user);
+
+        // load worksheets
+        const listEl = document.getElementById('worksheetsList');
+        if (listEl) {
+          listEl.innerHTML = '<p>Loading worksheets...</p>';
+          try {
+            const worksheets = await fetchWorksheets();
+            if (!worksheets || worksheets.length === 0) {
+              listEl.innerHTML = '<p>No worksheets available.</p>';
+            } else {
+              listEl.innerHTML = worksheets
+                .map(
+                  (w) => `
+                    <div class="worksheet-item" data-id="${w.id}">
+                      <div class="worksheet-row">
+                        <strong>${w.title || 'Untitled'}</strong>
+                        <small>${new Date(w.created_at).toLocaleString()}</small>
+                      </div>
+                    </div>
+                  `
+                )
+                .join('');
+            }
+          } catch (err) {
+            console.error('Failed to load worksheets', err);
+            listEl.innerHTML = '<p>Error loading worksheets.</p>';
+          }
+        }
       }
     } catch (error) {
       console.warn('Dashboard elements not found:', error);
