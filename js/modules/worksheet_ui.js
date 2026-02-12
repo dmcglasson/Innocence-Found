@@ -1,3 +1,7 @@
+// import { getSupabaseClient } from "./supabase.js";
+
+// const supabase = getSupabaseClient()
+
 const worksheets = [
   {
     id: "ela-evidence",
