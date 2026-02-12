@@ -1,0 +1,37 @@
+<div class="content-section profile">
+  <div class="section-header">
+    <h1>Profile</h1>
+    <p class="muted">Manage your account settings.</p>
+  </div>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Account Info</h2>
+      <button class="btn btn-secondary" id="editBtn">Edit</button>
+    </div>
+
+    <!-- View State -->
+    <div id="viewState">
+      <p><strong>Name:</strong> <span id="viewName">John Doe</span></p>
+      <p><strong>Email:</strong> <span id="viewEmail">john@email.com</span></p>
+    </div>
+
+    <!-- Edit State -->
+    <form id="editForm" hidden>
+      <div class="form-group">
+        <label for="nameInput">Name</label>
+        <input type="text" id="nameInput" required />
+      </div>
+
+      <div class="form-group">
+        <label for="emailInput">Email</label>
+        <input type="email" id="emailInput" disabled />
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Save</button>
+        <button class="btn btn-secondary" type="button" id="cancelBtn">Cancel</button>
+      </div>
+    </form>
+  </section>
+</div>
