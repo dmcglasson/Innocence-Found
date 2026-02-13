@@ -50,4 +50,24 @@ export function getSupabaseClient() {
 export function isSupabaseInitialized() {
   return supabaseClient !== null;
 }
+/**
+ * Fetch worksheets for viewing
+ * @returns {Array|null}
+ */
+export async function fetchWorksheets() {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  const { data, error } = await client
+    .from('worksheets')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching worksheets:', error);
+    return null;
+  }
+
+  return data;
+}
 
