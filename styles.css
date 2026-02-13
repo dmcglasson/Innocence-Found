@@ -428,3 +428,123 @@ footer p {
         font-size: 32px;
     }
 }
+
+.profile-page {
+  max-width: 900px;
+  margin: 48px auto;
+  padding: 0 16px;
+}
+
+.profile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.profile-title {
+  margin: 0;
+  font-size: 40px;
+}
+
+.profile-subtitle {
+  margin: 6px 0 0;
+  opacity: 0.8;
+}
+
+.panel {
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 18px 0;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(0,0,0,0.15);
+}
+
+.panel-header {
+  background: #3b2a1e; 
+  color: #fff;
+  padding: 10px 14px;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.3px;
+}
+
+.panel-body {
+  padding: 14px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-label {
+  font-weight: 700;
+}
+
+.field-value {
+  opacity: 0.9;
+}
+
+/* Buttons */
+.btn {
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.btn-amber {
+  background: #d07a2b;
+  color: white;
+}
+
+.btn-amber:hover {
+  filter: brightness(0.95);
+}
+
+.btn-muted {
+  background: rgba(0,0,0,0.12);
+  color: #222;
+}
+
+.profile-form .form-group {
+  margin-bottom: 12px;
+}
+
+.profile-form label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.profile-form input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.2);
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.form-message {
+  margin: 10px 0 0;
+  min-height: 18px;
+}

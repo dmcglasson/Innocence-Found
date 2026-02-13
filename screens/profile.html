@@ -1,37 +1,49 @@
-<div class="content-section profile">
-  <div class="section-header">
-    <h1>Profile</h1>
-    <p class="muted">Manage your account settings.</p>
-  </div>
-
-  <section class="card">
-    <div class="card-header">
-      <h2>Account Info</h2>
-      <button class="btn btn-secondary" id="editBtn">Edit</button>
+<div class="profile-page">
+  <header class="profile-header">
+    <div>
+      <h1 class="profile-title">Profile Settings</h1>
+      <p class="profile-subtitle">Manage your account settings.</p>
     </div>
 
-    <!-- View State -->
-    <div id="viewState">
-      <p><strong>Name:</strong> <span id="viewName">John Doe</span></p>
-      <p><strong>Email:</strong> <span id="viewEmail">john@email.com</span></p>
+    <button class="btn btn-amber" id="profileEditBtn" type="button">
+      Edit Profile
+    </button>
+  </header>
+
+  <section class="panel" aria-labelledby="accountInfoTitle">
+    <div class="panel-header">
+      <h2 id="accountInfoTitle" class="panel-title">Account Information</h2>
     </div>
 
-    <!-- Edit State -->
-    <form id="editForm" hidden>
-      <div class="form-group">
-        <label for="nameInput">Name</label>
-        <input type="text" id="nameInput" required />
+    <div class="panel-body">
+      <div id="profileView">
+        <div class="field-row">
+          <div class="field-label">Name</div>
+          <div class="field-value" id="profileNameText">—</div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-label">Email</div>
+          <div class="field-value" id="profileEmailText">—</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="securityTitle">
+    <div class="panel-header">
+      <h2 id="securityTitle" class="panel-title">Security</h2>
+    </div>
+
+    <div class="panel-body">
+      <div class="field-row">
+        <div class="field-label">Password</div>
+        <div class="field-value">••••••••</div>
       </div>
 
-      <div class="form-group">
-        <label for="emailInput">Email</label>
-        <input type="email" id="emailInput" disabled />
-      </div>
-
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Save</button>
-        <button class="btn btn-secondary" type="button" id="cancelBtn">Cancel</button>
-      </div>
-    </form>
+      <button class="btn btn-amber" type="button">
+        Change Password
+      </button>
+    </div>
   </section>
 </div>
