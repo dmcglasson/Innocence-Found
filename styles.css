@@ -514,37 +514,3 @@ footer p {
 .btn-amber:hover {
   filter: brightness(0.95);
 }
-
-.btn-muted {
-  background: rgba(0,0,0,0.12);
-  color: #222;
-}
-
-.profile-form .form-group {
-  margin-bottom: 12px;
-}
-
-.profile-form label {
-  display: block;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.profile-form input {
-  width: 100%;
-  padding: 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(0,0,0,0.2);
-}
-
-.form-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.form-message {
-  margin: 10px 0 0;
-  min-height: 18px;
-}
