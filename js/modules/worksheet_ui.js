@@ -1,6 +1,5 @@
-// import { getSupabaseClient } from "./supabase.js";
+// this js file is invalid, ask iftcar and suyesh 
 
-// const supabase = getSupabaseClient()
 
 const worksheets = [
   {
