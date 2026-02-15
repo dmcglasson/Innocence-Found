@@ -1,0 +1,54 @@
+<!-- Create class for Profile Page -->
+<div class="profile-page">
+  <header class="profile-header"> <!-- Create header for page, holds Profile Settings + Manage your account settings. -->
+    <div>
+      <h1 class="profile-title">Profile Settings</h1>
+      <p class="profile-subtitle">Manage your account settings.</p>
+    </div>
+
+    <!-- Button for Edit Profile -->
+    <button class="btn btn-amber" type="button"> 
+      Edit Profile
+    </button>
+  </header>
+
+  <!-- Create panel for Account Information -->
+  <section class="panel" aria-labelledby="accountInfoTitle"> 
+    <div class="panel-header">
+      <h2 id="accountInfoTitle" class="panel-title">Account Information</h2> <!-- Title for panel, says Account Information -->
+    </div>
+
+    <div class="panel-body">
+      <div>
+        <div class="field-row">
+          <div class="field-label">Name</div> <!-- Field for Name and name value -->
+          <div class="field-value">—</div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-label">Email</div> <!-- Field for Email and email value -->
+          <div class="field-value">—</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Create panel for Security -->
+  <section class="panel" aria-labelledby="securityTitle"> 
+    <div class="panel-header">
+      <h2 id="securityTitle" class="panel-title">Security</h2> <!-- Title for Security panel -->
+    </div>
+
+    <div class="panel-body">
+      <div class="field-row">
+        <div class="field-label">Password</div> <!-- Field for Password and password value -->
+        <div class="field-value">••••••••</div>
+      </div>
+
+      <!-- Button for Change Password -->
+      <button class="btn btn-amber" type="button"> 
+        Change Password
+      </button>
+    </div>
+  </section>
+</div>

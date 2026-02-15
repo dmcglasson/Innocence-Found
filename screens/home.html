@@ -1,21 +1,344 @@
-<div class="hero">
-    <h1>Innocence Found</h1>
-    <p>Dedicated to seeking justice and truth for the wrongfully convicted</p>
-    <a href="#" class="btn" onclick="showPage('about'); return false;">Learn More</a>
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Innocence Found — Home</title>
 
-<div class="content-section">
-    <h2>Our Mission</h2>
-    <p>
-        Innocence Found is committed to advocating for those who have been wrongfully convicted 
-        and working tirelessly to ensure justice prevails. Through investigation, legal support, 
-        and public awareness, we strive to bring light to cases of wrongful conviction and help 
-        restore freedom to the innocent.
-    </p>
-    <p>
-        Our organization brings together legal experts, investigators, and volunteers who share 
-        a common goal: to right the wrongs of the justice system and support those who have been 
-        unjustly imprisoned.
-    </p>
-</div>
+  <!-- Vintage, bookish serif + clean UI sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Crimson+Text:wght@400;600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
+  <style>
+    :root{
+      /* Autumn / vintage palette */
+      --cedar:#6b3f2d;
+      --caramel:#b46b33;
+      --coffee:#7a5b45;
+      --sage:#9ba68b;
+      --parchment:#f3e7d7;
+      --ink:#2b2b2b;
+      --accent:#a11d1d;
+      --card:#fffaf1;
+      --shadow: 0 10px 30px rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.06);
+      --radius: 18px;
+      --max: 1100px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      color:var(--ink);
+      font-family: "Crimson Text", serif;
+      background:
+        radial-gradient(1200px 600px at -10% -10%, rgba(180,107,51,.10), transparent 60%),
+        radial-gradient(900px 600px at 110% 10%, rgba(155,166,139,.12), transparent 60%),
+        radial-gradient(700px 500px at 30% 120%, rgba(107,63,45,.12), transparent 60%),
+        var(--parchment);
+      /* subtle stipple */
+      background-image:
+        radial-gradient(rgba(0,0,0,.06) 0.7px, transparent 0.7px),
+        radial-gradient(rgba(0,0,0,.04) 0.7px, transparent 0.7px),
+        radial-gradient(1200px 600px at -10% -10%, rgba(180,107,51,.10), transparent 60%),
+        radial-gradient(900px 600px at 110% 10%, rgba(155,166,139,.12), transparent 60%),
+        radial-gradient(700px 500px at 30% 120%, rgba(107,63,45,.12), transparent 60%),
+        linear-gradient(var(--parchment), var(--parchment));
+      background-size: 6px 6px, 12px 12px, auto, auto, auto, auto;
+      background-blend-mode: normal, normal, multiply, multiply, multiply, normal;
+    }
+
+    /* Layout helpers */
+    .wrap{max-width:var(--max); margin-inline:auto; padding-inline: clamp(16px, 3vw, 28px);}
+    .stack{display:grid; gap:clamp(20px, 2.2vw, 28px);}
+    .row{display:flex; gap:14px; align-items:center}
+
+    /* Header / Nav */
+    header{
+      position:sticky; top:0; z-index:50;
+      background:linear-gradient(#fffaf6, #fff3e5);
+      border-bottom:1px solid rgba(0,0,0,.06);
+      box-shadow:0 2px 8px rgba(0,0,0,.04);
+      backdrop-filter:saturate(1.1) blur(2px);
+    }
+    .brand{
+      font-family:"Abril Fatface", serif;
+      letter-spacing:.5px;
+      color:var(--cedar);
+      font-size: clamp(22px, 2.1vw, 28px);
+    }
+    nav a{
+      font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color:var(--ink);
+      text-decoration:none;
+      padding:.55rem .9rem;
+      border-radius:10px;
+      font-weight:600;
+    }
+    nav a:hover{ background: rgba(180,107,51,.10); color:var(--cedar) }
+    nav .cta{
+      background:var(--cedar); color:#fff;
+      box-shadow:var(--shadow);
+    }
+    nav .cta:hover{ background:var(--caramel) }
+
+    .headbar{display:flex; justify-content:space-between; align-items:center; padding:.75rem 0;}
+
+    /* Hero */
+    .hero{
+      position:relative;
+      padding: clamp(48px, 7vw, 92px) 0;
+      overflow:hidden;
+    }
+    .hero .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow: var(--shadow);
+      padding: clamp(22px, 3vw, 34px);
+      border:1px solid rgba(0,0,0,.06);
+      max-width: 820px;
+    }
+    .eyebrow{
+      text-transform:uppercase;
+      letter-spacing: .22em;
+      font-family:"Inter", sans-serif;
+      color:var(--caramel);
+      font-weight:700;
+      font-size: .78rem;
+    }
+    h1{
+      margin:.3rem 0 .6rem;
+      font-family:"Abril Fatface", serif;
+      font-weight:400;
+      font-size: clamp(34px, 5vw, 56px);
+      color:var(--cedar);
+      line-height:1.05;
+    }
+    .lead{ font-size: clamp(18px, 2.1vw, 20px); color:#3b2f26 }
+    .ctaRow{ display:flex; gap:12px; margin-top:16px; flex-wrap:wrap }
+    .btn{
+      font-family:"Inter", sans-serif;
+      border:none; cursor:pointer;
+      padding:.8rem 1.05rem; border-radius:12px;
+      font-weight:700; letter-spacing:.2px;
+      text-decoration:none; display:inline-flex; align-items:center; gap:.5rem;
+    }
+    .btn.primary{ background:var(--cedar); color:#fff }
+    .btn.primary:hover{ background:var(--caramel) }
+    .btn.ghost{ background:transparent; color:var(--cedar); border:2px solid var(--cedar) }
+    .btn.ghost:hover{ background:rgba(180,107,51,.08) }
+
+    /* Decorative feather SVG (top-right) */
+    .feather{
+      position:absolute; inset:auto -90px -60px auto; width:min(36vw, 420px); opacity:.18; pointer-events:none;
+      transform: rotate(-6deg);
+    }
+
+    /* Feature grid */
+    .features{ padding: clamp(28px, 4.5vw, 54px) 0 70px }
+    .grid{
+      display:grid; gap:clamp(18px, 2.2vw, 26px);
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .feature{
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:22px;
+      border:1px solid rgba(0,0,0,.06);
+      box-shadow: var(--shadow);
+      display:grid; gap:10px;
+      min-height: 210px;
+    }
+    .feature h3{
+      margin:0; font-family:"Crimson Text", serif; font-size: 1.35rem; color:var(--cedar)
+    }
+    .tag{
+      font-family:"Inter", sans-serif;
+      font-size:.72rem; letter-spacing:.08em; text-transform:uppercase;
+      color:#6d5a4e; background:#f1e4d1; padding:.25rem .5rem; border-radius:999px; width:max-content
+    }
+    .feature p{ margin:.2rem 0 .6rem; color:#473b31 }
+    .feature .btn{ margin-top:auto; width:max-content }
+
+    /* Section headings */
+    .section-title{
+      display:flex; align-items:center; gap:12px; margin: 4px 0 10px;
+      color:#5a4738; font-family:"Inter", sans-serif; font-weight:800; letter-spacing:.08em; text-transform:uppercase
+    }
+    .rule{ height:1px; background: rgba(0,0,0,.12); flex:1 }
+
+    /* Footer */
+    footer{
+      background: linear-gradient(#2c201a, #231a15);
+      color:#eee8df;
+      margin-top: 30px;
+      border-top: 4px solid var(--caramel);
+    }
+    footer .cols{ display:grid; gap:24px; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); padding: 28px 0 }
+    footer a{ color:#f2d2b5; text-decoration:none }
+    footer a:hover{ text-decoration:underline }
+    .copyright{ font-family:"Inter", sans-serif; font-size:.84rem; color:#d7cbbd; padding: 0 0 22px }
+
+    /* Accessibility focus */
+    a:focus-visible, button:focus-visible{ outline:3px solid var(--sage); outline-offset:3px; border-radius:10px }
+
+    /* Small screens */
+    @media (max-width: 720px){
+      .feather{ display:none }
+      nav{ display:none }       /* minimal for mobile demo */
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header / Nav -->
+  <header>
+    <div class="wrap headbar">
+      <div class="row">
+        <!-- Tiny acorn/leaf mark (inline SVG) -->
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M7 12c0-3.314 2.686-6 6-6 1.657 0 3 1.343 3 3v3H7z" fill="#b46b33"/>
+          <path d="M9 13c0 3.314 2.686 6 6 6 1.657 0 3-1.343 3-3v-3H9z" fill="#6b3f2d" opacity=".92"/>
+          <path d="M4 13c2.5-2.5 7-2 10-2" stroke="#7a5b45" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div class="brand">Innocence Found</div>
+      </div>
+
+      <nav class="row" aria-label="Primary">
+        <a href="#chapters">Book Chapters</a>
+        <a href="#worksheets">Worksheets</a>
+        <a href="#readers">Reader’s Corner</a>
+        <a href="#about">About / Contact</a>
+        <a class="cta" href="#subscribe">Subscribe / Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="wrap stack">
+      <div class="card">
+        <div class="eyebrow">Welcome Home</div>
+        <h1>Wholesome Stories for Curious Minds</h1>
+        <p class="lead">
+         Explore interactive
+          <strong>chapters</strong>, printable <strong>worksheets</strong>, and a friendly
+          <strong>Reader’s Corner</strong>—all crafted to encourage reading, reflection,
+          and creativity.
+        </p>
+        <div class="ctaRow">
+          <a class="btn primary" href="#chapters">Start Reading</a>
+          <a class="btn ghost" href="#worksheets">Try Worksheets</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Decorative feather illustration -->
+    <svg class="feather" viewBox="0 0 180 520" fill="none" aria-hidden="true">
+      <path d="M118 6C72 44 30 102 18 170c-9 50 3 110 55 155 15 12-5 35-30 53 33-7 57-26 73-45-12 30-31 54-54 74 34-10 64-33 88-63-7 29-22 53-41 74 32-16 59-42 79-80 24-47 29-102 6-163C172 95 151 42 118 6Z" fill="#7a5b45"/>
+      <path d="M122 30c-36 34-66 83-74 128-7 39 2 82 41 115" stroke="#2b2b2b" stroke-width="3" opacity=".55"/>
+    </svg>
+  </section>
+
+  <!-- Features -->
+  <section id="chapters" class="features wrap">
+    <div class="section-title"><span>Site Features</span><div class="rule"></div></div>
+
+    <div class="grid">
+
+      <article class="feature" aria-labelledby="f1">
+        <span class="tag">Read</span>
+        <h3 id="f1">Book Chapters</h3>
+        <p>
+          An interactive reading platform with gentle animations, chapter saves,
+          and vocabulary helpers. Perfect for solo reading or parent time.
+        </p>
+        <a class="btn ghost" href="#chapters">Open Chapters</a>
+      </article>
+
+      <article id="worksheets" class="feature" aria-labelledby="f2">
+        <span class="tag">Learn</span>
+        <h3 id="f2">Educational Worksheets</h3>
+        <p>
+          Printable comprehension, grammar, and creative writing sheets aligned
+          to each chapter. Classroom-friendly and parent-approved.
+        </p>
+        <a class="btn ghost" href="#worksheets">Browse Worksheets</a>
+      </article>
+
+      <article id="readers" class="feature" aria-labelledby="f3">
+        <span class="tag">Community</span>
+        <h3 id="f3">Reader’s Corner</h3>
+        <p>
+          Join contests, leave kind comments, and share drawings. A moderated,
+          family-safe space to celebrate reading.
+        </p>
+        <a class="btn ghost" href="#readers">Visit Reader’s Corner</a>
+      </article>
+
+      <article id="about" class="feature" aria-labelledby="f4">
+        <span class="tag">About</span>
+        <h3 id="f4">About & Contact</h3>
+        <p>
+          Learn about our mission to promote wholesome storytelling and how to
+          reach the team for partnerships, support, or permissions.
+        </p>
+        <a class="btn ghost" href="#about">About / Contact</a>
+      </article>
+
+      <article id="subscribe" class="feature" aria-labelledby="f5">
+        <span class="tag">Membership</span>
+        <h3 id="f5">Subscribe / Login</h3>
+        <p>
+          Create a free account to save progress and unlock extras. Upgrade to
+          support new chapters, printable bundles, and seasonal events.
+        </p>
+        <a class="btn primary" href="#subscribe">Create Account</a>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="wrap cols">
+      <div>
+        <div class="brand" style="color:#f0d7c3">Innocence Found</div>
+        <p style="max-width:46ch; line-height:1.55;">
+          Promoting wholesome, educational storytelling. Thank you for reading with us.
+        </p>
+      </div>
+
+      <div>
+        <h4 style="margin:.3rem 0 8px;font-family:Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase">Contact</h4>
+        <p>Email: <a href="mailto:hello@innocencefound.org">hello@innocencefound.org</a><br>
+           Media: <a href="#">press@innocencefound.org</a><br>
+           Sacramento, CA</p>
+      </div>
+
+      <div>
+        <h4 style="margin:.3rem 0 8px;font-family:Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase">Stay in touch</h4>
+        <p><a href="#">Newsletter</a> • <a href="#">Instagram</a> • <a href="#">Pinterest</a></p>
+      </div>
+    </div>
+    <div class="wrap copyright">© <span id="year"></span> Innocence Found. All rights reserved.</div>
+  </footer>
+
+  <script>
+    // Current year in footer
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Optional: smooth scroll for in-page “nav to section”
+    document.querySelectorAll('a[href^="#"]').forEach(a=>{
+      a.addEventListener('click', e=>{
+        const id = a.getAttribute('href').slice(1);
+        const el = document.getElementById(id);
+        if(el){
+          e.preventDefault();
+          el.scrollIntoView({behavior:'smooth', block:'start'});
+        }
+      })
+    });
+  </script>
+</body>
+</html>
