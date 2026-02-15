@@ -1,25 +1,26 @@
-/* General Layout */
-body {
+* {
   margin: 0;
   padding: 0;
-  font-family: "Georgia", serif;
-  background-color: #fffaf2;
-  width: 1440px;
-  height: 1024px;
   box-sizing: border-box;
+}
+
+body {
+  font-family: "Playfair Display", serif;
+  background: url("forest-bg.jpg") no-repeat center center/cover;
+  min-height: 100vh;
   color: #3b2a16;
 }
 
-/* Header */
+/* NAVBAR */
 .navbar {
-  width: 1440px;
+  width: 100%;
   height: 82px;
-  border-bottom: 1px solid #d4c2a3;
-  background-color: #f7ead2;
+  background: #fdf5eb;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 60px;
+  padding: 0 40px;
+  flex-wrap: wrap;
 }
 
 .logo-section {
@@ -29,143 +30,149 @@ body {
 }
 
 .main-logo {
-  width: 80px;
-  height: 80px;
+  height: 60px;
+  width: auto;
+  object-fit: contain;
 }
 
 .brand {
-  font-size: 1.3rem;
+  font-size: 20px;
   font-weight: bold;
-  color: #3b2a16;
 }
 
-.nav-links a {
+nav a {
+  font-size: 18px;
+  color: #4c3a28;
   text-decoration: none;
-  color: #3b2a16;
-  margin-left: 40px;
-  font-size: 1.2rem;
+  margin-left: 30px;
 }
 
-.nav-links a:hover {
-  text-decoration: underline;
-}
-
-/* Hero Section */
-.hero {
-  text-align: center;
-  padding: 50px 100px;
-}
-
-.hero h1 {
-  font-size: 2.8rem;
-  margin-bottom: 10px;
-}
-
-.hero span {
-  color: #5a3b1e;
-}
-
-.hero p {
-  font-size: 1.3rem;
-  max-width: 800px;
-  margin: 0 auto;
-  line-height: 1.5;
-}
-
-/* Plans Section */
-.plans {
+/* LOGIN CONTAINER */
+.login-container {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  gap: 80px;
-  padding-top: 40px;
+  align-items: center;
+  padding: 60px 20px;
 }
 
-/* Each Plan Box */
-.plan {
-  width: 489px;
-  height: 609px;
-  background-color: #654321;
-  color: #fff;
-  border-radius: 33px;
+/* LOGIN CARD */
+.login-card {
+  width: 100%;
+  max-width: 500px;
+  background-color: #fbf3e6;
+  border-radius: 18px;
+  box-shadow: 0px 3px 10px rgba(0,0,0,0.15);
+  padding: 40px;
   text-align: center;
-  padding: 50px 40px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-  transition: transform 0.3s ease;
 }
 
-.plan:hover {
-  transform: translateY(-5px);
+.login-card h2 {
+  font-size: 24px;
+  margin-bottom: 5px;
 }
 
-.plan h2 {
-  font-size: 2.2rem;
-  margin-bottom: 10px;
+.subtext {
+  font-family: "Dancing Script";
+  font-size: 24px;
+  color: #7a5631;
+  margin-bottom: 30px;
 }
 
-.price {
-  font-size: 2rem;
-  font-style: italic;
-  margin-bottom: 15px;
+input[type="email"],
+input[type="password"] {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #d6c6b2;
+  border-radius: 8px;
+  font-size: 16px;
+  margin-bottom: 18px;
 }
 
-.desc {
-  font-size: 1.1rem;
+/* Forgot Link */
+.forgot {
+  text-align: right;
   margin-bottom: 20px;
 }
 
-.plan ul {
-  list-style: disc;
-  text-align: left;
-  margin: 0 auto 20px;
-  width: fit-content;
-  font-size: 1.2rem;
-  line-height: 1.6;
+.forgot a {
+  font-size: 14px;
+  color: #a46a3e;
+  text-decoration: none;
 }
 
-.plan li {
-  margin-bottom: 10px;
-}
-
-/* Buttons */
-.btn {
-  background-color: #f7ead2;
-  color: #3b2a16;
+/* Button */
+.primary-btn {
+  width: 100%;
+  padding: 14px;
+  background: #d58136;
+  color: white;
+  font-size: 18px;
   border: none;
-  padding: 12px 28px;
   border-radius: 25px;
-  font-size: 1.1rem;
-  font-weight: bold;
   cursor: pointer;
-  transition: all 0.3s ease;
 }
 
-.btn:hover {
-  background-color: #fff5e1;
-  transform: scale(1.05);
+/* Signup */
+.signup {
+  margin-top: 20px;
+  font-size: 15px;
 }
 
-/* Premium Section with Tree */
-.premium-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.signup a {
+  color: #a46a3e;
+  text-decoration: none;
 }
 
-.tree-logo {
-  width: 260px;
-  height: 260px;
-  margin-bottom: -60px;
-  z-index: 1;
-  position: relative;
+/* Accessibility Focus States */
+a:focus,
+button:focus,
+input:focus {
+  outline: 3px solid #005fcc;
+  outline-offset: 2px;
 }
 
-.premium {
-  background-color: #5a3b1e;
-  position: relative;
-  z-index: 0;
+/* RESPONSIVE */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .navbar {
+    padding: 0 20px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+
+  .navbar {
+    flex-direction: column;
+    height: auto;
+    padding: 15px;
+    gap: 10px;
+  }
+
+  nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  nav a {
+    margin-left: 0;
+  }
+
+  .login-container {
+    padding: 40px 15px;
+  }
+
+  .login-card {
+    padding: 25px;
+  }
+
+  .login-card h2 {
+    font-size: 20px;
+  }
+
+  .subtext {
+    font-size: 20px;
+  }
 }

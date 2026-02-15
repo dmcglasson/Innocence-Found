@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Innocence Found - Worksheets</title>
+
+  <link rel="stylesheet" href="worksheets.css" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header class="navbar">
+    <div class="logo">Innocence Found</div>
+
+    <nav aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="login.html">Login/Signup</a>
+    </nav>
+  </header>
+
+  <main id="main-content">
+
+    <!-- HERO SECTION -->
+    <section class="hero">
+      <div class="hero-content">
+        <h1>Explore & Learn</h1>
+        <p>Printable worksheets inspired by each chapter’s adventure</p>
+
+        <a href="#worksheets" class="primary-btn">
+          Browse Worksheets
+        </a>
+      </div>
+
+      <div class="hero-image">
+        <img src="book.png"
+             alt="Illustration of an open book">
+      </div>
+    </section>
+
+    <!-- FILTER BAR -->
+    <section class="filters" aria-label="Worksheet filters">
+      <select aria-label="Filter by age group">
+        <option>Age Group</option>
+      </select>
+
+      <select aria-label="Filter by subject">
+        <option>Subject</option>
+      </select>
+
+      <div class="search-box">
+        <input type="text"
+               placeholder="Search"
+               aria-label="Search worksheets">
+      </div>
+    </section>
+
+    <!-- WORKSHEET CARDS -->
+    <section class="cards" id="worksheets">
+
+      <!-- Friendly Empty Message -->
+      <div id="no-worksheets" class="no-worksheets-message">
+        No worksheets are available at the moment. Please check back later.
+      </div>
+
+      <article class="card">
+        <img src="mouse.png"
+             alt="Illustration of a mouse character">
+
+        <h3>Buttons the Brave Mouse</h3>
+
+        <div class="tags">
+          <span>Fantasy</span>
+          <span>Age 6–10</span>
+        </div>
+
+        <p>Description of the book</p>
+
+        <a href="buttons-worksheet.pdf"
+           class="outline-btn"
+           download>
+           Download worksheet
+        </a>
+
+        <a href="buttons-answer.pdf"
+           class="outline-btn"
+           download>
+           Download Answer Key (Parents only)
+        </a>
+      </article>
+
+      <article class="card">
+        <img src="family.png"
+             alt="Illustration of a family">
+
+        <h3>The Clockmakers Apprentice</h3>
+
+        <div class="tags">
+          <span>Family</span>
+          <span>Age 6–10</span>
+        </div>
+
+        <p>Description of the book</p>
+
+        <a href="clockmaker-worksheet.pdf"
+           class="outline-btn"
+           download>
+           Download worksheet
+        </a>
+
+        <a href="clockmaker-answer.pdf"
+           class="outline-btn"
+           download>
+           Download Answer Key (Parents only)
+        </a>
+      </article>
+
+    </section>
+
+  </main>
+
+  <!-- SCRIPT FOR ERROR HANDLING -->
+  <script>
+  document.addEventListener("DOMContentLoaded", function () {
+
+    const cards = document.querySelectorAll(".card");
+    const noMessage = document.getElementById("no-worksheets");
+
+    // Show friendly message if no worksheets
+    if (cards.length === 0) {
+      noMessage.style.display = "block";
+    } else {
+      noMessage.style.display = "none";
+    }
+
+    // Handle broken images gracefully
+    document.querySelectorAll("img").forEach(img => {
+      img.onerror = function () {
+        this.src = "placeholder.png";
+        this.alt = "Image unavailable";
+      };
+    });
+
+    // Handle missing download files safely
+    document.querySelectorAll(".outline-btn").forEach(link => {
+      link.addEventListener("click", function (event) {
+
+        fetch(this.href, { method: "HEAD" })
+          .then(response => {
+            if (!response.ok) {
+              event.preventDefault();
+              showError("Sorry, this file is currently unavailable.");
+            }
+          })
+          .catch(() => {
+            event.preventDefault();
+            showError("Unable to load file. Please try again later.");
+          });
+
+      });
+    });
+
+    function showError(message) {
+      const banner = document.createElement("div");
+      banner.textContent = message;
+      banner.style.background = "#f8d7da";
+      banner.style.color = "#721c24";
+      banner.style.padding = "15px";
+      banner.style.textAlign = "center";
+      banner.style.marginBottom = "20px";
+      banner.style.borderRadius = "8px";
+
+      document.querySelector("main").prepend(banner);
+
+      setTimeout(() => {
+        banner.remove();
+      }, 4000);
+    }
+
+  });
+  </script>
+
+</body>
+</html>
