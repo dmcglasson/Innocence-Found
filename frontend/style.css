@@ -226,3 +226,10 @@ button[type="submit"]:active {
     gap: 20px;
   }
 }
+#successMessage {
+  margin-top: 12px;
+  color: #2e7d32;
+  font-size: 13px;
+  font-weight: 500;
+}
+
