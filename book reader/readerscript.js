@@ -1,22 +1,38 @@
 // === PDF.js Book Viewer ===
-const url = "books/book1.pdf"; // Path to your PDF
 const pdfjsLib = window["pdfjs-dist/build/pdf"];
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
 
 let pdfDoc = null;
 let currentPage = 1;
+let currentUrl = "books/book1.pdf";
 const canvasLeft = document.getElementById("leftPage");
 const canvasRight = document.getElementById("rightPage");
 const ctxLeft = canvasLeft.getContext("2d");
 const ctxRight = canvasRight.getContext("2d");
 const pageInfo = document.getElementById("pageInfo");
+const bookSelect = document.getElementById("bookSelect");
 
-// Load the PDF
-pdfjsLib.getDocument(url).promise.then((pdf) => {
-  pdfDoc = pdf;
-  renderPages();
-});
+// Load a PDF by URL
+function loadDocument(url) {
+  // fade out current view while loading
+  canvasLeft.style.opacity = "0";
+  canvasRight.style.opacity = "0";
+  pageInfo.textContent = "Loading...";
+
+  pdfjsLib
+    .getDocument(url)
+    .promise.then((pdf) => {
+      pdfDoc = pdf;
+      currentPage = 1;
+      currentUrl = url;
+      renderPages();
+    })
+    .catch((err) => {
+      console.error("Failed to load document", err);
+      pageInfo.textContent = "Failed to load book";
+    });
+}
 
 function renderPage(pageNum, canvas, ctx) {
   return pdfDoc.getPage(pageNum).then((page) => {
@@ -33,6 +49,8 @@ function renderPage(pageNum, canvas, ctx) {
 }
 
 function renderPages() {
+  if (!pdfDoc) return;
+
   // quick cross-fade: hide, render, then fade in
   canvasLeft.style.opacity = "0";
   canvasRight.style.opacity = "0";
@@ -85,3 +103,11 @@ document.getElementById("leftPage").addEventListener("click", () => {
     renderPages();
   }
 });
+
+// Book selector change
+bookSelect.addEventListener("change", (e) => {
+  loadDocument(e.target.value);
+});
+
+// Initial load
+loadDocument(currentUrl);

@@ -135,6 +135,30 @@ canvas {
   gap: 1.5rem;               /* space between book and controls */
 }
 
+.book-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 14px var(--shadow);
+}
+
+.book-selector label {
+  font-weight: bold;
+}
+
+.book-selector select {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fffaf3;
+  color: var(--text);
+  font-family: 'Georgia', serif;
+}
+
 .controls {
   display: flex;
   justify-content: center;
