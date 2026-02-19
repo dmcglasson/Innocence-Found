@@ -27,6 +27,8 @@ export const APP_CONFIG = {
   DEFAULT_PAGE: "home",
   SCREENS_PATH: "screens/",
   CACHE_ENABLED: true,
+  FREE_CHAPTER_COUNT: 3,
+  TOTAL_CHAPTERS: 10,
 };
 
 // Validation for debugging (does not break the app)
