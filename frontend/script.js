@@ -1,4 +1,9 @@
-const supabase = window.supabase.createClient(window.ENV.SUPABASE_URL, window.ENV.SUPABASE_ANON_KEY);
+const env = window.ENV || {};
+const supabaseClient = window.supabase.createClient(
+  env.SUPABASE_URL || "https://khiwkbnqjjycmwonbhqu.supabase.co",
+  env.SUPABASE_ANON_KEY || "YOUR_ANON_KEY_HERE"
+);
+
 const form = document.getElementById("registrationForm");
 const errorMessage = document.getElementById("errorMessage");
 const successMessage = document.getElementById("successMessage");
@@ -75,7 +80,7 @@ form.addEventListener("submit", async function (e) {
 // ===========================
 // SUCCESS
 // ===========================
-const { data, error } = await supabase.auth.signUp({
+const { data, error } = await supabaseClient.auth.signUp({
   email,
   password,
   options: {
