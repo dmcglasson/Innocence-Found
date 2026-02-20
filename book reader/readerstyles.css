@@ -16,7 +16,7 @@
 }
 
 body {
-  background: url("images/autumn_pattern.png") center fixed repeat;
+  background: url("images/autumn_pattern_colorless.png") center fixed repeat;
   background-size: 300px 300px; /* show more of the repeating pattern */
   background-color: var(--bg-main); /* fallback if image fails */
   color: var(--text);

@@ -106,7 +106,12 @@ document.getElementById("leftPage").addEventListener("click", () => {
 
 // Book selector change
 bookSelect.addEventListener("change", (e) => {
-  loadDocument(e.target.value);
+  const val = e.target.value;
+  if (val === "locked") {
+    window.location.href = "../index.html";
+    return;
+  }
+  loadDocument(val);
 });
 
 // Initial load
