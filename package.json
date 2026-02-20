@@ -1,0 +1,17 @@
+{
+  "name": "innocence-found",
+  "version": "1.0.0",
+  "description": "*A storytelling and educational platform created for author Cynthia Davies.*",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/.bin/vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "happy-dom": "^20.6.3",
+    "jsdom": "^27.0.1",
+    "vitest": "^4.0.18"
+  }
+}

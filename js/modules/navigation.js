@@ -16,7 +16,7 @@ const screenCache = {};
  * @param {string} html - HTML string to sanitize
  * @returns {string} Sanitized HTML
  */
-function sanitizeHTML(html) {
+export function sanitizeHTML(html) {
   if (!html || typeof html !== 'string') {
     return '';
   }
