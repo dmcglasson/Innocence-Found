@@ -1,92 +1,86 @@
-<div class="auth-box" id="loginBox">
-    <h1>Welcome</h1>
-    <p class="subtitle">Sign in to your account</p>
-    
+<section class="auth-scene">
+  <img src="frontend/images/loginbg.png" class="auth-scene__bgImg" alt="">
+
+  <div class="auth-scene__overlay"></div>
+
+  <div class="auth-box auth-box--storybook" id="loginBox">
+    <h1 class="auth-title">Welcome Back to Innocence Found</h1>
+    <p class="auth-subtitle">Open your next chapter.</p>
+
     <form id="loginForm">
-        <div class="form-group">
-            <label for="loginEmail">Email</label>
-            <input 
-                type="email" 
-                id="loginEmail" 
-                placeholder="Enter your email" 
-                required
-                autocomplete="email"
-            >
-        </div>
-        
-        <div class="form-group">
-            <label for="loginPassword">Password</label>
-            <input 
-                type="password" 
-                id="loginPassword" 
-                placeholder="Enter your password" 
-                required
-                autocomplete="current-password"
-            >
-        </div>
-        
-        <button type="submit" class="btn btn-primary" id="loginBtn">
-            Sign In
-        </button>
+      <div class="form-group">
+        <label for="loginEmail">Email address</label>
+        <input
+          type="email"
+          id="loginEmail"
+          placeholder="Email address"
+          required
+          autocomplete="email"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <input
+          type="password"
+          id="loginPassword"
+          placeholder="Password"
+          required
+          autocomplete="current-password"
+        >
+        <a class="auth-link auth-link--forgot" href="#" id="forgotPasswordLink">Forgot Password?</a>
+      </div>
+
+      <button type="submit" class="btn btn-amber btn--block auth-btn" id="loginBtn">
+        Open the Book
+      </button>
     </form>
-    
+
     <div class="message" id="loginMessage"></div>
-    
-    <p class="switch-text">
-        Don't have an account? 
-        <a href="#" id="signupSwitchLink">Create one</a>
-    </p>
-</div>
 
-<div class="auth-box" id="signupBox" style="display: none;">
-    <h1>Create Account</h1>
-    <p class="subtitle">Sign up to get started</p>
-    
+    <p class="switch-text">
+      New here?
+      <a href="#" id="signupSwitchLink">Create an account</a>
+    </p>
+  </div>
+
+  <div class="auth-box auth-box--storybook" id="signupBox" style="display:none;">
+    <h1 class="auth-title">Create Account</h1>
+    <p class="auth-subtitle">Begin your story.</p>
+
     <form id="signupForm">
-        <div class="form-group">
-            <label for="signupName">Name</label>
-            <input 
-                type="text" 
-                id="signupName" 
-                placeholder="Enter your name" 
-                required
-                autocomplete="name"
-            >
-        </div>
-        
-        <div class="form-group">
-            <label for="signupEmail">Email</label>
-            <input 
-                type="email" 
-                id="signupEmail" 
-                placeholder="Enter your email" 
-                required
-                autocomplete="email"
-            >
-        </div>
-        
-        <div class="form-group">
-            <label for="signupPassword">Password</label>
-            <input 
-                type="password" 
-                id="signupPassword" 
-                    placeholder="Create a password (min. 8 characters, include a number)" 
-                required
-                minlength="8"
-                autocomplete="new-password"
-            >
-        </div>
-        
-        <button type="submit" class="btn btn-primary" id="signupBtn">
-            Create Account
-        </button>
-    </form>
-    
-    <div class="message" id="signupMessage"></div>
-    
-    <p class="switch-text">
-        Already have an account? 
-        <a href="#" id="loginSwitchLink">Sign in</a>
-    </p>
-</div>
+      <div class="form-group">
+        <label for="signupName">Name</label>
+        <input type="text" id="signupName" placeholder="Name" required autocomplete="name">
+      </div>
 
+      <div class="form-group">
+        <label for="signupEmail">Email</label>
+        <input type="email" id="signupEmail" placeholder="Email address" required autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label for="signupPassword">Password</label>
+        <input
+          type="password"
+          id="signupPassword"
+          placeholder="Create a password"
+          required
+          minlength="8"
+          autocomplete="new-password"
+        >
+      </div>
+
+      <button type="submit" class="btn btn-amber btn--block auth-btn" id="signupBtn">
+        Create Account
+      </button>
+    </form>
+
+    <div class="message" id="signupMessage"></div>
+
+    <p class="switch-text">
+      Already have an account?
+      <a href="#" id="loginSwitchLink">Sign in</a>
+    </p>
+  </div>
+</section>
