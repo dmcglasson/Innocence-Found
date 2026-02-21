@@ -162,31 +162,37 @@ async function handleLogin(form) {
  * @param {HTMLFormElement} form - Signup form element
  */
 async function handleSignup(form) {
-  const nameInput = form.querySelector('#signupName');
+  const fNameInput = form.querySelector('#signupFirstName');
+  const lNameInput = form.querySelector('#signupLastName');
   const emailInput = form.querySelector('#signupEmail');
   const passwordInput = form.querySelector('#signupPassword');
+  const parentInput = form.querySelector('#signupParent');
   const signupBtn = form.querySelector('#signupBtn');
   const signupMsg = document.getElementById('signupMessage');
 
-  if (!nameInput || !emailInput || !passwordInput || !signupBtn) return;
+  if (!fNameInput || !lNameInput || !emailInput || !passwordInput || !parentInput || !signupBtn) return;
 
   // Sanitize and get input values
-  const name = sanitizeString(nameInput.value);
+  const firstName = sanitizeString(fNameInput.value);
+  const lastName = sanitizeString(lNameInput.value);
   const email = sanitizeString(emailInput.value);
   const password = passwordInput.value; // Don't sanitize password, but validate
+  const parent = parentInput.checked;
 
   // Validate form
   const validation = validateForm(
-    { name, email, password },
+    { firstName, lastName, email, password, parent },
     {
-      name: { required: true, minLength: 2 },
+      firstName: { required: true, minLength: 2 },
+      lastName: { required: true, minLength: 2 },
       email: { required: true, type: 'email' },
       password: { 
         required: true, 
         type: 'password', 
         minLength: 8,
         pattern: /\d/ // must include at least one number
-      }
+      },
+      parent: { required: true, type: 'boolean' }
     }
   );
 
@@ -201,7 +207,7 @@ async function handleSignup(form) {
   showMessage('signupMessage', '', 'success');
 
   try {
-    const result = await signUp(email, password, name);
+    const result = await signUp(email, password, firstName, lastName, parent);
 
     if (result.success) {
       showMessage('signupMessage', result.message, 'success');

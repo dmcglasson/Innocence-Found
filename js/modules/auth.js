@@ -86,25 +86,28 @@ export async function signIn(email, password) {
  * Sign up a new user
  * @param {string} email - User email
  * @param {string} password - User password
- * @param {string} name - User name
+ * @param {string} firstName - User first name
+ * @param {string} lastName - User last name
+ * @param {boolean} parent - Indicates if the user is a parent
  * @returns {Promise<Object>} Result object with success status and message
  */
-export async function signUp(email, password, name) {
+export async function signUp(email, password, firstName, lastName, parent) {
   const supabase = getSupabaseClient();
   if (!supabase) {
     return { success: false, message: "Supabase client not initialized" };
   }
 
   try {
-    // 🔐 Hash the password BEFORE sending to Supabase
-    const hashedPassword = await hashPassword(password);
-
     const { data, error } = await supabase.auth.signUp({
       email,
-      password: hashedPassword,
+      password,
       options: {
         data: {
-          name: name,
+          first_name: firstName,
+          last_name: lastName,
+          parent: parent,
+          subscriber: false, // Default to false, can be updated later
+          admin: false // Default to false, can be updated later
         },
       },
     });
