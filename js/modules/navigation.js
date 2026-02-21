@@ -150,13 +150,15 @@ export async function showPage(pageId, onLoadCallback = null) {
 }
 
 /**
- * Initialize page from URL hash
+ * Initialize page from URL hash.
+ * Uses window.showPage if set (e.g. by main.js) so screen init callbacks run.
  */
 export async function initPageFromHash() {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash to prevent XSS
   const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+  const pageId = sanitizedHash || APP_CONFIG.DEFAULT_PAGE;
+  const show = typeof window.showPage === 'function' ? window.showPage : showPage;
+  await show(pageId);
 }
 
 /**
@@ -166,10 +168,11 @@ export function clearScreenCache() {
   Object.keys(screenCache).forEach(key => delete screenCache[key]);
 }
 
-// Listen for hash changes
+// Listen for hash changes (use window.showPage if set so screen init runs)
 window.addEventListener("hashchange", async () => {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash
   const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+  const pageId = sanitizedHash || APP_CONFIG.DEFAULT_PAGE;
+  const show = typeof window.showPage === 'function' ? window.showPage : showPage;
+  await show(pageId);
 });

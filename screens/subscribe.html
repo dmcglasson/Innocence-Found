@@ -1,0 +1,32 @@
+<div class="content-section">
+  <div class="auth-box subscribe-box">
+    <h1>Subscribe</h1>
+    <p class="subtitle">Unlock all chapters and support new releases</p>
+
+    <div id="subscriptionStatus" class="subscription-status" style="display: none;">
+      <p id="subscriptionStatusText"></p>
+      <p id="subscriptionEndDate" class="muted small" style="display: none;"></p>
+    </div>
+
+    <div id="subscriptionCTA">
+      <p class="subscribe-lead">
+        Only subscribers can access locked chapters. Sign in and subscribe to continue
+        reading the story as it's released.
+      </p>
+      <ul class="subscribe-benefits">
+        <li>Access every chapter as it’s released</li>
+        <li>Read in the interactive book reader</li>
+        <li>Works on desktop and mobile</li>
+      </ul>
+      <div class="subscribe-actions" id="subscribeActionsNotLoggedIn">
+        <a href="#" class="btn btn-primary" id="subscribeLoginBtn" data-page="login">Sign in</a>
+        <a href="#" class="btn btn-secondary" id="subscribeSignupBtn" data-page="login">Create account</a>
+      </div>
+      <div class="subscribe-actions" id="subscribeActionsLoggedIn" style="display: none;">
+        <button type="button" class="btn btn-primary" id="activateSubscriptionBtn">Activate subscription</button>
+      </div>
+      <p id="subscribeMessage" class="muted small" style="display: none;"></p>
+      <p class="muted small">Already subscribed? <a href="#" data-page="dashboard">Go to Dashboard</a></p>
+    </div>
+  </div>
+</div>

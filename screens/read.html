@@ -1,0 +1,21 @@
+<div class="content-section reader-section">
+  <div id="readerLoading" class="reader-loading">
+    <p>Loading chapter…</p>
+  </div>
+  <div id="readerError" class="reader-error" style="display: none;">
+    <p id="readerErrorMessage"></p>
+    <a href="#" class="btn btn-primary" id="readerErrorAction">Go back</a>
+  </div>
+  <div id="readerContent" class="reader-content" style="display: none;">
+    <nav class="reader-nav" aria-label="Chapter navigation">
+      <a href="#" class="reader-back" id="readerBackLink">← Back to library</a>
+      <h1 id="readerChapterTitle" class="reader-title"></h1>
+    </nav>
+    <article id="readerArticle" class="reader-article" role="article">
+      <!-- Chapter body injected here -->
+    </article>
+    <nav class="reader-footer-nav" aria-label="Reader footer">
+      <a href="#" class="btn btn-secondary" id="readerBackBtn">Back to library</a>
+    </nav>
+  </div>
+</div>

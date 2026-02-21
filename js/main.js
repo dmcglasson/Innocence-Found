@@ -9,6 +9,8 @@ import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js'
 import { initPageFromHash, showPage } from './modules/navigation.js';
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
+import { getSubscriptionStatus, hasActiveSubscription, createSubscriptionForCurrentUser } from './modules/subscription.js';
+import { getBooks, getChapters, getChapterContent, getChapterMeta } from './modules/chapters.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
 
@@ -44,7 +46,10 @@ async function init() {
   // Initialize UI
   initUI();
 
-  // Initialize page from URL hash
+  // Set up screen initialization and wrap showPage so hash-based loads run init
+  setupScreenInitialization();
+
+  // Initialize page from URL hash (uses wrapped showPage so read/library/subscribe init runs)
   await initPageFromHash();
 
   // Check authentication state
@@ -55,9 +60,6 @@ async function init() {
 
   // Set up event listeners
   setupEventListeners();
-
-  // Set up screen initialization callback
-  setupScreenInitialization();
 }
 
 /**
@@ -262,29 +264,218 @@ async function initializeScreen(pageId) {
   // Login / Signup screen
   if (pageId === 'login') {
     try {
-      // Wait for the auth boxes to exist
       await waitForElement('#loginBox', 1000);
-
       const signupLink = document.getElementById('signupSwitchLink');
       const loginLink  = document.getElementById('loginSwitchLink');
-
       if (signupLink) {
-        signupLink.addEventListener('click', (e) => {
-          e.preventDefault();
-          toggleAuthForm('signup');
-        });
+        signupLink.addEventListener('click', (e) => { e.preventDefault(); toggleAuthForm('signup'); });
       }
-
       if (loginLink) {
-        loginLink.addEventListener('click', (e) => {
-          e.preventDefault();
-          toggleAuthForm('login');
-        });
+        loginLink.addEventListener('click', (e) => { e.preventDefault(); toggleAuthForm('login'); });
       }
     } catch (error) {
       console.warn('Auth screen elements not found:', error);
     }
   }
+
+  // Subscribe screen
+  if (pageId === 'subscribe') {
+    try {
+      await waitForElement('#subscriptionStatus', 500);
+      const statusEl = document.getElementById('subscriptionStatus');
+      const ctaEl = document.getElementById('subscriptionCTA');
+      const statusTextEl = document.getElementById('subscriptionStatusText');
+      const endDateEl = document.getElementById('subscriptionEndDate');
+      const session = await getCurrentSession();
+      const status = await getSubscriptionStatus();
+      if (session && status.active && statusTextEl) {
+        statusEl.style.display = 'block';
+        ctaEl.style.display = 'none';
+        statusTextEl.textContent = "You have an active subscription. You can read all locked chapters.";
+        if (status.endDate && endDateEl) {
+          endDateEl.style.display = 'block';
+          endDateEl.textContent = 'Renews: ' + new Date(status.endDate).toLocaleDateString();
+        }
+      } else if (session) {
+        const notLoggedIn = document.getElementById('subscribeActionsNotLoggedIn');
+        const loggedIn = document.getElementById('subscribeActionsLoggedIn');
+        if (notLoggedIn) notLoggedIn.style.display = 'none';
+        if (loggedIn) loggedIn.style.display = 'flex';
+        const activateBtn = document.getElementById('activateSubscriptionBtn');
+        if (activateBtn) {
+          activateBtn.onclick = async () => {
+            activateBtn.disabled = true;
+            const result = await createSubscriptionForCurrentUser();
+            if (result.success) {
+              window.showPage('subscribe', initializeScreen);
+            } else {
+              const msg = document.getElementById('subscribeMessage');
+              if (msg) { msg.style.display = 'block'; msg.textContent = result.message; }
+            }
+            activateBtn.disabled = false;
+          };
+        }
+      }
+      document.querySelectorAll('#subscriptionCTA [data-page]').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          const page = el.getAttribute('data-page');
+          if (page) window.showPage(page);
+        });
+      });
+    } catch (err) {
+      console.warn('Subscribe screen init:', err);
+    }
+  }
+
+  // Reader screen: enforce login + subscription for locked chapters, then load content
+  if (pageId === 'read') {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const chapterId = params.get('chapter') || params.get('chapterId');
+      const bookId = params.get('book') || params.get('bookId');
+      const loadingEl = document.getElementById('readerLoading');
+      const errorEl = document.getElementById('readerError');
+      const contentEl = document.getElementById('readerContent');
+      const errorMsgEl = document.getElementById('readerErrorMessage');
+      const errorActionEl = document.getElementById('readerErrorAction');
+
+      const showError = (msg, goToSubscribe = false) => {
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (contentEl) contentEl.style.display = 'none';
+        if (errorEl) errorEl.style.display = 'block';
+        if (errorMsgEl) errorMsgEl.textContent = msg;
+        if (errorActionEl) {
+          errorActionEl.textContent = goToSubscribe ? 'Go to Subscribe' : 'Go back';
+          errorActionEl.onclick = (e) => {
+            e.preventDefault();
+            window.showPage(goToSubscribe ? 'subscribe' : 'library');
+          };
+        }
+      };
+
+      if (!chapterId) {
+        showError('No chapter specified.');
+        return;
+      }
+
+      const session = await getCurrentSession();
+      if (!session) {
+        window.showPage('login');
+        return;
+      }
+
+      const meta = await getChapterMeta(chapterId);
+      if (!meta) {
+        showError('Chapter not found or not yet released.');
+        return;
+      }
+
+      if (!meta.is_free) {
+        const active = await hasActiveSubscription();
+        if (!active) {
+          window.showPage('subscribe');
+          return;
+        }
+      }
+
+      const chapter = await getChapterContent(chapterId);
+      if (!chapter || chapter.content == null) {
+        window.showPage('subscribe');
+        return;
+      }
+
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (errorEl) errorEl.style.display = 'none';
+      if (contentEl) contentEl.style.display = 'block';
+
+      const titleEl = document.getElementById('readerChapterTitle');
+      const articleEl = document.getElementById('readerArticle');
+      if (titleEl) titleEl.textContent = chapter.title;
+      if (articleEl) {
+        const text = chapter.content || '';
+        articleEl.innerHTML = text.split(/\n\n+/).map(p => '<p>' + escapeHtml(p) + '</p>').join('');
+      }
+
+      const backLink = document.getElementById('readerBackLink');
+      const backBtn = document.getElementById('readerBackBtn');
+      if (backLink) {
+        backLink.onclick = (e) => { e.preventDefault(); window.showPage('library'); };
+      }
+      if (backBtn) {
+        backBtn.onclick = (e) => { e.preventDefault(); window.showPage('library'); };
+      }
+    } catch (err) {
+      console.error('Reader init error:', err);
+      const errorEl = document.getElementById('readerError');
+      const errorMsgEl = document.getElementById('readerErrorMessage');
+      const loadingEl = document.getElementById('readerLoading');
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (errorEl) errorEl.style.display = 'block';
+      if (errorMsgEl) errorMsgEl.textContent = 'Something went wrong. Please try again.';
+    }
+  }
+
+  // Library screen: list books and chapters with Read links
+  if (pageId === 'library') {
+    try {
+      const loadingEl = document.getElementById('libraryLoading');
+      const emptyEl = document.getElementById('libraryEmpty');
+      const listEl = document.getElementById('libraryList');
+      const books = await getBooks();
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (books.length === 0) {
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = 'none';
+      if (listEl) {
+        listEl.style.display = 'block';
+        let html = '';
+        for (const book of books) {
+          const chapters = await getChapters(book.id);
+          const chapterRows = chapters.map(ch => {
+            const badge = ch.is_free ? '<span class="chapter-badge">Free</span>' : '<span class="chapter-badge locked">Subscribers</span>';
+            return `<li>
+              <span class="chapter-title">${escapeHtml(ch.title)}</span>
+              ${badge}
+              <a href="#" class="btn btn-read btn-primary" data-book-id="${escapeHtml(book.id)}" data-chapter-id="${escapeHtml(ch.id)}">Read</a>
+            </li>`;
+          }).join('');
+          html += `<div class="book-card">
+            <h2>${escapeHtml(book.title)}</h2>
+            ${book.description ? `<p class="book-description">${escapeHtml(book.description)}</p>` : ''}
+            <ul class="chapter-list">${chapterRows}</ul>
+          </div>`;
+        }
+        listEl.innerHTML = html;
+        listEl.querySelectorAll('[data-book-id][data-chapter-id]').forEach(link => {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const bid = link.getAttribute('data-book-id');
+            const cid = link.getAttribute('data-chapter-id');
+            if (bid && cid) window.showReader(bid, cid);
+          });
+        });
+      }
+    } catch (err) {
+      console.error('Library init error:', err);
+      const loadingEl = document.getElementById('libraryLoading');
+      const emptyEl = document.getElementById('libraryEmpty');
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (emptyEl) {
+        emptyEl.style.display = 'block';
+        emptyEl.querySelector('p').textContent = 'Unable to load library. Please try again.';
+      }
+    }
+  }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 
@@ -332,6 +523,20 @@ window.showSignup = () => {
   });
 };
 window.handleLogout = handleLogout;
+
+/**
+ * Open the interactive reader for a chapter. Uses URL search params for book and chapter.
+ * Access control (login + subscription for locked chapters) runs when the read screen loads.
+ */
+window.showReader = (bookId, chapterId) => {
+  const params = new URLSearchParams();
+  if (bookId) params.set('book', bookId);
+  if (chapterId) params.set('chapter', chapterId);
+  const query = params.toString();
+  const url = window.location.pathname + (query ? '?' + query : '') + '#read';
+  window.history.replaceState(null, '', url);
+  showPage('read', initializeScreen);
+};
 
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {

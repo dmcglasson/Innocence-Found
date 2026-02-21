@@ -1,0 +1,3 @@
+-- Seed data lives in your existing Books and Chapters tables.
+-- Use your existing data; ensure some chapters have free = true (preview) and some free = false (locked).
+-- Subscriptions: users can create one via the app (Subscribe → Activate subscription).
