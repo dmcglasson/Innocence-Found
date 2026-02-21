@@ -1,0 +1,109 @@
+/* RESET */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Playfair Display", serif;
+    color: #3b2a1d;
+}
+
+/* ================= NAVBAR ================= */
+
+.navbar {
+    background-color: #f3eadc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 80px;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    width: 50px;
+    margin-right: 12px;
+}
+
+.brand {
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.nav-links a {
+    margin-left: 50px;
+    text-decoration: none;
+    color: #4a3422;
+    font-size: 18px;
+}
+
+/* ================= HERO ================= */
+
+.hero {
+    background-color: #d8c7a6;
+    text-align: center;
+    padding: 120px 20px 100px 20px;
+}
+
+.hero h1 {
+    font-size: 58px;
+    margin-bottom: 20px;
+}
+
+.subtitle {
+    font-family: "Dancing Script", cursive;
+    font-size: 32px;
+    color: #7a5a35;
+}
+
+/* ================= CARDS ================= */
+
+.cards {
+    background-image: url("forest-bg.jpg");   /* Correct path */
+    background-size: cover;
+    background-position: center;
+    padding: 150px 80px;
+    display: flex;
+    justify-content: center;
+    gap: 70px;
+}
+
+.card {
+    background-color: #6e4a1f;
+    width: 330px;
+    padding: 50px 40px;
+    border-radius: 30px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+}
+
+.card h2 {
+    font-size: 32px;
+    margin-bottom: 25px;
+}
+
+.card p {
+    font-size: 17px;
+    line-height: 1.6;
+    margin-bottom: 35px;
+}
+
+.btn {
+    display: inline-block;
+    background: #e1872c;
+    padding: 14px 35px;
+    border-radius: 30px;
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.btn:hover {
+    background: #d5781f;
+}
