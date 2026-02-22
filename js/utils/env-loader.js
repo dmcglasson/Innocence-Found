@@ -1,58 +1,61 @@
 /**
  * Environment Variable Loader
- * 
+ *
  * Loads environment variables from .env file or window.ENV
- * 
- * Note: For vanilla JS, .env files can't be fetched directly.
- * This loader attempts to fetch, but falls back to window.ENV
- * which can be set in index.html before modules load.
+ *
+ * Live Server usually cannot serve .env, so if window.ENV already
+ * has the needed values, we skip fetching .env entirely.
  */
+
+function hasSupabaseEnv() {
+  return (
+    window.ENV &&
+    typeof window.ENV.SUPABASE_URL === "string" &&
+    window.ENV.SUPABASE_URL.trim().length > 0 &&
+    typeof window.ENV.SUPABASE_ANON_KEY === "string" &&
+    window.ENV.SUPABASE_ANON_KEY.trim().length > 0
+  );
+}
 
 /**
  * Load environment variables from .env file
  * @returns {Promise<Object>} Environment variables as key-value pairs
  */
 export async function loadEnvVars() {
-  // Try to load from .env file (may fail if server doesn't serve it)
   try {
-    const response = await fetch('.env');
-    if (response.ok) {
-      const text = await response.text();
-      const env = {};
-      
-      // Parse .env file (basic parser)
-      text.split('\n').forEach(line => {
-        line = line.trim();
-        // Skip comments and empty lines
-        if (!line || line.startsWith('#')) {
-          return;
+    const response = await fetch(".env", { cache: "no-store" });
+
+    // If .env isn't served (404), just return empty object silently
+    if (!response.ok) return {};
+
+    const text = await response.text();
+    const env = {};
+
+    text.split("\n").forEach((line) => {
+      line = line.trim();
+      if (!line || line.startsWith("#")) return;
+
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        let value = match[2].trim();
+
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1);
         }
-        
-        // Parse KEY=VALUE format
-        const match = line.match(/^([^=]+)=(.*)$/);
-        if (match) {
-          const key = match[1].trim();
-          let value = match[2].trim();
-          
-          // Remove quotes if present
-          if ((value.startsWith('"') && value.endsWith('"')) ||
-              (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-          }
-          
-          env[key] = value;
-        }
-      });
-      
-      return env;
-    }
+
+        env[key] = value;
+      }
+    });
+
+    return env;
   } catch (error) {
-    // .env file not accessible via fetch (normal for vanilla JS)
-    // This is expected - we'll use window.ENV instead
-    console.log('Note: .env file not accessible via fetch (this is normal). Using window.ENV or direct config.');
+    // Live Server may fail fetch; ignore and fall back to window.ENV
+    return {};
   }
-  
-  return {};
 }
 
 /**
@@ -60,24 +63,25 @@ export async function loadEnvVars() {
  * Call this before loading the main application
  */
 export async function initEnv() {
-  // Try to load from .env file first
+  // KEY FIX: If index.html already set window.ENV with Supabase values,
+  // do NOT fetch .env at all (prevents 404 noise).
+  if (hasSupabaseEnv()) return window.ENV;
+
+  // Ensure window.ENV exists
+  if (!window.ENV) window.ENV = {};
+
+  // Otherwise try loading from .env (fallback only)
   const envVars = await loadEnvVars();
-  
-  // Merge with any existing window.ENV (set in HTML if needed)
-  if (!window.ENV) {
-    window.ENV = {};
-  }
-  
-  // Merge .env values into window.ENV (env file takes precedence)
+
+  // Merge .env values into window.ENV
   Object.assign(window.ENV, envVars);
-  
-  // If still no values, try to load from a config script tag
-  // This allows setting credentials in HTML without committing to git
-  if (!window.ENV.SUPABASE_URL && !window.ENV.SUPABASE_ANON_KEY) {
-    // Check if there's a config script that sets window.ENV
-    // This would be added manually in index.html for local dev
-    console.log('No environment variables found. Please set window.ENV in index.html or use .env file.');
+
+  // If still missing, leave a small note (optional)
+  if (!hasSupabaseEnv()) {
+    console.warn(
+      "Supabase ENV missing. Set window.ENV in index.html or provide a served .env file."
+    );
   }
-  
+
   return window.ENV;
 }

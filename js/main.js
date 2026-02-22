@@ -6,8 +6,8 @@
  */
 
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
-import { initPageFromHash, showPage } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
+import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
+import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus } from './modules/auth.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
@@ -15,10 +15,11 @@ import { validateForm, sanitizeString } from './utils/validators.js';
 /**
  * Initialize the application
  */
+const FREE_LIMIT = 2;
 async function init() {
   // Wait a moment for env vars to be available
   await new Promise(resolve => setTimeout(resolve, 100));
-  
+
   // Check Supabase initialization
   const client = getSupabaseClient();
   if (!client) {
@@ -43,7 +44,7 @@ async function init() {
 
   // Initialize UI
   initUI();
-
+  setGlobalOnLoadCallback(initializeScreen);
   // Initialize page from URL hash
   await initPageFromHash();
 
@@ -58,6 +59,7 @@ async function init() {
 
   // Set up screen initialization callback
   setupScreenInitialization();
+
 }
 
 /**
@@ -75,7 +77,7 @@ function setupEventListeners() {
     }
   });
 
-    // Click handlers (logout + switch between login/signup)
+  // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
     const target = e.target;
 
@@ -144,7 +146,14 @@ async function handleLogin(form) {
     if (result.success) {
       showMessage('loginMessage', result.message, 'success');
       setTimeout(() => {
-        showPage('dashboard');
+        const returnTo = sessionStorage.getItem('returnTo');
+
+        if (returnTo) {
+          sessionStorage.removeItem('returnTo');
+          location.hash = returnTo;   // go back to chapters (or any future page)
+        } else {
+          window.location.hash = 'chapters'; // default
+        }
       }, 1000);
     } else {
       showMessage('loginMessage', result.message, 'error');
@@ -181,9 +190,9 @@ async function handleSignup(form) {
     {
       name: { required: true, minLength: 2 },
       email: { required: true, type: 'email' },
-      password: { 
-        required: true, 
-        type: 'password', 
+      password: {
+        required: true,
+        type: 'password',
         minLength: 8,
         pattern: /\d/ // must include at least one number
       }
@@ -249,13 +258,110 @@ async function initializeScreen(pageId) {
     try {
       await waitForElement('#userName', 1000);
       await waitForElement('#userEmail', 1000);
-      
+
       const session = await getCurrentSession();
       if (session && session.user) {
         updateDashboardUserInfo(session.user);
       }
     } catch (error) {
       console.warn('Dashboard elements not found:', error);
+
+    }
+  }
+  if (pageId === 'chapter-reader') {
+    await waitForElement('#chapterTitle', 1000);
+
+    const chapterNumber = Number(sessionStorage.getItem('activeChapter'));
+
+    // If someone goes to #chapter-reader directly without picking a chapter
+    if (!chapterNumber) {
+      window.location.hash = 'chapters';
+      return;
+    }
+
+    // ✅ Paywall check: chapters 1-2 are free, 3+ require subscriber
+    if (chapterNumber > FREE_LIMIT) {
+      const session = await getCurrentSession();
+
+      // Not logged in -> send to login
+      if (!session || !session.user) {
+        sessionStorage.setItem('returnTo', '#chapters');
+        sessionStorage.setItem('requestedChapter', String(chapterNumber));
+        showLogin();
+        return;
+      }
+
+      // Logged in but not subscriber -> block
+      const subInfo = await getSubscriberStatus();
+      if (!subInfo.isSubscriber) {
+        alert('Subscribers only.');
+        window.location.hash = 'chapters';
+        return;
+      }
+    }
+
+    // ===== Render chapter (your exact existing content) =====
+    const titleEl = document.getElementById('chapterTitle');
+    const bodyEl = document.getElementById('chapterBody');
+    const backBtn = document.getElementById('backToChaptersBtn');
+
+    if (titleEl) titleEl.textContent = `Chapter ${chapterNumber}`;
+
+    if (bodyEl) {
+      const mockChapters = {
+        1: `
+        <p><em>Chapter 1 — The Woods Behind the House</em></p>
+        <p>
+          The path behind the old fence was never meant for children. It began as a thin line in the grass,
+          then faded into roots and wet soil, as if the forest was trying to erase it.
+        </p>
+        <p>
+          Mara stepped carefully, listening. The world here sounded different—quieter, but not empty.
+          Leaves moved without wind. A bird called once, then stopped like it remembered a rule.
+        </p>
+        <p>
+          Halfway down the trail she found the first sign: a ribbon tied around a branch,
+          pale and frayed, the kind people used to mark “safe” places.
+        </p>
+        <p>
+          She reached out to touch it, and that’s when she noticed the initials stitched into the fabric:
+          <strong>I.F.</strong>
+        </p>
+      `,
+        2: `
+        <p><em>Chapter 2 — A Letter With No Stamp</em></p>
+        <p>
+          The envelope appeared where it shouldn’t have—between the pages of a book she hadn’t opened in years.
+          No stamp. No return address. Only her name written in careful, old-fashioned ink.
+        </p>
+        <p>
+          She waited before tearing it open, as if patience could change what was inside.
+          But curiosity always wins when fear has no shape.
+        </p>
+        <p>
+          The letter was short, almost polite:
+        </p>
+        <p style="margin-left: 18px; border-left: 2px solid #d4af37; padding-left: 12px;">
+          “If you want the truth, follow the path behind the house at dawn. Do not bring anyone.
+          Do not look back until you reach the stones.”
+        </p>
+        <p>
+          Mara read it twice. Then a third time, slower—because the last line felt less like advice
+          and more like a warning written by someone who already knew what she would do.
+        </p>
+      `
+      };
+
+      bodyEl.innerHTML = mockChapters[chapterNumber] || `
+      <p><em>Chapter ${chapterNumber}</em></p>
+      <p>This chapter is not available in preview yet. Please check back later.</p>
+    `;
+    }
+
+    if (backBtn) {
+      backBtn.onclick = () => {
+        window.location.hash = 'chapters';
+      };
     }
   }
 
@@ -266,7 +372,7 @@ async function initializeScreen(pageId) {
       await waitForElement('#loginBox', 1000);
 
       const signupLink = document.getElementById('signupSwitchLink');
-      const loginLink  = document.getElementById('loginSwitchLink');
+      const loginLink = document.getElementById('loginSwitchLink');
 
       if (signupLink) {
         signupLink.addEventListener('click', (e) => {
@@ -274,6 +380,7 @@ async function initializeScreen(pageId) {
           toggleAuthForm('signup');
         });
       }
+
 
       if (loginLink) {
         loginLink.addEventListener('click', (e) => {
@@ -285,8 +392,27 @@ async function initializeScreen(pageId) {
       console.warn('Auth screen elements not found:', error);
     }
   }
-}
 
+  if (pageId === 'chapters') {
+    await waitForElement('#chapterList', 1000);
+
+    const session = await getCurrentSession();
+    let isSubscriber = false;
+
+    if (session && session.user) {
+      const subInfo = await getSubscriberStatus();
+      isSubscriber = subInfo.isSubscriber;
+    }
+
+    renderChapters({ isSubscriber });
+
+    const requestedChapter = sessionStorage.getItem('requestedChapter');
+    if (requestedChapter) {
+      sessionStorage.removeItem('requestedChapter');
+      handleLockedChapter(Number(requestedChapter));
+    }
+  }
+}
 
 /**
  * Set up screen initialization callback for navigation
@@ -295,12 +421,12 @@ function setupScreenInitialization() {
   // Wrap showPage to include screen initialization
   const originalShowPage = showPage;
   const wrappedShowPage = async (pageId) => {
-    await originalShowPage(pageId, initializeScreen);
+    await originalShowPage(pageId);
   };
-  
+
   // Expose globally for onclick handlers and navigation
   window.showPage = wrappedShowPage;
-  
+
   // Set up navigation event delegation
   document.addEventListener('click', (e) => {
     const pageLink = e.target.closest('[data-page]');
@@ -311,7 +437,7 @@ function setupScreenInitialization() {
         wrappedShowPage(pageId);
       }
     }
-    
+
     // Handle logout link
     if (e.target.id === 'logoutLink' || e.target.closest('#logoutLink')) {
       e.preventDefault();
@@ -339,3 +465,46 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+function renderChapters({ isSubscriber = false } = {}) {
+  const chapterList = document.getElementById("chapterList");
+  if (!chapterList) return;
+
+  let html = "";
+
+  for (let i = 1; i <= 6; i++) {
+    const isLocked = !isSubscriber && i > 2; // 🔥 Only 1 & 2 free
+
+    html += `
+      <div class="chapter-item">
+        <h3>${isLocked ? "🔒 " : ""}Chapter ${i}</h3>
+        ${isLocked
+        ? `<button onclick="handleLockedChapter(${i})">Subscribers Only</button>`
+        : `<button onclick="handleLockedChapter(${i})">Read for Free</button>`
+      }
+      </div>
+    `;
+  }
+
+  chapterList.innerHTML = html;
+}
+
+async function handleLockedChapter(chapterNumber) {
+  // Chapters 1–2 are free
+  const isFreeChapter = chapterNumber <= FREE_LIMIT;
+
+  // Only require login for locked chapters (3+)
+  if (!isFreeChapter) {
+    const session = await getCurrentSession();
+    if (!session || !session.user) {
+      sessionStorage.setItem('returnTo', '#chapters');
+      sessionStorage.setItem('requestedChapter', String(chapterNumber));
+      showLogin();
+      return;
+    }
+  }
+
+  // Open the chapter
+  sessionStorage.setItem('activeChapter', String(chapterNumber));
+  window.location.hash = 'chapter-reader';
+}
+window.handleLockedChapter = handleLockedChapter;
