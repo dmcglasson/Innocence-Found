@@ -192,7 +192,7 @@ async function handleSignup(form) {
         minLength: 8,
         pattern: /\d/ // must include at least one number
       },
-      parent: { required: true, type: 'boolean' }
+      parent: { type: 'boolean' }
     }
   );
 
