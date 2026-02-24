@@ -103,6 +103,7 @@ export async function signUp(email, password, firstName, lastName, parent) {
       password,
       options: {
         data: {
+          name: [firstName, lastName].filter(Boolean).join(' '),
           first_name: firstName,
           last_name: lastName,
           parent: parent,
