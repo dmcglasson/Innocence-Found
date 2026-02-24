@@ -13,6 +13,8 @@ import { getSupabaseClient } from './supabase.js';
 import { showPage } from './navigation.js';
 import { updateNavForLoggedIn, updateNavForLoggedOut } from './ui.js';
 
+let authStateListeners = [];
+
 /**
  * Check if user is authenticated
  * @returns {Promise<Object|null>} Session object or null
