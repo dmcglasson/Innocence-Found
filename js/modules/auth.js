@@ -12,7 +12,6 @@
 import { getSupabaseClient } from './supabase.js';
 import { showPage } from './navigation.js';
 import { updateNavForLoggedIn, updateNavForLoggedOut } from './ui.js';
-import { hashPassword } from '../utils/password-encryption.js';   // <-- ADDED
 
 let authStateListeners = [];
 
