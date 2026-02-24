@@ -12,9 +12,6 @@
 import { getSupabaseClient } from './supabase.js';
 import { showPage } from './navigation.js';
 import { updateNavForLoggedIn, updateNavForLoggedOut } from './ui.js';
-import { hashPassword } from '../utils/password-encryption.js';   // <-- ADDED
-
-let authStateListeners = [];
 
 /**
  * Check if user is authenticated
@@ -26,13 +23,9 @@ export async function getCurrentSession() {
 
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error("Error getting session:", error);
-      return null;
-    }
+    if (error) return null;
     return session;
-  } catch (error) {
-    console.error("Error checking auth state:", error);
+  } catch {
     return null;
   }
 }
@@ -44,7 +37,6 @@ export async function checkAuthState() {
   const session = await getCurrentSession();
   if (session) {
     updateNavForLoggedIn(session.user);
-    // Only redirect to dashboard if on login page
     const currentPage = window.location.hash.substring(1) || "home";
     if (currentPage === "login") {
       showPage("dashboard");
@@ -56,9 +48,6 @@ export async function checkAuthState() {
 
 /**
  * Sign in a user
- * @param {string} email - User email
- * @param {string} password - User password
- * @returns {Promise<Object>} Result object with success status and message
  */
 export async function signIn(email, password) {
   const supabase = getSupabaseClient();
@@ -77,8 +66,8 @@ export async function signIn(email, password) {
     }
 
     return { success: true, data, message: "Login successful!" };
-  } catch (error) {
-    return { success: false, message: error.message || "Failed to sign in" };
+  } catch {
+    return { success: false, message: "Failed to sign in" };
   }
 }
 
@@ -108,6 +97,7 @@ export async function signUp(email, password, firstName, lastName, parent) {
           parent: parent,
           subscriber: false, // Default to false, can be updated later
           admin: false // Default to false, can be updated later
+          name: firstName + ' ' + lastName,
         },
       },
     });
@@ -121,14 +111,13 @@ export async function signUp(email, password, firstName, lastName, parent) {
       data,
       message: "Account created successfully! Please check your email to verify your account.",
     };
-  } catch (error) {
-    return { success: false, message: error.message || "Failed to create account" };
+  } catch {
+    return { success: false, message: "Failed to create account" };
   }
 }
 
 /**
  * Sign out the current user
- * @returns {Promise<Object>} Result object with success status and message
  */
 export async function signOut() {
   const supabase = getSupabaseClient();
@@ -142,14 +131,13 @@ export async function signOut() {
       return { success: false, message: error.message };
     }
     return { success: true, message: "Signed out successfully" };
-  } catch (error) {
-    return { success: false, message: error.message || "Failed to sign out" };
+  } catch {
+    return { success: false, message: "Failed to sign out" };
   }
 }
 
 /**
  * Initialize auth state listener
- * @param {Function} callback - Callback function for auth state changes
  */
 export function initAuthStateListener(callback) {
   const supabase = getSupabaseClient();
@@ -159,14 +147,89 @@ export function initAuthStateListener(callback) {
     if (event === "SIGNED_IN") {
       updateNavForLoggedIn(session.user);
       showPage("dashboard");
-    } else if (event === "SIGNED_OUT") {
+    }
+
+    if (event === "SIGNED_OUT") {
       updateNavForLoggedOut();
       showPage("home");
     }
 
-    // Call custom callback if provided
-    if (callback && typeof callback === 'function') {
+    if (callback) {
       callback(event, session);
     }
   });
+}
+
+/* ===============================
+   Secure Password Update Helpers
+================================ */
+function needsReauth(error) {
+  const msg = String(error?.message || "").toLowerCase();
+
+  return (
+    msg.includes("recent") ||
+    msg.includes("reauth") ||
+    msg.includes("re-auth") ||
+    (msg.includes("login") && msg.includes("required"))
+  );
+}
+
+function friendlyAuthError(error) {
+  const msg = String(error?.message || "").toLowerCase();
+
+  if (msg.includes("invalid")) {
+    return "Current password is incorrect.";
+  }
+
+  if (msg.includes("password")) {
+    return "New password does not meet the password requirements.";
+  }
+
+  if (msg.includes("expired")) {
+    return "Your session expired. Please re-authenticate.";
+  }
+
+  return "Unable to update your password.";
+}
+
+/**
+ * Secure password update with re-authentication
+ */
+export async function updatePasswordSecurely({ currentPassword, newPassword }) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: "Supabase client not initialized" };
+  }
+
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData?.user?.email) {
+    return { success: false, message: "You must be signed in to change your password." };
+  }
+
+  const email = userData.user.email;
+
+  const firstTry = await supabase.auth.updateUser({ password: newPassword });
+  if (!firstTry.error) {
+    return { success: true, message: "Password updated successfully." };
+  }
+
+  if (!needsReauth(firstTry.error)) {
+    return { success: false, message: friendlyAuthError(firstTry.error) };
+  }
+
+  const reauth = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  });
+
+  if (reauth.error) {
+    return { success: false, message: friendlyAuthError(reauth.error) };
+  }
+
+  const secondTry = await supabase.auth.updateUser({ password: newPassword });
+  if (secondTry.error) {
+    return { success: false, message: friendlyAuthError(secondTry.error) };
+  }
+
+  return { success: true, message: "Password updated successfully." };
 }

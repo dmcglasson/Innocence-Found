@@ -1,13 +1,51 @@
 <div class="content-section">
-    <div class="auth-box">
-        <h1>Welcome, <span id="userName"></span></h1>
-        <p class="subtitle">You are successfully logged in</p>
-        
-        <div class="user-info">
-            <p><strong>Email:</strong> <span id="userEmail"></span></p>
-        </div>
-        
-        <button class="btn btn-secondary" id="logoutBtn">Sign Out</button>
-    </div>
-</div>
+  <div class="auth-box">
+    <h1>Welcome, <span id="userName"></span></h1>
+    <p class="subtitle">You are successfully logged in</p>
 
+    <div class="user-info">
+      <p><strong>Email:</strong> <span id="userEmail"></span></p>
+    </div>
+
+    <button class="btn btn-secondary" id="logoutBtn">Sign Out</button>
+
+    <hr />
+
+    <h2>Change Password</h2>
+
+    <form id="changePasswordForm">
+      <div class="form-group">
+        <label for="currentPassword">Current Password</label>
+        <input
+          type="password"
+          id="currentPassword"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="newPassword">New Password</label>
+        <input
+          type="password"
+          id="newPassword"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="confirmNewPassword">Confirm New Password</label>
+        <input
+          type="password"
+          id="confirmNewPassword"
+          required
+        />
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        Update Password
+      </button>
+
+      <p id="passwordMessage"></p>
+    </form>
+  </div>
+</div>
