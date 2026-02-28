@@ -11,11 +11,12 @@ import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurr
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
+import { APP_CONFIG } from './config.js';
 
 /**
  * Initialize the application
  */
-const FREE_LIMIT = 2;
+const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
 async function init() {
   // Wait a moment for env vars to be available
   await new Promise(resolve => setTimeout(resolve, 100));
@@ -150,9 +151,9 @@ async function handleLogin(form) {
 
         if (returnTo) {
           sessionStorage.removeItem('returnTo');
-          location.hash = returnTo;   // go back to chapters (or any future page)
+          window.location.hash = returnTo.replace(/^#/, '');
         } else {
-          window.location.hash = 'chapters'; // default
+          window.location.hash = 'chapters';
         }
       }, 1000);
     } else {
@@ -279,15 +280,14 @@ async function initializeScreen(pageId) {
       return;
     }
 
-    // ✅ Paywall check: chapters 1-2 are free, 3+ require subscriber
     if (chapterNumber > FREE_LIMIT) {
       const session = await getCurrentSession();
 
       // Not logged in -> send to login
       if (!session || !session.user) {
-        sessionStorage.setItem('returnTo', '#chapters');
+        sessionStorage.setItem('returnTo', 'chapters');
         sessionStorage.setItem('requestedChapter', String(chapterNumber));
-        showLogin();
+        window.showLogin();
         return;
       }
 
@@ -471,21 +471,37 @@ function renderChapters({ isSubscriber = false } = {}) {
 
   let html = "";
 
-  for (let i = 1; i <= 6; i++) {
-    const isLocked = !isSubscriber && i > 2; // 🔥 Only 1 & 2 free
-
+  for (let i = 1; i <= APP_CONFIG.TOTAL_CHAPTERS; i++) {
+    const isLocked = !isSubscriber && i > APP_CONFIG.FREE_CHAPTER_COUNT;
     html += `
       <div class="chapter-item">
         <h3>${isLocked ? "🔒 " : ""}Chapter ${i}</h3>
-        ${isLocked
-        ? `<button onclick="handleLockedChapter(${i})">Subscribers Only</button>`
-        : `<button onclick="handleLockedChapter(${i})">Read for Free</button>`
-      }
+        <button 
+  type="button" 
+  class="chapter-button" 
+  data-chapter="${i}"
+>
+  ${isLocked ? "Subscribers Only" : "Read for Free"}
+</button>
       </div>
     `;
   }
 
   chapterList.innerHTML = html;
+  //One click listener for all chapter buttons (no inline onclick)
+  if (!chapterList.dataset.listenerAttached) {
+    chapterList.addEventListener("click", (e) => {
+      const btn = e.target.closest(".chapter-button");
+      if (!btn) return;
+
+      const chapterNumber = Number(btn.dataset.chapter);
+      if (Number.isNaN(chapterNumber)) return;
+
+      handleLockedChapter(chapterNumber);
+    });
+
+    chapterList.dataset.listenerAttached = "true";
+  }
 }
 
 async function handleLockedChapter(chapterNumber) {
@@ -498,7 +514,7 @@ async function handleLockedChapter(chapterNumber) {
     if (!session || !session.user) {
       sessionStorage.setItem('returnTo', '#chapters');
       sessionStorage.setItem('requestedChapter', String(chapterNumber));
-      showLogin();
+      window.showLogin();
       return;
     }
   }
