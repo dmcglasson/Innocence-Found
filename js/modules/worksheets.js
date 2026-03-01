@@ -139,3 +139,48 @@ export async function getWorksheetFileUrl(worksheetId, options = {}) {
     };
   }
 }
+
+export async function downloadWorksheet(worksheetId, filename = "worksheet.pdf") {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, status: 500, message: "Supabase client not initialized" };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const user = sessionData?.session?.user || null;
+  if (!user) return { success: false, status: 401, message: "Please log in." };
+
+  const canAccessProtected = hasProtectedAccess(user);
+  if (!canAccessProtected) return { success: false, status: 403, message: "Subscription required." };
+  const { data: rows, error: metaErr } = await supabase
+    .from(WORKSHEETS_CONFIG.TABLE)
+    .select("title")
+    .eq("id", worksheetId)
+    .limit(1);
+
+  if (metaErr) return { success: false, status: 400, message: metaErr.message };
+  if (!rows || !rows.length) return { success: false, status: 404, message: "Worksheet not found" };
+
+  const safeTitle = String(rows[0].title || "worksheet")
+    .replace(/[^a-z0-9-_ ]/gi, "")
+    .trim()
+    .replace(/\s+/g, "_");
+
+  const finalName = `${safeTitle}.pdf`;
+
+  const fileRes = await getWorksheetFileUrl(worksheetId, { expiresIn: WORKSHEETS_CONFIG.SIGNED_URL_EXPIRES_IN });
+  if (!fileRes.success) {
+    const msg = fileRes.message || "Worksheet not found";
+    const status = msg.toLowerCase().includes("not found") ? 404 : 400;
+    return { success: false, status, message: msg };
+  }
+
+  const url = fileRes.data.url;
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = finalName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  return { success: true, status: 200, message: "Download started." };
+}
