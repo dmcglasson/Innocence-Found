@@ -35,7 +35,7 @@ header .site-title {
   white-space: nowrap;
 
   font-family: 'Cormorant Garamond', serif;
-  font-weight: 550;       
+  font-weight: 600;       
   font-size: 35px;       
   letter-spacing: 0;
   color: #4B2E05;          
@@ -867,8 +867,12 @@ footer p {
   position: absolute;
   width: 1px;
   height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
-  clip: rect(0,0,0,0);
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .auth-title{
@@ -894,14 +898,9 @@ footer p {
   text-align: left;
 }
 
-.auth-box--storybook label{
-  font-size: 13px;
-  letter-spacing: 0.2px;
-  color: rgba(75, 46, 5, 0.90);
-}
 
 .auth-box--storybook input{
-  margin-top: 6px;
+  margin-top: 0;
   border-radius: 12px;
   border: 1px solid rgba(75, 46, 5, 0.18);
   background: rgba(255,255,255,0.70);
@@ -933,12 +932,12 @@ footer p {
   float: right;
 }
 
-.auth-btn{
-  border-radius: 999px !important;
-  padding: 14px 22px !important;
+.auth-box--storybook .auth-btn{
+  border-radius: 999px;
+  padding: 14px 22px;
   font-size: 15px;
-  text-transform: none !important;
-  letter-spacing: 0 !important;
+  text-transform: none;
+  letter-spacing: 0;
   margin-top: 8px;
 }
 
