@@ -8,23 +8,32 @@
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
     <!-- Note: X-Frame-Options and frame-ancestors must be set via HTTP headers, not meta tags -->
     <title>Innocence Found</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <header>
-        <nav>
-            <a href="#" class="logo" data-page="home">Innocence Found</a>
+        <nav class="nav">
+            <a href="#" class="brand" data-page="home">
+            <img src="images/logo.png" alt="Innocence Found logo">
+            </a>
+
+            <h1 class="site-title">Innocence Found</h1>
+
+            <div class="nav-right">
             <ul class="nav-links">
                 <li><a href="#" data-page="home">Home</a></li>
                 <li><a href="#" data-page="about">About</a></li>
                 <li><a href="#" data-page="contact">Contact</a></li>
                 <li id="authNavItem">
-                    <a href="#" data-page="login" id="loginNavLink">Login</a>
+                <a href="#" data-page="login" id="loginNavLink">Login</a>
                 </li>
             </ul>
+
             <div class="user-menu" id="userMenu" style="display: none;">
                 <span id="userNameNav"></span>
                 <a href="#" id="logoutLink">Sign Out</a>
+            </div>
             </div>
         </nav>
     </header>
