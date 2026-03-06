@@ -13,6 +13,8 @@ import { getSupabaseClient } from './supabase.js';
 import { showPage } from './navigation.js';
 import { updateNavForLoggedIn, updateNavForLoggedOut } from './ui.js';
 
+let authStateListeners = [];
+
 /**
  * Check if user is authenticated
  * @returns {Promise<Object|null>} Session object or null
@@ -73,8 +75,14 @@ export async function signIn(email, password) {
 
 /**
  * Sign up a new user
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @param {string} firstName - User first name
+ * @param {string} lastName - User last name
+ * @param {boolean} parent - Indicates if the user is a parent
+ * @returns {Promise<Object>} Result object with success status and message
  */
-export async function signUp(email, password, name) {
+export async function signUp(email, password, firstName, lastName, parent) {
   const supabase = getSupabaseClient();
   if (!supabase) {
     return { success: false, message: "Supabase client not initialized" };
@@ -86,7 +94,13 @@ export async function signUp(email, password, name) {
       password,
       options: {
         data: {
-          name,
+          name: [firstName, lastName].filter(Boolean).join(' '),
+          first_name: firstName,
+          last_name: lastName,
+          parent: parent,
+          subscriber: false, // Default to false, can be updated later
+          admin: false // Default to false, can be updated later
+          name: firstName + ' ' + lastName,
         },
       },
     });
