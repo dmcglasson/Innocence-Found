@@ -9,6 +9,12 @@ import { APP_CONFIG } from '../config.js';
 
 // Cache for loaded screens
 const screenCache = {};
+// Global screen init callback (set once from main.js)
+let globalOnLoadCallback = null;
+
+export function setGlobalOnLoadCallback(cb) {
+  globalOnLoadCallback = cb;
+}
 
 /**
  * Sanitize HTML to prevent XSS attacks
@@ -20,20 +26,20 @@ function sanitizeHTML(html) {
   if (!html || typeof html !== 'string') {
     return '';
   }
-  
+
   try {
     // Use DOMParser for better control
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    
+
     // Remove script tags
     const scripts = doc.querySelectorAll('script');
     scripts.forEach(script => script.remove());
-    
+
     // Remove iframe tags (potential XSS vector)
     const iframes = doc.querySelectorAll('iframe');
     iframes.forEach(iframe => iframe.remove());
-    
+
     // Remove dangerous event handlers from all elements
     const allElements = doc.querySelectorAll('*');
     const dangerousAttrs = [
@@ -42,7 +48,7 @@ function sanitizeHTML(html) {
       'onabort', 'onkeydown', 'onkeypress', 'onkeyup', 'onmousedown',
       'onmousemove', 'onmouseout', 'onmouseup'
     ];
-    
+
     allElements.forEach(el => {
       // Remove event handler attributes
       dangerousAttrs.forEach(attr => {
@@ -50,7 +56,7 @@ function sanitizeHTML(html) {
           el.removeAttribute(attr);
         }
       });
-      
+
       // Remove javascript: protocol from href/src
       ['href', 'src', 'action'].forEach(attr => {
         const value = el.getAttribute(attr);
@@ -59,7 +65,7 @@ function sanitizeHTML(html) {
         }
       });
     });
-    
+
     return doc.body.innerHTML;
   } catch (error) {
     console.error('Error sanitizing HTML:', error);
@@ -92,15 +98,15 @@ export async function loadScreen(screenName) {
       throw new Error(`Failed to load screen: ${screenName}`);
     }
     const html = await response.text();
-    
+
     // Sanitize HTML before caching/using
     const sanitizedHtml = sanitizeHTML(html);
-    
+
     // Cache the screen if caching is enabled
     if (APP_CONFIG.CACHE_ENABLED) {
       screenCache[screenName] = sanitizedHtml;
     }
-    
+
     return sanitizedHtml;
   } catch (error) {
     console.error(`Error loading screen ${screenName}:`, error);
@@ -131,17 +137,16 @@ export async function showPage(pageId, onLoadCallback = null) {
   pageContainer.textContent = 'Loading...'; // Use textContent instead of innerHTML for safety
   pageContainer.classList.add("active");
 
-  // Update URL hash
-  window.location.hash = pageId;
-
   try {
     // Load the screen
     const screenHtml = await loadScreen(pageId);
     pageContainer.innerHTML = screenHtml;
 
-    // Call the callback if provided (for initializing screen-specific logic)
-    if (onLoadCallback && typeof onLoadCallback === 'function') {
-      await onLoadCallback(pageId);
+    // Call the callback (screen init). Prefer the passed callback, otherwise use global one.
+    const cb = onLoadCallback || globalOnLoadCallback;
+
+    if (cb && typeof cb === 'function') {
+      await cb(pageId);
     }
   } catch (error) {
     console.error("Error showing page:", error);
@@ -154,9 +159,14 @@ export async function showPage(pageId, onLoadCallback = null) {
  */
 export async function initPageFromHash() {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash to prevent XSS
-  const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+
+// remove query string from hash (anything after ?)
+const pageOnly = hash.split('?')[0];
+
+// sanitize only the page name
+const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+
+await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
 }
 
 /**
@@ -169,7 +179,7 @@ export function clearScreenCache() {
 // Listen for hash changes
 window.addEventListener("hashchange", async () => {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash
-  const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+const pageOnly = hash.split('?')[0];
+const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
 });
