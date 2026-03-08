@@ -9,6 +9,43 @@ import { APP_CONFIG } from '../config.js';
 
 // Cache for loaded screens
 const screenCache = {};
+let globalScreenLoadCallback = null;
+const aliasMap = {
+  readers: "bookreader",
+};
+const screenStyleMap = {
+  bookreader: "screens/bookreader.css",
+};
+const dynamicScreenStyleId = "dynamic-screen-style";
+
+function normalizePageId(raw) {
+  if (!raw || typeof raw !== "string") return "";
+  const sanitized = raw.replace(/[^a-zA-Z0-9_-]/g, "");
+  return aliasMap[sanitized] || sanitized;
+}
+
+function applyScreenStyle(pageId) {
+  const href = screenStyleMap[pageId];
+  const existing = document.getElementById(dynamicScreenStyleId);
+
+  if (!href) {
+    existing?.remove();
+    return;
+  }
+
+  if (existing && existing.getAttribute("href") === href) {
+    return;
+  }
+
+  const link = existing || document.createElement("link");
+  link.id = dynamicScreenStyleId;
+  link.rel = "stylesheet";
+  link.href = href;
+
+  if (!existing) {
+    document.head.appendChild(link);
+  }
+}
 
 /**
  * Sanitize HTML to prevent XSS attacks
@@ -121,11 +158,13 @@ export async function showPage(pageId, onLoadCallback = null) {
     return;
   }
 
-  // Validate pageId
-  if (!pageId || typeof pageId !== 'string') {
-    console.error('Invalid page ID');
+  pageId = normalizePageId(pageId);
+  if (!pageId) {
+    console.error("Invalid page ID");
     return;
   }
+
+  applyScreenStyle(pageId);
 
   // Show loading state
   pageContainer.textContent = 'Loading...'; // Use textContent instead of innerHTML for safety
@@ -139,9 +178,18 @@ export async function showPage(pageId, onLoadCallback = null) {
     const screenHtml = await loadScreen(pageId);
     pageContainer.innerHTML = screenHtml;
 
-    // Call the callback if provided (for initializing screen-specific logic)
+    // Call per-navigation callback if provided
     if (onLoadCallback && typeof onLoadCallback === 'function') {
       await onLoadCallback(pageId);
+    }
+
+    // Call global callback for all screen loads (including hash navigation)
+    if (
+      globalScreenLoadCallback &&
+      typeof globalScreenLoadCallback === "function" &&
+      globalScreenLoadCallback !== onLoadCallback
+    ) {
+      await globalScreenLoadCallback(pageId);
     }
   } catch (error) {
     console.error("Error showing page:", error);
@@ -150,13 +198,20 @@ export async function showPage(pageId, onLoadCallback = null) {
 }
 
 /**
+ * Register a global callback to run after every screen load
+ * @param {Function|null} callback - Callback with signature (pageId) => Promise<void>|void
+ */
+export function setScreenLoadCallback(callback) {
+  globalScreenLoadCallback =
+    typeof callback === "function" ? callback : null;
+}
+
+/**
  * Initialize page from URL hash
  */
 export async function initPageFromHash() {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash to prevent XSS
-  const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+  await showPage(normalizePageId(hash) || APP_CONFIG.DEFAULT_PAGE);
 }
 
 /**
@@ -169,7 +224,5 @@ export function clearScreenCache() {
 // Listen for hash changes
 window.addEventListener("hashchange", async () => {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash
-  const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+  await showPage(normalizePageId(hash) || APP_CONFIG.DEFAULT_PAGE);
 });

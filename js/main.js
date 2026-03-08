@@ -6,7 +6,7 @@
  */
 
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
-import { initPageFromHash, showPage } from './modules/navigation.js';
+import { initPageFromHash, setScreenLoadCallback, showPage } from './modules/navigation.js';
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
@@ -44,6 +44,9 @@ async function init() {
   // Initialize UI
   initUI();
 
+  // Register screen initialization before first page load
+  setupScreenInitialization();
+
   // Initialize page from URL hash
   await initPageFromHash();
 
@@ -56,8 +59,6 @@ async function init() {
   // Set up event listeners
   setupEventListeners();
 
-  // Set up screen initialization callback
-  setupScreenInitialization();
 }
 
 /**
@@ -244,6 +245,16 @@ async function handleLogout() {
  * @param {string} pageId - ID of the loaded page
  */
 async function initializeScreen(pageId) {
+  // Bookreader screen (supports direct hash and DOM detection)
+  if (pageId === 'bookreader' || document.getElementById('bookSelect')) {
+    try {
+      const { initBookReader } = await import('./modules/bookreader.js');
+      await initBookReader();
+    } catch (error) {
+      console.warn('Bookreader screen failed to initialize:', error);
+    }
+  }
+
   // Dashboard screen
   if (pageId === 'dashboard') {
     try {
@@ -292,14 +303,13 @@ async function initializeScreen(pageId) {
  * Set up screen initialization callback for navigation
  */
 function setupScreenInitialization() {
-  // Wrap showPage to include screen initialization
-  const originalShowPage = showPage;
-  const wrappedShowPage = async (pageId) => {
-    await originalShowPage(pageId, initializeScreen);
-  };
-  
+  // Run initializeScreen after every route load (initial, click, hash change)
+  setScreenLoadCallback(initializeScreen);
+
   // Expose globally for onclick handlers and navigation
-  window.showPage = wrappedShowPage;
+  window.showPage = async (pageId) => {
+    await showPage(pageId);
+  };
   
   // Set up navigation event delegation
   document.addEventListener('click', (e) => {
@@ -308,7 +318,7 @@ function setupScreenInitialization() {
       e.preventDefault();
       const pageId = pageLink.getAttribute('data-page');
       if (pageId) {
-        wrappedShowPage(pageId);
+        window.showPage(pageId);
       }
     }
     

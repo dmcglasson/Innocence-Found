@@ -1,33 +1,35 @@
-﻿// === PDF.js Book Viewer ===
-const pdfjsLib = window["pdfjs-dist/build/pdf"];
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+// === PDF.js Book Viewer (SPA-friendly) ===
+const PDF_JS_SRC = "https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js";
+const PDF_JS_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js";
 
+let pdfjsLib = null;
 let pdfDoc = null;
 let currentPage = 1;
-let currentUrl = "books/book1.pdf";
+let currentUrl = "../book reader/books/book1.pdf";
 const subscriber = true; // toggle: true = can post/reply, false = read-only
 
-const canvasLeft = document.getElementById("leftPage");
-const canvasRight = document.getElementById("rightPage");
-const ctxLeft = canvasLeft.getContext("2d");
-const ctxRight = canvasRight.getContext("2d");
-const pageInfo = document.getElementById("pageInfo");
-const bookSelect = document.getElementById("bookSelect");
-const commentsTitle = document.getElementById("commentsTitle");
-const commentsMeta = document.getElementById("commentsMeta");
-const commentsList = document.getElementById("commentsList");
-const noComments = document.getElementById("noComments");
-const refreshCommentsBtn = document.getElementById("refreshComments");
-const filterComments = document.getElementById("filterComments");
-const newCommentArea = document.getElementById("newCommentArea");
-const newCommentText = document.getElementById("newCommentText");
-const submitComment = document.getElementById("submitComment");
-const subscriberNotice = document.getElementById("subscriberNotice");
+let canvasLeft;
+let canvasRight;
+let ctxLeft;
+let ctxRight;
+let pageInfo;
+let bookSelect;
+let commentsTitle;
+let commentsMeta;
+let commentsList;
+let noComments;
+let refreshCommentsBtn;
+let filterComments;
+let newCommentArea;
+let newCommentText;
+let submitComment;
+let subscriberNotice;
+let listenersAttached = false;
+let lastBoundCanvasLeft = null;
 
-// Demo store keyed by book URL (book-level comments)
+// Demo store keyed by book URL (match the option values in book selector)
 const commentStore = {
-  "books/book1.pdf": [
+  "../book reader/books/book1.pdf": [
     {
       author: "Priya",
       date: "2026-02-10 09:30",
@@ -49,7 +51,7 @@ const commentStore = {
       replies: [],
     },
   ],
-  "books/book2.pdf": [
+  "../book reader/books/book2.pdf": [
     {
       author: "Anita",
       date: "2026-02-09 08:20",
@@ -59,8 +61,72 @@ const commentStore = {
   ],
 };
 
-// Load a PDF by URL
+function loadScriptOnce(src, id) {
+  const existing = id ? document.getElementById(id) : document.querySelector(`script[src="${src}"]`);
+  if (existing) {
+    return existing._loadingPromise || Promise.resolve();
+  }
+
+  const script = document.createElement("script");
+  script.src = src;
+  script.defer = true;
+  if (id) script.id = id;
+
+  const promise = new Promise((resolve, reject) => {
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+  });
+
+  script._loadingPromise = promise;
+  document.head.appendChild(script);
+  return promise;
+}
+
+async function ensurePdfJs() {
+  if (pdfjsLib) return pdfjsLib;
+  await loadScriptOnce(PDF_JS_SRC, "pdfjs-cdn");
+  pdfjsLib = window.pdfjsLib || window["pdfjs-dist/build/pdf"];
+  if (!pdfjsLib) {
+    throw new Error("PDF.js failed to load");
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_JS_WORKER;
+  return pdfjsLib;
+}
+
+function cacheDom() {
+  canvasLeft = document.getElementById("leftPage");
+  canvasRight = document.getElementById("rightPage");
+  pageInfo = document.getElementById("pageInfo");
+  bookSelect = document.getElementById("bookSelect");
+  commentsTitle = document.getElementById("commentsTitle");
+  commentsMeta = document.getElementById("commentsMeta");
+  commentsList = document.getElementById("commentsList");
+  noComments = document.getElementById("noComments");
+  refreshCommentsBtn = document.getElementById("refreshComments");
+  filterComments = document.getElementById("filterComments");
+  newCommentArea = document.getElementById("newCommentArea");
+  newCommentText = document.getElementById("newCommentText");
+  submitComment = document.getElementById("submitComment");
+  subscriberNotice = document.getElementById("subscriberNotice");
+
+  if (!canvasLeft || !canvasRight || !pageInfo || !bookSelect) {
+    console.warn("Bookreader DOM elements not found; skipping init.");
+    return false;
+  }
+
+  // Reset listener flag if we are binding to a new DOM instance
+  if (canvasLeft !== lastBoundCanvasLeft) {
+    listenersAttached = false;
+    lastBoundCanvasLeft = canvasLeft;
+  }
+
+  ctxLeft = canvasLeft.getContext("2d");
+  ctxRight = canvasRight.getContext("2d");
+  return true;
+}
+
 function loadDocument(url) {
+  if (!pdfjsLib) return;
   canvasLeft.style.opacity = "0";
   canvasRight.style.opacity = "0";
   pageInfo.textContent = "Loading...";
@@ -121,55 +187,6 @@ function renderPages() {
   });
 }
 
-document.getElementById("nextPage").addEventListener("click", () => {
-  if (currentPage + 2 <= pdfDoc.numPages) {
-    currentPage += 2;
-    renderPages();
-  }
-});
-
-document.getElementById("prevPage").addEventListener("click", () => {
-  if (currentPage - 2 >= 1) {
-    currentPage -= 2;
-    renderPages();
-  }
-});
-
-document.getElementById("rightPage").addEventListener("click", () => {
-  if (currentPage + 2 <= pdfDoc.numPages) {
-    currentPage += 2;
-    renderPages();
-  }
-});
-
-document.getElementById("leftPage").addEventListener("click", () => {
-  if (currentPage - 2 >= 1) {
-    currentPage -= 2;
-    renderPages();
-  }
-});
-
-// Book selector change
-bookSelect.addEventListener("change", (e) => {
-  const val = e.target.value;
-  if (val === "locked") {
-    window.location.href = "../index.html";
-    return;
-  }
-  loadDocument(val);
-});
-
-// Initial load
-loadDocument(currentUrl);
-updateCommentUIAccess();
-
-function currentPageSpan() {
-  if (!pdfDoc) return "1-2";
-  const start = currentPage;
-  const end = Math.min(currentPage + 1, pdfDoc.numPages);
-  return `${start}-${end}`;
-}
-
 function setCommentHeader() {
   if (!commentsTitle || !commentsMeta) return;
   const label = bookSelect.options[bookSelect.selectedIndex].text.replace(
@@ -184,21 +201,24 @@ function renderComments() {
   if (!commentsList || !noComments) return;
   setCommentHeader();
   commentsList.innerHTML = "";
-  const entries = [...(commentStore[currentUrl] || [])];
+  const section = ensureSectionStore();
+  const entries = section.map((entry, index) => ({ entry, index }));
 
   const selected = filterComments?.value || "desc";
   entries.sort((a, b) => {
+    const aEntry = a.entry;
+    const bEntry = b.entry;
     if (selected === "asc") {
-      return toTime(a.date) - toTime(b.date);
+      return toTime(aEntry.date) - toTime(bEntry.date);
     }
     if (selected === "popular") {
-      const countA = Array.isArray(a.replies) ? a.replies.length : 0;
-      const countB = Array.isArray(b.replies) ? b.replies.length : 0;
+      const countA = Array.isArray(aEntry.replies) ? aEntry.replies.length : 0;
+      const countB = Array.isArray(bEntry.replies) ? bEntry.replies.length : 0;
       if (countB !== countA) return countB - countA;
-      return toTime(b.date) - toTime(a.date);
+      return toTime(bEntry.date) - toTime(aEntry.date);
     }
     // default newest first
-    return toTime(b.date) - toTime(a.date);
+    return toTime(bEntry.date) - toTime(aEntry.date);
   });
   if (!entries.length) {
     noComments.classList.remove("hidden");
@@ -206,7 +226,8 @@ function renderComments() {
   }
   noComments.classList.add("hidden");
 
-  entries.forEach(({ author, date, text, replies = [] }, idx) => {
+  entries.forEach(({ entry, index }) => {
+    const { author, date, text, replies = [] } = entry;
     const card = document.createElement("article");
     card.className = "comment-card";
 
@@ -251,7 +272,7 @@ function renderComments() {
       replySubmit.addEventListener("click", () => {
         const value = replyInput.value.trim();
         if (!value) return;
-        appendReply(idx, value);
+        appendReply(index, value);
       });
     }
 
@@ -277,20 +298,6 @@ function renderComments() {
     commentsList.appendChild(card);
   });
 }
-
-refreshCommentsBtn?.addEventListener("click", renderComments);
-
-submitComment?.addEventListener("click", () => {
-  if (!subscriber) return;
-  const text = newCommentText.value.trim();
-  if (!text) return;
-  appendComment(text);
-  newCommentText.value = "";
-});
-
-filterComments?.addEventListener("change", () => {
-  renderComments();
-});
 
 function updateCommentUIAccess() {
   if (subscriber) {
@@ -349,4 +356,78 @@ function toTime(dateString) {
     : dateString.replace(" ", "T");
   const t = Date.parse(normalized);
   return Number.isNaN(t) ? 0 : t;
+}
+
+function attachEventHandlers() {
+  document.getElementById("nextPage")?.addEventListener("click", () => {
+    if (pdfDoc && currentPage + 2 <= pdfDoc.numPages) {
+      currentPage += 2;
+      renderPages();
+    }
+  });
+
+  document.getElementById("prevPage")?.addEventListener("click", () => {
+    if (pdfDoc && currentPage - 2 >= 1) {
+      currentPage -= 2;
+      renderPages();
+    }
+  });
+
+  canvasRight?.addEventListener("click", () => {
+    if (pdfDoc && currentPage + 2 <= pdfDoc.numPages) {
+      currentPage += 2;
+      renderPages();
+    }
+  });
+
+  canvasLeft?.addEventListener("click", () => {
+    if (pdfDoc && currentPage - 2 >= 1) {
+      currentPage -= 2;
+      renderPages();
+    }
+  });
+
+  // Book selector change
+  bookSelect?.addEventListener("change", (e) => {
+    const val = e.target.value;
+    if (val === "locked") {
+      window.location.href = "../index.html";
+      return;
+    }
+    loadDocument(val);
+  });
+
+  refreshCommentsBtn?.addEventListener("click", renderComments);
+
+  submitComment?.addEventListener("click", () => {
+    if (!subscriber) return;
+    const text = newCommentText.value.trim();
+    if (!text) return;
+    appendComment(text);
+    newCommentText.value = "";
+  });
+
+  filterComments?.addEventListener("change", renderComments);
+}
+
+export async function initBookReader() {
+  if (!cacheDom()) return;
+
+  // Default to the first option if available
+  currentUrl = bookSelect?.value || currentUrl;
+
+  if (!listenersAttached) {
+    attachEventHandlers();
+    listenersAttached = true;
+  }
+  updateCommentUIAccess();
+  renderComments();
+
+  try {
+    await ensurePdfJs();
+    loadDocument(currentUrl);
+  } catch (error) {
+    console.warn("PDF.js failed to initialize. Comments remain available.", error);
+    pageInfo.textContent = "Reader unavailable";
+  }
 }
