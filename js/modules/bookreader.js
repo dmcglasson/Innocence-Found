@@ -15,7 +15,7 @@ let currentBookId = 1;
 let currentChapterRowId = 1;  
 let currentChapterNum = 1;    
 function getCurrentChapterId() {
-  return currentChapterRowId;
+  return 14;
 }
 
 async function refreshAuthState() {
@@ -400,7 +400,17 @@ function attachEventHandlers() {
   refreshCommentsBtn?.addEventListener("click", renderComments);
 
 submitComment?.addEventListener("click", async () => {
-  if (!subscriber) return;
+  // Not logged in
+  if (!currentUserId) {
+    alert("Please log in to view comments.");
+    return;
+  }
+
+  // Logged in but not subscribed
+  if (!subscriber) {
+    alert("You must be subscribed to comment.");
+    return;
+  }
 
   const text = newCommentText.value.trim();
   if (!text) return;
@@ -415,10 +425,8 @@ submitComment?.addEventListener("click", async () => {
 
   if (!res.ok) {
     const msg = (res.message || "").toLowerCase();
-
-    // RLS / permission error -> show friendly message
     if (msg.includes("row-level security") || msg.includes("rls") || msg.includes("policy")) {
-      alert("You must be subscribed to comment");
+      alert("You must be subscribed to comment.");
     } else {
       alert(res.message || "Failed to post comment.");
     }
