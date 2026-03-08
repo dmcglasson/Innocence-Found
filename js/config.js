@@ -31,6 +31,10 @@ export const APP_CONFIG = {
   TOTAL_CHAPTERS: 10,
 };
 
+// Admin API (backend); set in .env as API_BASE_URL or leave default for local dev
+const envVarsForApi = typeof window !== "undefined" ? (window.ENV || {}) : {};
+export const API_BASE_URL = envVarsForApi.API_BASE_URL || envVarsForApi.API_URL || "http://localhost:3001";
+
 // Validation for debugging (does not break the app)
 if (!SUPABASE_CONFIG.URL || !SUPABASE_CONFIG.ANON_KEY) {
   console.error(" Missing Supabase credentials in config.js or window.ENV");

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net http://localhost:3001 http://127.0.0.1:3001; object-src 'none'; base-uri 'self';">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
     <!-- Note: X-Frame-Options and frame-ancestors must be set via HTTP headers, not meta tags -->
@@ -32,6 +32,9 @@
             </ul>
 
             <div class="user-menu" id="userMenu" style="display: none;">
+                <a href="#" data-page="dashboard">Dashboard</a>
+                <a href="#" data-page="admin">Admin</a>
+                <a href="#" data-page="profile">Profile</a>
                 <span id="userNameNav"></span>
                 <a href="#" id="logoutLink">Sign Out</a>
             </div>
@@ -46,10 +49,10 @@
     </main>
 
     <footer>
-        <p>&copy; 2024 Innocence Found. All rights reserved.</p>
+        <p>&copy; <span id="footerYear"></span> Innocence Found. All rights reserved.</p>
     </footer>
 
-    <!-- Supabase JS Client Library -->
+    <!-- Supabase JS Client Library (must load before app so window.supabase exists) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
     // NOTE:

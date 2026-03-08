@@ -58,6 +58,59 @@ export async function checkAuthState() {
 }
 
 /**
+ * Handle Supabase email confirmation redirect.
+ * When user clicks the link in the email, Supabase redirects with tokens in the hash.
+ * We must consume the hash and set the session before navigation treats it as a page name.
+ * @returns {Promise<boolean>} True if the URL was an auth callback (hash was processed)
+ */
+export async function handleAuthCallback() {
+  const supabase = getSupabaseClient();
+  if (!supabase) return false;
+
+  const hash = window.location.hash.substring(1) || "";
+  const isAuthCallback =
+    hash.includes("access_token=") ||
+    hash.includes("error=") ||
+    hash.includes("refresh_token=");
+
+  if (!isAuthCallback) return false;
+
+  try {
+    // Let Supabase parse the hash and set the session
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error("Auth callback error:", error);
+      window.location.hash = "login";
+      return true;
+    }
+
+    // Check for error in hash (e.g. link expired)
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    const hashError = params.get("error");
+    const errorDescription = params.get("error_description") || "";
+
+    if (hashError) {
+      console.warn("Auth error in callback:", hashError, errorDescription);
+      window.location.hash = "login";
+      return true;
+    }
+
+    // Success: go to dashboard and let auth state listener update UI
+    if (session) {
+      window.location.hash = "dashboard";
+    } else {
+      window.location.hash = "login";
+    }
+  } catch (e) {
+    console.error("Error handling auth callback:", e);
+    window.location.hash = "login";
+  }
+
+  return true;
+}
+
+/**
  * Sign in a user
  */
 export async function signIn(email, password) {

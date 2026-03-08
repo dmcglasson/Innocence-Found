@@ -16,6 +16,24 @@ export function setGlobalOnLoadCallback(cb) {
   globalOnLoadCallback = cb;
 }
 
+// Hashes that are in-page sections on home (not separate screen files). 'chapters' is a real screen.
+const HOME_SECTION_IDS = ['worksheets', 'readers', 'about', 'subscribe'];
+
+/**
+ * Normalize hash to a valid page id: default page if it looks like auth tokens or is a home section.
+ * Home sections are still used for scroll-after-load.
+ */
+function normalizeHash(hash) {
+  if (!hash || typeof hash !== 'string') return APP_CONFIG.DEFAULT_PAGE;
+  const raw = hash.trim();
+  // Auth callback or token in hash - never treat as page name
+  if (raw.includes('=') || raw.startsWith('access_token') || raw.startsWith('error') || raw.length > 200) {
+    return APP_CONFIG.DEFAULT_PAGE;
+  }
+  const sanitized = raw.replace(/[^a-zA-Z0-9_-]/g, '');
+  return sanitized || APP_CONFIG.DEFAULT_PAGE;
+}
+
 /**
  * Sanitize HTML to prevent XSS attacks
  * Removes script tags and dangerous attributes
@@ -142,9 +160,7 @@ export async function showPage(pageId, onLoadCallback = null) {
     const screenHtml = await loadScreen(pageId);
     pageContainer.innerHTML = screenHtml;
 
-    // Call the callback (screen init). Prefer the passed callback, otherwise use global one.
     const cb = onLoadCallback || globalOnLoadCallback;
-
     if (cb && typeof cb === 'function') {
       await cb(pageId);
     }
@@ -158,15 +174,21 @@ export async function showPage(pageId, onLoadCallback = null) {
  * Initialize page from URL hash
  */
 export async function initPageFromHash() {
-  const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-
-// remove query string from hash (anything after ?)
-const pageOnly = hash.split('?')[0];
-
-// sanitize only the page name
-const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
-
-await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
+  let hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
+  const pageOnly = hash.split('?')[0];
+  if (pageOnly.includes('=') || pageOnly.startsWith('access_token') || pageOnly.startsWith('error') || pageOnly.length > 200) {
+    await showPage(APP_CONFIG.DEFAULT_PAGE);
+    return;
+  }
+  const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+  const isHomeSection = HOME_SECTION_IDS.includes(sanitized);
+  if (isHomeSection) {
+    await showPage('home');
+    const el = document.getElementById(sanitized);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
 }
 
 /**
@@ -178,8 +200,19 @@ export function clearScreenCache() {
 
 // Listen for hash changes
 window.addEventListener("hashchange", async () => {
-  const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-const pageOnly = hash.split('?')[0];
-const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
-await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
+  let hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
+  const pageOnly = hash.split('?')[0];
+  if (pageOnly.includes('=') || pageOnly.startsWith('access_token') || pageOnly.startsWith('error') || pageOnly.length > 200) {
+    await showPage(APP_CONFIG.DEFAULT_PAGE);
+    return;
+  }
+  const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+  const isHomeSection = HOME_SECTION_IDS.includes(sanitized);
+  if (isHomeSection) {
+    await showPage('home');
+    const el = document.getElementById(sanitized);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
 });

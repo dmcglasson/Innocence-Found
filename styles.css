@@ -969,3 +969,22 @@ footer p {
   }
   .auth-title{ font-size: 18px; }
 }
+
+/* Admin page */
+.admin-page .message { display: block; margin-bottom: 1rem; }
+.admin-page .message:empty { display: none; }
+.admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+.admin-tab { padding: 10px 18px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 14px; }
+.admin-tab:hover { background: #f5f5f5; }
+.admin-tab.active { background: #d4af37; color: #fff; border-color: #d4af37; }
+.admin-panel h3 { margin: 0 0 14px; font-size: 18px; }
+.admin-form .form-inline { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.admin-form .form-group { margin-bottom: 0; flex: 0 0 auto; }
+.admin-form .form-group-check { display: flex; align-items: center; }
+.admin-form .form-group-check label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.admin-table-wrap { overflow-x: auto; margin-top: 16px; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.admin-table th, .admin-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
+.admin-table th { background: #f9f9f9; font-weight: 600; }
+.admin-table .btn-small { padding: 4px 10px; font-size: 12px; margin-right: 6px; }
+.admin-pagination { margin-top: 10px; color: #666; font-size: 13px; }

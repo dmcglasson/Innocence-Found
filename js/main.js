@@ -7,60 +7,64 @@
 
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus } from './modules/auth.js';
+import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, handleAuthCallback } from './modules/auth.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
 import { APP_CONFIG } from './config.js';
+import { initAdminPage } from './modules/admin-ui.js';
 
 /**
  * Initialize the application
  */
 const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
 async function init() {
-  // Wait a moment for env vars to be available
-  await new Promise(resolve => setTimeout(resolve, 100));
-
-  // Check Supabase initialization
-  const client = getSupabaseClient();
-  if (!client) {
-    console.error("Failed to initialize Supabase client. Check your .env file or config.");
-    // Show user-friendly error
-    const pageContainer = document.getElementById("pageContainer");
+  const pageContainer = document.getElementById("pageContainer");
+  try {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const client = getSupabaseClient();
+    if (!client) {
+      console.error("Failed to initialize Supabase client. Check your .env file or config.");
+      if (pageContainer) {
+        pageContainer.innerHTML = `
+          <div class="content-section">
+            <h2>Configuration Error</h2>
+            <p>Supabase credentials not configured. Please:</p>
+            <ol>
+              <li>Create a <code>.env</code> file (copy from <code>.env.example</code>)</li>
+              <li>Add your <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code></li>
+              <li>Refresh this page</li>
+            </ol>
+          </div>
+        `;
+      }
+      return;
+    }
+    initUI();
+    const footerYear = document.getElementById('footerYear');
+    if (footerYear) footerYear.textContent = new Date().getFullYear();
+    await handleAuthCallback();
+    setGlobalOnLoadCallback(initializeScreen);
+    await initPageFromHash();
+    await checkAuthState();
+    initAuthStateListener();
+    setupEventListeners();
+    setupScreenInitialization();
+  } catch (err) {
+    console.error("App init error:", err);
     if (pageContainer) {
       pageContainer.innerHTML = `
         <div class="content-section">
-          <h2>Configuration Error</h2>
-          <p>Supabase credentials not configured. Please:</p>
-          <ol>
-            <li>Create a <code>.env</code> file (copy from <code>.env.example</code>)</li>
-            <li>Add your <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code></li>
-            <li>Refresh this page</li>
-          </ol>
+          <h2>Something went wrong</h2>
+          <p>Unable to load the page. Try refreshing.</p>
+          <p><a href="#" data-page="home">Go to Home</a></p>
         </div>
       `;
     }
-    return;
+    initUI();
+    setupEventListeners();
+    setupScreenInitialization();
   }
-
-  // Initialize UI
-  initUI();
-  setGlobalOnLoadCallback(initializeScreen);
-  // Initialize page from URL hash
-  await initPageFromHash();
-
-  // Check authentication state
-  await checkAuthState();
-
-  // Initialize auth state listener
-  initAuthStateListener();
-
-  // Set up event listeners
-  setupEventListeners();
-
-  // Set up screen initialization callback
-  setupScreenInitialization();
-
 }
 
 /**
@@ -371,6 +375,15 @@ async function initializeScreen(pageId) {
     }
   }
 
+  // Admin screen
+  if (pageId === 'admin') {
+    try {
+      await initAdminPage();
+    } catch (error) {
+      console.warn('Admin init error:', error);
+    }
+  }
+
   // Login / Signup screen
   if (pageId === 'login') {
     try {
@@ -466,10 +479,20 @@ window.showSignup = () => {
 window.handleLogout = handleLogout;
 
 // Initialize app when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+function bootstrap() {
+  init().catch((err) => {
+    console.error("App failed to start:", err);
+    const pageContainer = document.getElementById("pageContainer");
+    if (pageContainer) {
+      pageContainer.innerHTML = '<div class="content-section"><h2>Loading error</h2><p>Please refresh the page.</p><a href="#" data-page="home">Home</a></div>';
+    }
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootstrap);
 } else {
-  init();
+  bootstrap();
 }
 function renderChapters({ isSubscriber = false } = {}) {
   const chapterList = document.getElementById("chapterList");

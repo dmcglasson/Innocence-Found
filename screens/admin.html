@@ -1,0 +1,71 @@
+<div class="content-section admin-page">
+  <h2>Admin</h2>
+  <p id="adminMessage" class="message"></p>
+  <div id="adminContent" style="display: none;">
+    <div class="admin-tabs">
+      <button type="button" class="admin-tab active" data-tab="chapters">Chapters</button>
+      <button type="button" class="admin-tab" data-tab="documents">Documents / Worksheets</button>
+    </div>
+
+    <div id="adminChapters" class="admin-panel">
+      <h3>Chapters</h3>
+      <div class="admin-form panel">
+        <div class="panel-header">Add chapter</div>
+        <div class="panel-body">
+          <form id="chapterForm" class="form-inline">
+            <div class="form-group">
+              <label for="chBookId">Book ID</label>
+              <input type="number" id="chBookId" name="book_id" required min="1" placeholder="1" />
+            </div>
+            <div class="form-group">
+              <label for="chNum">Chapter #</label>
+              <input type="number" id="chNum" name="chapter_num" required min="0" placeholder="1" />
+            </div>
+            <div class="form-group form-group-check">
+              <label><input type="checkbox" id="chFree" name="free" checked /> Free</label>
+            </div>
+            <button type="submit" class="btn btn-primary">Add</button>
+          </form>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>ID</th><th>Book</th><th>#</th><th>Free</th><th>Created</th><th></th></tr></thead>
+          <tbody id="chaptersList"></tbody>
+        </table>
+        <p id="chaptersPagination" class="admin-pagination"></p>
+      </div>
+    </div>
+
+    <div id="adminDocuments" class="admin-panel" style="display: none;">
+      <h3>Documents / Worksheets</h3>
+      <div class="admin-form panel">
+        <div class="panel-header">Upload worksheet</div>
+        <div class="panel-body">
+          <form id="documentForm">
+            <div class="form-group">
+              <label for="docTitle">Title</label>
+              <input type="text" id="docTitle" name="title" required placeholder="Worksheet title" />
+            </div>
+            <div class="form-group">
+              <label for="docDesc">Description</label>
+              <input type="text" id="docDesc" name="description" placeholder="Optional" />
+            </div>
+            <div class="form-group">
+              <label for="docFile">File</label>
+              <input type="file" id="docFile" name="file" required accept=".pdf,.doc,.docx,.txt,image/*" />
+            </div>
+            <button type="submit" class="btn btn-primary">Upload</button>
+          </form>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Title</th><th>Description</th><th>Created</th><th></th></tr></thead>
+          <tbody id="documentsList"></tbody>
+        </table>
+        <p id="documentsPagination" class="admin-pagination"></p>
+      </div>
+    </div>
+  </div>
+</div>
