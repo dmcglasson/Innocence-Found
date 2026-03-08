@@ -49,6 +49,7 @@
         // This script runs before modules load, so config.js can access window.ENV
         (async function() {
             try {
+                if (location.hostname === "127.0.0.1" || location.hostname === "localhost") return;
                 const response = await fetch('.env');
                 if (response.ok) {
                     const text = await response.text();

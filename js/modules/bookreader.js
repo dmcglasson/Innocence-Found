@@ -1,12 +1,37 @@
+import { submitComment as submitCommentToDB, getCommentsByChapter } from "./comments.js";
+import { getSupabaseClient } from "./supabase.js";
 // === PDF.js Book Viewer (SPA-friendly) ===
 const PDF_JS_SRC = "https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js";
 const PDF_JS_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js";
+
 
 let pdfjsLib = null;
 let pdfDoc = null;
 let currentPage = 1;
 let currentUrl = "../book reader/books/book1.pdf";
-const subscriber = true; // toggle: true = can post/reply, false = read-only
+let subscriber = false;
+let currentUserId = null;
+let currentBookId = 1;       
+let currentChapterRowId = 1;  
+let currentChapterNum = 1;    
+function getCurrentChapterId() {
+  return currentChapterRowId;
+}
+
+async function refreshAuthState() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    currentUserId = null;
+    subscriber = false;
+    updateCommentUIAccess();
+    return;
+  }
+
+  const { data } = await supabase.auth.getUser();
+  currentUserId = data?.user?.id ?? null;
+  subscriber = !!currentUserId;
+  updateCommentUIAccess();
+}
 
 let canvasLeft;
 let canvasRight;
@@ -196,104 +221,79 @@ function setCommentHeader() {
   commentsTitle.textContent = `${label} - Section`;
   commentsMeta.textContent = `All pages`;
 }
+async function ensureChapterRow(bookId, chapterNum = 1) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
 
-function renderComments() {
+  // Try to find existing chapter row
+  let { data, error } = await supabase
+    .from("Chapters")
+    .select("id")
+    .eq("book_id", bookId)
+    .eq("chapter_num", chapterNum)
+    .maybeSingle();
+
+  if (error) {
+    console.error("ensureChapterRow select error:", error);
+    return null;
+  }
+
+  // If missing, create it
+  if (!data) {
+    const insertRes = await supabase
+      .from("Chapters")
+      .insert({ book_id: bookId, chapter_num: chapterNum, free: true })
+      .select("id")
+      .single();
+
+    if (insertRes.error) {
+      console.error("ensureChapterRow insert error:", insertRes.error);
+      return null;
+    }
+    data = insertRes.data;
+  }
+
+  return data.id;
+}
+async function renderComments() {
   if (!commentsList || !noComments) return;
+
   setCommentHeader();
   commentsList.innerHTML = "";
-  const section = ensureSectionStore();
-  const entries = section.map((entry, index) => ({ entry, index }));
 
-  const selected = filterComments?.value || "desc";
-  entries.sort((a, b) => {
-    const aEntry = a.entry;
-    const bEntry = b.entry;
-    if (selected === "asc") {
-      return toTime(aEntry.date) - toTime(bEntry.date);
-    }
-    if (selected === "popular") {
-      const countA = Array.isArray(aEntry.replies) ? aEntry.replies.length : 0;
-      const countB = Array.isArray(bEntry.replies) ? bEntry.replies.length : 0;
-      if (countB !== countA) return countB - countA;
-      return toTime(bEntry.date) - toTime(aEntry.date);
-    }
-    // default newest first
-    return toTime(bEntry.date) - toTime(aEntry.date);
-  });
-  if (!entries.length) {
+  const chapterId = getCurrentChapterId();
+  const result = await getCommentsByChapter(chapterId);
+
+  if (!result.ok || !result.data?.length) {
     noComments.classList.remove("hidden");
     return;
   }
   noComments.classList.add("hidden");
 
-  entries.forEach(({ entry, index }) => {
-    const { author, date, text, replies = [] } = entry;
+  const selected = filterComments?.value || "desc";
+  const rows = [...result.data];
+
+  // Sort by created_at
+  rows.sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    return selected === "asc" ? ta - tb : tb - ta;
+  });
+
+  rows.forEach((row) => {
     const card = document.createElement("article");
     card.className = "comment-card";
 
     const meta = document.createElement("div");
     meta.className = "comment-meta";
-    meta.textContent = `${author} - ${date}`;
+    const who = row.uid === currentUserId ? "You" : "Subscriber";
+    meta.textContent = `${who} - ${new Date(row.created_at).toLocaleString()}`;
     card.appendChild(meta);
 
     const body = document.createElement("p");
     body.className = "comment-text";
-    body.textContent = text;
+    body.textContent = row.message; // ✅ XSS-safe
     card.appendChild(body);
-
-    if (subscriber) {
-      const actions = document.createElement("div");
-      actions.className = "comment-actions";
-      const replyBtn = document.createElement("button");
-      replyBtn.className = "reply-btn";
-      replyBtn.textContent = "Reply";
-      actions.appendChild(replyBtn);
-      card.appendChild(actions);
-
-      const replyForm = document.createElement("div");
-      replyForm.className = "reply-form hidden";
-      const replyInput = document.createElement("textarea");
-      replyInput.rows = 2;
-      replyInput.placeholder = "Write a reply...";
-      const replySubmit = document.createElement("button");
-      replySubmit.type = "button";
-      replySubmit.textContent = "Post reply";
-      replyForm.appendChild(replyInput);
-      replyForm.appendChild(replySubmit);
-      card.appendChild(replyForm);
-
-      replyBtn.addEventListener("click", () => {
-        replyForm.classList.toggle("hidden");
-        if (!replyForm.classList.contains("hidden")) {
-          replyInput.focus();
-        }
-      });
-
-      replySubmit.addEventListener("click", () => {
-        const value = replyInput.value.trim();
-        if (!value) return;
-        appendReply(index, value);
-      });
-    }
-
-    if (replies.length) {
-      const repliesWrap = document.createElement("div");
-      repliesWrap.className = "replies";
-      replies.forEach((reply) => {
-        const r = document.createElement("div");
-        r.className = "reply";
-        const rMeta = document.createElement("div");
-        rMeta.className = "comment-meta";
-        rMeta.textContent = `${reply.author} - ${reply.date}`;
-        const rText = document.createElement("p");
-        rText.className = "comment-text";
-        rText.textContent = reply.text;
-        r.appendChild(rMeta);
-        r.appendChild(rText);
-        repliesWrap.appendChild(r);
-      });
-      card.appendChild(repliesWrap);
-    }
 
     commentsList.appendChild(card);
   });
@@ -399,19 +399,44 @@ function attachEventHandlers() {
 
   refreshCommentsBtn?.addEventListener("click", renderComments);
 
-  submitComment?.addEventListener("click", () => {
-    if (!subscriber) return;
-    const text = newCommentText.value.trim();
-    if (!text) return;
-    appendComment(text);
-    newCommentText.value = "";
+submitComment?.addEventListener("click", async () => {
+  if (!subscriber) return;
+
+  const text = newCommentText.value.trim();
+  if (!text) return;
+
+  const chapterId = getCurrentChapterId();
+
+  const res = await submitCommentToDB({
+    chapterId,
+    message: text,
+    parentCommentId: null,
   });
 
+  if (!res.ok) {
+    const msg = (res.message || "").toLowerCase();
+
+    // RLS / permission error -> show friendly message
+    if (msg.includes("row-level security") || msg.includes("rls") || msg.includes("policy")) {
+      alert("You must be subscribed to comment");
+    } else {
+      alert(res.message || "Failed to post comment.");
+    }
+    return;
+  }
+
+  newCommentText.value = "";
+  await renderComments();
+});
   filterComments?.addEventListener("change", renderComments);
 }
 
 export async function initBookReader() {
   if (!cacheDom()) return;
+
+  await refreshAuthState();
+  currentChapterRowId = await ensureChapterRow(currentBookId, currentChapterNum);
+  
 
   // Default to the first option if available
   currentUrl = bookSelect?.value || currentUrl;
@@ -420,12 +445,13 @@ export async function initBookReader() {
     attachEventHandlers();
     listenersAttached = true;
   }
+
   updateCommentUIAccess();
-  renderComments();
+  await renderComments();     // optional but cleaner
 
   try {
-    await ensurePdfJs();
-    loadDocument(currentUrl);
+    //await ensurePdfJs();
+    //loadDocument(currentUrl);
   } catch (error) {
     console.warn("PDF.js failed to initialize. Comments remain available.", error);
     pageInfo.textContent = "Reader unavailable";
