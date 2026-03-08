@@ -93,12 +93,15 @@ export async function loadScreen(screenName) {
   }
 
   try {
-    const response = await fetch(`${APP_CONFIG.SCREENS_PATH}${screenName}.html`);
+        const url = `${APP_CONFIG.SCREENS_PATH}${screenName}.html`;
+    console.log("🌐 fetching screen:", url);
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to load screen: ${screenName}`);
     }
     const html = await response.text();
 
+    console.log("📄 loaded HTML length for", screenName, "=", html.length);
     // Sanitize HTML before caching/using
     const sanitizedHtml = sanitizeHTML(html);
 
@@ -121,7 +124,9 @@ export async function loadScreen(screenName) {
  * @returns {Promise<void>}
  */
 export async function showPage(pageId, onLoadCallback = null) {
+    console.log("🧭 showPage called with:", pageId);
   const pageContainer = document.getElementById("pageContainer");
+    console.log("📦 pageContainer exists?", !!pageContainer);
   if (!pageContainer) {
     console.error("Page container not found");
     return;

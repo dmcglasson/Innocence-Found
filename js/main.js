@@ -5,14 +5,16 @@
  * It coordinates between different modules and handles the application lifecycle.
  */
 
+console.log("✅ main.js loaded");
+console.log("✅ imports finished, about to run init()");
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus } from './modules/auth.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
-import { APP_CONFIG } from './config.js';
-
+import { fetchWorksheetMetadata, downloadWorksheet } from "./modules/worksheets.js";
+let worksheetsLoadToken = 0;
 /**
  * Initialize the application
  */
@@ -45,9 +47,13 @@ async function init() {
 
   // Initialize UI
   initUI();
-  setGlobalOnLoadCallback(initializeScreen);
+
   // Initialize page from URL hash
-  await initPageFromHash();
+  // Set up screen initialization FIRST
+  setupScreenInitialization();
+
+  // Initialize page from URL hash
+  await window.showPage(window.location.hash.replace('#', '') || 'home');
 
   // Check authentication state
   await checkAuthState();
@@ -57,10 +63,6 @@ async function init() {
 
   // Set up event listeners
   setupEventListeners();
-
-  // Set up screen initialization callback
-  setupScreenInitialization();
-
 }
 
 /**
@@ -81,6 +83,19 @@ function setupEventListeners() {
   // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
     const target = e.target;
+
+    // Download worksheet button
+    const dlBtn = target.closest && target.closest(".downloadWorksheetBtn");
+    if (dlBtn) {
+      e.preventDefault();
+      const id = dlBtn.getAttribute("data-id");
+      const result = await downloadWorksheet(id);
+
+      if (!result.success) {
+        alert(result.message);
+      }
+      return;
+    }
 
     // Logout button
     if (target.id === 'logoutBtn' || (target.closest && target.closest('#logoutBtn'))) {
@@ -260,162 +275,112 @@ async function handleLogout() {
  * @param {string} pageId - ID of the loaded page
  */
 async function initializeScreen(pageId) {
+  console.log("🔥 initializeScreen called with:", pageId);
   // Dashboard screen
-  if (pageId === 'dashboard') {
+  if (pageId === "dashboard") {
     try {
-      await waitForElement('#userName', 1000);
-      await waitForElement('#userEmail', 1000);
+      await waitForElement("#userName", 1000);
+      await waitForElement("#userEmail", 1000);
 
       const session = await getCurrentSession();
       if (session && session.user) {
         updateDashboardUserInfo(session.user);
       }
     } catch (error) {
-      console.warn('Dashboard elements not found:', error);
-
-    }
-  }
-  if (pageId === 'chapter-reader') {
-    await waitForElement('#chapterTitle', 1000);
-
-    const chapterNumber = Number(sessionStorage.getItem('activeChapter'));
-
-    // If someone goes to #chapter-reader directly without picking a chapter
-    if (!chapterNumber) {
-      window.location.hash = 'chapters';
-      return;
+      console.warn("Dashboard elements not found:", error);
     }
 
-    if (chapterNumber > FREE_LIMIT) {
-      const session = await getCurrentSession();
+    try {
+      await waitForElement("#worksheetsContainer", 2000);
+      const wsBox = document.getElementById("worksheetsContainer");
 
-      // Not logged in -> send to login
-      if (!session || !session.user) {
-        sessionStorage.setItem('returnTo', 'chapters');
-        sessionStorage.setItem('requestedChapter', String(chapterNumber));
-        window.showLogin();
+      if (!wsBox) {
+        console.warn("worksheetsContainer not found");
         return;
       }
 
-      // Logged in but not subscriber -> block
-      const subInfo = await getSubscriberStatus();
-      if (!subInfo.isSubscriber) {
-        alert('Subscribers only.');
-        window.location.hash = 'chapters';
+      wsBox.dataset.loading = "true";
+      const currentLoadToken = ++worksheetsLoadToken;
+
+      // Always reload worksheets when entering dashboard
+      wsBox.dataset.loaded = "false";
+
+      wsBox.innerHTML = "<p>Loading worksheets...</p>";
+
+      const res = await fetchWorksheetMetadata({ includeAnswerKeys: true });
+      if (currentLoadToken !== worksheetsLoadToken) return;
+
+
+      if (!res || !res.success) {
+        wsBox.innerHTML = `<p>${res?.message || "Failed to load worksheets."}</p>`;
+        wsBox.dataset.loading = "false";
         return;
+      }
+
+      if (!Array.isArray(res.data) || res.data.length === 0) {
+        wsBox.innerHTML = "<p>No worksheets available.</p>";
+        wsBox.dataset.loading = "false";
+        return;
+      }
+
+      const worksheetHtml = res.data
+        .map((w) => {
+          const title = w?.title || "Worksheet";
+          const description = w?.description || "";
+          const id = w?.id || "";
+
+          return `
+        <div class="worksheet-item" style="margin-bottom:12px;">
+          <div><strong>${title}</strong></div>
+          <div style="font-size:14px; opacity:0.8;">${description}</div>
+          <button class="btn btn-primary downloadWorksheetBtn" data-id="${id}">
+            Download
+          </button>
+        </div>
+      `;
+        })
+        .join("");
+
+      wsBox.innerHTML = worksheetHtml;
+      wsBox.dataset.loaded = "true";
+      wsBox.dataset.loading = "false";
+
+    } catch (err) {
+      console.error("Worksheet load error:", err);
+
+      const wsBox = document.getElementById("worksheetsContainer");
+      if (wsBox) {
+        wsBox.innerHTML = "<p>Failed to load worksheets.</p>";
       }
     }
 
-    // ===== Render chapter (your exact existing content) =====
-    const titleEl = document.getElementById('chapterTitle');
-    const bodyEl = document.getElementById('chapterBody');
-    const backBtn = document.getElementById('backToChaptersBtn');
-
-    if (titleEl) titleEl.textContent = `Chapter ${chapterNumber}`;
-
-    if (bodyEl) {
-      const mockChapters = {
-        1: `
-        <p><em>Chapter 1 — The Woods Behind the House</em></p>
-        <p>
-          The path behind the old fence was never meant for children. It began as a thin line in the grass,
-          then faded into roots and wet soil, as if the forest was trying to erase it.
-        </p>
-        <p>
-          Mara stepped carefully, listening. The world here sounded different—quieter, but not empty.
-          Leaves moved without wind. A bird called once, then stopped like it remembered a rule.
-        </p>
-        <p>
-          Halfway down the trail she found the first sign: a ribbon tied around a branch,
-          pale and frayed, the kind people used to mark “safe” places.
-        </p>
-        <p>
-          She reached out to touch it, and that’s when she noticed the initials stitched into the fabric:
-          <strong>I.F.</strong>
-        </p>
-      `,
-        2: `
-        <p><em>Chapter 2 — A Letter With No Stamp</em></p>
-        <p>
-          The envelope appeared where it shouldn’t have—between the pages of a book she hadn’t opened in years.
-          No stamp. No return address. Only her name written in careful, old-fashioned ink.
-        </p>
-        <p>
-          She waited before tearing it open, as if patience could change what was inside.
-          But curiosity always wins when fear has no shape.
-        </p>
-        <p>
-          The letter was short, almost polite:
-        </p>
-        <p style="margin-left: 18px; border-left: 2px solid #d4af37; padding-left: 12px;">
-          “If you want the truth, follow the path behind the house at dawn. Do not bring anyone.
-          Do not look back until you reach the stones.”
-        </p>
-        <p>
-          Mara read it twice. Then a third time, slower—because the last line felt less like advice
-          and more like a warning written by someone who already knew what she would do.
-        </p>
-      `
-      };
-
-      bodyEl.innerHTML = mockChapters[chapterNumber] || `
-      <p><em>Chapter ${chapterNumber}</em></p>
-      <p>This chapter is not available in preview yet. Please check back later.</p>
-    `;
-    }
-
-    if (backBtn) {
-      backBtn.onclick = () => {
-        window.location.hash = 'chapters';
-      };
-    }
+    return;
   }
 
   // Login / Signup screen
-  if (pageId === 'login') {
+  if (pageId === "login") {
     try {
-      // Wait for the auth boxes to exist
-      await waitForElement('#loginBox', 1000);
+      await waitForElement("#loginBox", 1000);
 
-      const signupLink = document.getElementById('signupSwitchLink');
-      const loginLink = document.getElementById('loginSwitchLink');
+      const signupLink = document.getElementById("signupSwitchLink");
+      const loginLink = document.getElementById("loginSwitchLink");
 
       if (signupLink) {
-        signupLink.addEventListener('click', (e) => {
+        signupLink.addEventListener("click", (e) => {
           e.preventDefault();
-          toggleAuthForm('signup');
+          toggleAuthForm("signup");
         });
       }
 
 
       if (loginLink) {
-        loginLink.addEventListener('click', (e) => {
+        loginLink.addEventListener("click", (e) => {
           e.preventDefault();
-          toggleAuthForm('login');
+          toggleAuthForm("login");
         });
       }
     } catch (error) {
-      console.warn('Auth screen elements not found:', error);
-    }
-  }
-
-  if (pageId === 'chapters') {
-    await waitForElement('#chapterList', 1000);
-
-    const session = await getCurrentSession();
-    let isSubscriber = false;
-
-    if (session && session.user) {
-      const subInfo = await getSubscriberStatus();
-      isSubscriber = subInfo.isSubscriber;
-    }
-
-    renderChapters({ isSubscriber });
-
-    const requestedChapter = sessionStorage.getItem('requestedChapter');
-    if (requestedChapter) {
-      sessionStorage.removeItem('requestedChapter');
-      handleLockedChapter(Number(requestedChapter));
+      console.warn("Auth screen elements not found:", error);
     }
   }
 }
@@ -424,42 +389,45 @@ async function initializeScreen(pageId) {
  * Set up screen initialization callback for navigation
  */
 function setupScreenInitialization() {
-  // Wrap showPage to include screen initialization
   const originalShowPage = showPage;
-  const wrappedShowPage = async (pageId) => {
+
+  window.showPage = async function (pageId) {
     await originalShowPage(pageId);
+    await initializeScreen(pageId);
   };
 
-  // Expose globally for onclick handlers and navigation
-  window.showPage = wrappedShowPage;
-
-  // Set up navigation event delegation
-  document.addEventListener('click', (e) => {
-    const pageLink = e.target.closest('[data-page]');
+  document.addEventListener("click", (e) => {
+    const pageLink = e.target.closest("[data-page]");
     if (pageLink) {
       e.preventDefault();
-      const pageId = pageLink.getAttribute('data-page');
+      const pageId = pageLink.getAttribute("data-page");
       if (pageId) {
-        wrappedShowPage(pageId);
+        window.showPage(pageId);
       }
+      return;
     }
 
-    // Handle logout link
-    if (e.target.id === 'logoutLink' || e.target.closest('#logoutLink')) {
+    if (e.target.id === "logoutLink" || e.target.closest("#logoutLink")) {
       e.preventDefault();
       handleLogout();
     }
+  });
+
+  window.addEventListener("hashchange", async () => {
+    const pageId = window.location.hash.replace("#", "") || "home";
+    await initializeScreen(pageId);
   });
 }
 
 // Global functions for programmatic access
 window.showLogin = () => {
-  showPage('login').then(() => {
+  window.showPage('login').then(() => {
     setTimeout(() => toggleAuthForm('login'), 100);
   });
 };
+
 window.showSignup = () => {
-  showPage('login').then(() => {
+  window.showPage('login').then(() => {
     setTimeout(() => toggleAuthForm('signup'), 100);
   });
 };
