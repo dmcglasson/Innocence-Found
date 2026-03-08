@@ -108,8 +108,7 @@ export async function signUp(email, password, firstName, lastName, parent) {
           last_name: lastName,
           parent: parent,
           subscriber: false, // Default to false, can be updated later
-          admin: false // Default to false, can be updated later
-          name: firstName + ' ' + lastName,
+          admin: false, // Default to false, can be updated later
         },
       },
     });
