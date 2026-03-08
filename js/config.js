@@ -34,6 +34,7 @@ export const WORKSHEETS_CONFIG = {
   TABLE: "worksheets",
   BUCKET: envVars.SUPABASE_WORKSHEETS_BUCKET || "worksheets",
   SIGNED_URL_EXPIRES_IN: 60 * 5, // 5 minutes
+  FUNCTIONS_BASE_URL: "https://khiwkbnqjjycmwonbhqu.supabase.co/functions/v1",
 };
 
 // Validation for debugging (does not break the app)

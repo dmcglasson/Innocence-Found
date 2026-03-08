@@ -48,18 +48,9 @@ export async function fetchWorksheetMetadata(options = {}) {
 
     let query = supabase
       .from(WORKSHEETS_CONFIG.TABLE)
-      .select(
-        "id,title,description,file_path,is_protected,is_answer_key,grade_level,created_at,updated_at"
-      )
+      .select("id,title,description,file_path,created_at")
       .order("created_at", { ascending: false });
 
-    if (!canAccessProtected) {
-      query = query.eq("is_protected", false);
-    }
-
-    if (!includeAnswerKeys || !canAccessProtected) {
-      query = query.eq("is_answer_key", false);
-    }
 
     const { data, error } = await query;
     if (error) {
@@ -95,7 +86,7 @@ export async function getWorksheetFileUrl(worksheetId, options = {}) {
 
     const { data: rows, error: lookupError } = await supabase
       .from(WORKSHEETS_CONFIG.TABLE)
-      .select("id,file_path,is_protected,is_answer_key")
+      .select("id,file_path")
       .eq("id", worksheetId)
       .limit(1);
 
@@ -107,31 +98,21 @@ export async function getWorksheetFileUrl(worksheetId, options = {}) {
     if (!worksheet || !worksheet.file_path) {
       return { success: false, message: "Worksheet file not found" };
     }
+    const expiresIn =
+      options.expiresIn || WORKSHEETS_CONFIG.SIGNED_URL_EXPIRES_IN;
 
-    const isProtected = worksheet.is_protected || worksheet.is_answer_key;
-    if (isProtected && !canAccessProtected) {
-      return { success: false, message: "Not authorized to access this file" };
-    }
-
-    if (isProtected) {
-      const expiresIn =
-        options.expiresIn || WORKSHEETS_CONFIG.SIGNED_URL_EXPIRES_IN;
-      const { data, error } = await supabase.storage
-        .from(WORKSHEETS_CONFIG.BUCKET)
-        .createSignedUrl(worksheet.file_path, expiresIn);
-
-      if (error) {
-        return { success: false, message: error.message };
-      }
-
-      return { success: true, data: { url: data.signedUrl } };
-    }
-
-    const { data } = supabase.storage
+    const { data, error } = await supabase.storage
       .from(WORKSHEETS_CONFIG.BUCKET)
-      .getPublicUrl(worksheet.file_path);
+      .createSignedUrl(worksheet.file_path, expiresIn);
 
-    return { success: true, data: { url: data.publicUrl } };
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    return { success: true, data: { url: data.signedUrl } };
+
+
+
   } catch (error) {
     return {
       success: false,
@@ -140,47 +121,65 @@ export async function getWorksheetFileUrl(worksheetId, options = {}) {
   }
 }
 
-export async function downloadWorksheet(worksheetId, filename = "worksheet.pdf") {
+export async function downloadWorksheet(worksheetId) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, status: 500, message: "Supabase client not initialized" };
+  if (!supabase)
+    return { success: false, status: 500, message: "Supabase client not initialized" };
 
   const { data: sessionData } = await supabase.auth.getSession();
-  const user = sessionData?.session?.user || null;
-  if (!user) return { success: false, status: 401, message: "Please log in." };
+  const session = sessionData?.session;
 
-  const canAccessProtected = hasProtectedAccess(user);
-  if (!canAccessProtected) return { success: false, status: 403, message: "Subscription required." };
-  const { data: rows, error: metaErr } = await supabase
-    .from(WORKSHEETS_CONFIG.TABLE)
-    .select("title")
-    .eq("id", worksheetId)
-    .limit(1);
+  if (!session)
+    return { success: false, status: 401, message: "Please log in." };
 
-  if (metaErr) return { success: false, status: 400, message: metaErr.message };
-  if (!rows || !rows.length) return { success: false, status: 404, message: "Worksheet not found" };
+  try {
+    const response = await fetch(
+      `${WORKSHEETS_CONFIG.FUNCTIONS_BASE_URL}/download-worksheet?id=${worksheetId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }
+    );
 
-  const safeTitle = String(rows[0].title || "worksheet")
-    .replace(/[^a-z0-9-_ ]/gi, "")
-    .trim()
-    .replace(/\s+/g, "_");
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      return {
+        success: false,
+        status: response.status,
+        message: error?.error || "Download failed",
+      };
+    }
 
-  const finalName = `${safeTitle}.pdf`;
+    let filename = "worksheet.pdf";
+    const disposition = response.headers.get("Content-Disposition");
 
-  const fileRes = await getWorksheetFileUrl(worksheetId, { expiresIn: WORKSHEETS_CONFIG.SIGNED_URL_EXPIRES_IN });
-  if (!fileRes.success) {
-    const msg = fileRes.message || "Worksheet not found";
-    const status = msg.toLowerCase().includes("not found") ? 404 : 400;
-    return { success: false, status, message: msg };
+    if (disposition && disposition.includes("filename=")) {
+      filename = disposition
+        .split("filename=")[1]
+        .replace(/"/g, "")
+        .trim();
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    window.URL.revokeObjectURL(url);
+
+    return { success: true, status: 200, message: "Download started." };
+  } catch (error) {
+    return {
+      success: false,
+      status: 500,
+      message: error.message || "Server error",
+    };
   }
-
-  const url = fileRes.data.url;
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = finalName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
-  return { success: true, status: 200, message: "Download started." };
 }
