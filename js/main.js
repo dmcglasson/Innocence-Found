@@ -18,6 +18,11 @@ let worksheetsLoadToken = 0;
 /**
  * Initialize the application
  */
+const APP_CONFIG = window.APP_CONFIG || {
+  FREE_CHAPTER_COUNT: 2,
+  TOTAL_CHAPTERS: 8
+};
+
 const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
 async function init() {
   // Wait a moment for env vars to be available
@@ -71,14 +76,17 @@ async function init() {
 function setupEventListeners() {
   // Login form
   document.addEventListener('submit', async (e) => {
-    if (e.target.id === 'loginForm') {
-      e.preventDefault();
-      await handleLogin(e.target);
-    } else if (e.target.id === 'signupForm') {
-      e.preventDefault();
-      await handleSignup(e.target);
-    }
-  });
+  if (e.target.id === 'loginForm') {
+    e.preventDefault();
+    await handleLogin(e.target);
+  } else if (e.target.id === 'signupForm') {
+    e.preventDefault();
+    await handleSignup(e.target);
+  } else if (e.target.id === 'uploadWorksheetForm') {
+    e.preventDefault();
+    await handleWorksheetUpload(e.target);
+  }
+});
 
   // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
@@ -263,6 +271,80 @@ async function handleLogout() {
     // Navigation is handled by auth state listener
   } catch (error) {
     alert("Error signing out: " + error.message);
+  }
+}
+
+async function handleWorksheetUpload(form) {
+  const titleInput = form.querySelector('#worksheetTitle');
+  const descriptionInput = form.querySelector('#worksheetDescription');
+  const fileInput = form.querySelector('#worksheetFile');
+  const uploadMsg = document.getElementById('uploadMessage');
+  const uploadBtn = form.querySelector('button[type="submit"]');
+
+  if (!titleInput || !descriptionInput || !fileInput || !uploadBtn) {
+    console.error('Upload form elements not found');
+    return;
+  }
+
+  const file = fileInput.files?.[0];
+
+  if (!file) {
+    if (uploadMsg) uploadMsg.textContent = 'Please choose a PDF file.';
+    return;
+  }
+
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = 'Uploading...';
+  if (uploadMsg) uploadMsg.textContent = '';
+
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    const safeFileName = `${Date.now()}-${file.name}`;
+
+    const { error: storageError } = await supabase.storage
+      .from('Worksheets')
+      .upload(safeFileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (storageError) {
+      throw storageError;
+    }
+
+    const { error: dbError } = await supabase
+      .from('worksheets')
+      .insert([
+        {
+          title: titleInput.value.trim(),
+          description: descriptionInput.value.trim(),
+          file_path: safeFileName
+        }
+      ]);
+
+    if (dbError) {
+      throw dbError;
+    }
+
+    if (uploadMsg) uploadMsg.textContent = 'Worksheet uploaded successfully.';
+    form.reset();
+
+    const wsBox = document.getElementById('worksheetsContainer');
+    if (wsBox) {
+      wsBox.dataset.loaded = 'false';
+    }
+
+    await initializeScreen('dashboard');
+  } catch (error) {
+    console.error('Worksheet upload error:', error);
+    if (uploadMsg) uploadMsg.textContent = error.message || 'Upload failed.';
+  } finally {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload Worksheet';
   }
 }
 
