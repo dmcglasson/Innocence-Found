@@ -7,16 +7,17 @@
 
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus } from './modules/auth.js';
+import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
+import { initializeProfileScreen } from './modules/profile.js';
+import { initializeChaptersScreen, initializeChapterReaderScreen, handleLockedChapter } from './modules/chapters.js';
+import { initializeWorksheetsScreen, initializeWorksheetReaderScreen, handleLockedWorksheet } from './modules/worksheets.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
-import { APP_CONFIG } from './config.js';
 
 /**
  * Initialize the application
  */
-const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
 async function init() {
   // Wait a moment for env vars to be available
   await new Promise(resolve => setTimeout(resolve, 100));
@@ -53,7 +54,19 @@ async function init() {
   await checkAuthState();
 
   // Initialize auth state listener
-  initAuthStateListener();
+  initAuthStateListener(async (event) => {
+    const currentPage = window.location.hash.substring(1) || 'home';
+    if (currentPage !== 'profile') return;
+
+    if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+      await initializeProfileScreen();
+      return;
+    }
+
+    if (event === 'SIGNED_OUT') {
+      await initializeProfileScreen();
+    }
+  });
 
   // Set up event listeners
   setupEventListeners();
@@ -260,6 +273,10 @@ async function handleLogout() {
  * @param {string} pageId - ID of the loaded page
  */
 async function initializeScreen(pageId) {
+  if (pageId === 'profile') {
+    await initializeProfileScreen();
+  }
+
   // Dashboard screen
   if (pageId === 'dashboard') {
     try {
@@ -276,99 +293,11 @@ async function initializeScreen(pageId) {
     }
   }
   if (pageId === 'chapter-reader') {
-    await waitForElement('#chapterTitle', 1000);
+    await initializeChapterReaderScreen();
+  }
 
-    const chapterNumber = Number(sessionStorage.getItem('activeChapter'));
-
-    // If someone goes to #chapter-reader directly without picking a chapter
-    if (!chapterNumber) {
-      window.location.hash = 'chapters';
-      return;
-    }
-
-    if (chapterNumber > FREE_LIMIT) {
-      const session = await getCurrentSession();
-
-      // Not logged in -> send to login
-      if (!session || !session.user) {
-        sessionStorage.setItem('returnTo', 'chapters');
-        sessionStorage.setItem('requestedChapter', String(chapterNumber));
-        window.showLogin();
-        return;
-      }
-
-      // Logged in but not subscriber -> block
-      const subInfo = await getSubscriberStatus();
-      if (!subInfo.isSubscriber) {
-        alert('Subscribers only.');
-        window.location.hash = 'chapters';
-        return;
-      }
-    }
-
-    // ===== Render chapter (your exact existing content) =====
-    const titleEl = document.getElementById('chapterTitle');
-    const bodyEl = document.getElementById('chapterBody');
-    const backBtn = document.getElementById('backToChaptersBtn');
-
-    if (titleEl) titleEl.textContent = `Chapter ${chapterNumber}`;
-
-    if (bodyEl) {
-      const mockChapters = {
-        1: `
-        <p><em>Chapter 1 — The Woods Behind the House</em></p>
-        <p>
-          The path behind the old fence was never meant for children. It began as a thin line in the grass,
-          then faded into roots and wet soil, as if the forest was trying to erase it.
-        </p>
-        <p>
-          Mara stepped carefully, listening. The world here sounded different—quieter, but not empty.
-          Leaves moved without wind. A bird called once, then stopped like it remembered a rule.
-        </p>
-        <p>
-          Halfway down the trail she found the first sign: a ribbon tied around a branch,
-          pale and frayed, the kind people used to mark “safe” places.
-        </p>
-        <p>
-          She reached out to touch it, and that’s when she noticed the initials stitched into the fabric:
-          <strong>I.F.</strong>
-        </p>
-      `,
-        2: `
-        <p><em>Chapter 2 — A Letter With No Stamp</em></p>
-        <p>
-          The envelope appeared where it shouldn’t have—between the pages of a book she hadn’t opened in years.
-          No stamp. No return address. Only her name written in careful, old-fashioned ink.
-        </p>
-        <p>
-          She waited before tearing it open, as if patience could change what was inside.
-          But curiosity always wins when fear has no shape.
-        </p>
-        <p>
-          The letter was short, almost polite:
-        </p>
-        <p style="margin-left: 18px; border-left: 2px solid #d4af37; padding-left: 12px;">
-          “If you want the truth, follow the path behind the house at dawn. Do not bring anyone.
-          Do not look back until you reach the stones.”
-        </p>
-        <p>
-          Mara read it twice. Then a third time, slower—because the last line felt less like advice
-          and more like a warning written by someone who already knew what she would do.
-        </p>
-      `
-      };
-
-      bodyEl.innerHTML = mockChapters[chapterNumber] || `
-      <p><em>Chapter ${chapterNumber}</em></p>
-      <p>This chapter is not available in preview yet. Please check back later.</p>
-    `;
-    }
-
-    if (backBtn) {
-      backBtn.onclick = () => {
-        window.location.hash = 'chapters';
-      };
-    }
+  if (pageId === 'worksheet-reader') {
+    await initializeWorksheetReaderScreen();
   }
 
   // Login / Signup screen
@@ -400,47 +329,57 @@ async function initializeScreen(pageId) {
   }
 
   if (pageId === 'chapters') {
-    await waitForElement('#chapterList', 1000);
+    await initializeChaptersScreen();
+  }
 
-    const session = await getCurrentSession();
-    let isSubscriber = false;
-
-    if (session && session.user) {
-      const subInfo = await getSubscriberStatus();
-      isSubscriber = subInfo.isSubscriber;
-    }
-
-    renderChapters({ isSubscriber });
-
-    const requestedChapter = sessionStorage.getItem('requestedChapter');
-    if (requestedChapter) {
-      sessionStorage.removeItem('requestedChapter');
-      handleLockedChapter(Number(requestedChapter));
-    }
+  if (pageId === 'worksheets') {
+    await initializeWorksheetsScreen();
   }
 }
 
 /**
  * Set up screen initialization callback for navigation
  */
-function setupScreenInitialization() {
-  // Wrap showPage to include screen initialization
-  const originalShowPage = showPage;
-  const wrappedShowPage = async (pageId) => {
-    await originalShowPage(pageId);
-  };
+function navigateToPage(pageId) {
+  const safePage = String(pageId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safePage) return;
 
+  const nextHash = `#${safePage}`;
+
+  // If hash is unchanged, hashchange will not fire, so render directly.
+  if (window.location.hash === nextHash) {
+    showPage(safePage);
+    return;
+  }
+
+  window.location.hash = safePage;
+}
+
+function setupScreenInitialization() {
   // Expose globally for onclick handlers and navigation
-  window.showPage = wrappedShowPage;
+  window.showPage = navigateToPage;
 
   // Set up navigation event delegation
   document.addEventListener('click', (e) => {
     const pageLink = e.target.closest('[data-page]');
     if (pageLink) {
-      e.preventDefault();
       const pageId = pageLink.getAttribute('data-page');
+      const href = pageLink.getAttribute('href') || '';
+
+      // For normal hash anchors (ex: #about), let browser update the URL.
+      if (href.startsWith('#')) {
+        // If user clicks the current hash, manually re-render because hashchange won't fire.
+        if (window.location.hash === href && pageId) {
+          e.preventDefault();
+          showPage(pageId);
+        }
+        return;
+      }
+
+      // Fallback for non-anchor or non-hash navigation triggers.
+      e.preventDefault();
       if (pageId) {
-        wrappedShowPage(pageId);
+        navigateToPage(pageId);
       }
     }
 
@@ -454,16 +393,16 @@ function setupScreenInitialization() {
 
 // Global functions for programmatic access
 window.showLogin = () => {
-  showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('login'), 100);
-  });
+  navigateToPage('login');
+  setTimeout(() => toggleAuthForm('login'), 100);
 };
 window.showSignup = () => {
-  showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('signup'), 100);
-  });
+  navigateToPage('login');
+  setTimeout(() => toggleAuthForm('signup'), 100);
 };
 window.handleLogout = handleLogout;
+window.handleLockedChapter = handleLockedChapter;
+window.handleLockedWorksheet = handleLockedWorksheet;
 
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
@@ -471,62 +410,3 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
-function renderChapters({ isSubscriber = false } = {}) {
-  const chapterList = document.getElementById("chapterList");
-  if (!chapterList) return;
-
-  let html = "";
-
-  for (let i = 1; i <= APP_CONFIG.TOTAL_CHAPTERS; i++) {
-    const isLocked = !isSubscriber && i > APP_CONFIG.FREE_CHAPTER_COUNT;
-    html += `
-      <div class="chapter-item">
-        <h3>${isLocked ? "🔒 " : ""}Chapter ${i}</h3>
-        <button 
-  type="button" 
-  class="chapter-button" 
-  data-chapter="${i}"
->
-  ${isLocked ? "Subscribers Only" : "Read for Free"}
-</button>
-      </div>
-    `;
-  }
-
-  chapterList.innerHTML = html;
-  //One click listener for all chapter buttons (no inline onclick)
-  if (!chapterList.dataset.listenerAttached) {
-    chapterList.addEventListener("click", (e) => {
-      const btn = e.target.closest(".chapter-button");
-      if (!btn) return;
-
-      const chapterNumber = Number(btn.dataset.chapter);
-      if (Number.isNaN(chapterNumber)) return;
-
-      handleLockedChapter(chapterNumber);
-    });
-
-    chapterList.dataset.listenerAttached = "true";
-  }
-}
-
-async function handleLockedChapter(chapterNumber) {
-  // Chapters 1–2 are free
-  const isFreeChapter = chapterNumber <= FREE_LIMIT;
-
-  // Only require login for locked chapters (3+)
-  if (!isFreeChapter) {
-    const session = await getCurrentSession();
-    if (!session || !session.user) {
-      sessionStorage.setItem('returnTo', '#chapters');
-      sessionStorage.setItem('requestedChapter', String(chapterNumber));
-      window.showLogin();
-      return;
-    }
-  }
-
-  // Open the chapter
-  sessionStorage.setItem('activeChapter', String(chapterNumber));
-  window.location.hash = 'chapter-reader';
-}
-window.handleLockedChapter = handleLockedChapter;
