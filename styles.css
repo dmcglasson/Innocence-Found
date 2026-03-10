@@ -12,7 +12,7 @@ body {
 
     background:
         linear-gradient(rgba(243,231,215,0.85), rgba(243,231,215,0.85)),
-        url("frontend/images/forest-bg.jpg");
+        url("frontend/images/images/forest-bg.jpg");
 
     background-size: cover;
     background-position: center;
@@ -520,10 +520,13 @@ footer p {
 .btn-amber:hover {
   filter: brightness(0.95);
 }
-/* ===== HOME VINTAGE STYLES BELOW ===== */
-.home-vintage * { box-sizing: border-box; }
 
-.home-vintage{
+/* ===== HOME VINTAGE STYLES ===== */
+.home-vintage * { 
+  box-sizing: border-box; 
+}
+
+.home-vintage {
   background:
     linear-gradient(rgba(243,231,215,0.85), rgba(243,231,215,0.85)),
     url("frontend/images/images/forest-bg.jpg");
@@ -533,7 +536,6 @@ footer p {
   min-height: 100vh;
   width: 100%;
 }
-
 .home-vintage .hero {
   padding: 80px 20px;
   text-align: center;
@@ -599,9 +601,9 @@ footer p {
 
 .home-vintage .grid {
   display: grid;
-  gap: 30px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-width: 1100px;
+  gap: 24px;
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 1000px;
   margin: 0 auto;
 }
 
@@ -615,15 +617,13 @@ footer p {
 
 .home-vintage .feature{
   background: #fffaf1;
-  padding: 25px;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.08);
-
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.06);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-
-  min-height: 320px;
+  gap: 8px;
+  min-height: 240px;
 }
 
 .home-vintage .feature p{

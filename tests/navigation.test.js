@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+/**
+ * @jest-environment jsdom
+ */
+
 import { sanitizeHTML } from "../js/modules/navigation.js";
 
 describe("sanitizeHTML", () => {

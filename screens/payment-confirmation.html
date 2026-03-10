@@ -1,31 +1,44 @@
 <div class="home-vintage">
-  <section class="hero">
-    <div class="wrap stack">
-      <div class="card" style="max-width:720px;">
-        
-        <div class="eyebrow">Payment</div>
-        <h1>Confirm Your Subscription</h1>
+  <section class="features wrap">
+    <div class="card" style="max-width: 1000px;">
+      <div class="eyebrow">Payment</div>
+      <h1 style="margin-top: 10px;">Confirm Your Subscription</h1>
+      <p class="lead">
+        You’re about to subscribe to the <strong>Paid Plan</strong> for <strong>$4.99 / month</strong>.
+      </p>
 
-        <p class="lead">
-          You selected the <strong>Paid Plan</strong> ($4.99 / month).
-          Click confirm to activate your subscription.
-        </p>
+      <div class="grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start;">
+        <article class="feature" style="min-height: auto;">
+          <span class="tag">Included</span>
+          <h3>Paid Plan Benefits</h3>
+          <p style="margin: 0;">
+            • Full chapter access<br />
+            • All worksheets<br />
+            • Reader’s Corner extras<br />
+            • Subscriber-only updates
+          </p>
+        </article>
 
-        <div class="ctaRow">
-          <!-- IMPORTANT: Goes to payment-success -->
-          <a class="btn primary" href="#payment-success">
-            Confirm Payment
-          </a>
+        <article class="feature" style="min-height: auto;">
+          <span class="tag">Summary</span>
+          <h3>Payment Confirmation</h3>
 
-          <a class="btn ghost" href="#subscribe">
-            Back
-          </a>
-        </div>
+          <div style="margin-top: 10px; font-size: 15px; line-height: 1.8;">
+            <div><strong>Plan:</strong> Paid Plan</div>
+            <div><strong>Price:</strong> $4.99 / month</div>
+            <div><strong>Billing:</strong> Monthly recurring</div>
+            <div><strong>Cancel anytime:</strong> Yes</div>
+          </div>
 
-        <p style="margin-top:16px; opacity:.75; font-size:14px;">
-          (Demo confirmation page – no real payment processing.)
-        </p>
+          <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <a class="btn primary" href="#" id="confirmPaymentBtn">Confirm Payment</a>
+            <a class="btn ghost" href="#subscribe" data-page="subscribe">Back</a>
+          </div>
 
+          <p style="margin-top: 14px; font-size: 13px; opacity: 0.85;">
+            This is a mock checkout for Sprint 1. No real payment is processed.
+          </p>
+        </article>
       </div>
     </div>
   </section>
