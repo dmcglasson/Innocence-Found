@@ -20,18 +20,24 @@ export function getSupabaseClient() {
 
   try {
     // Check if config has valid values
-    if (SUPABASE_CONFIG.URL === "YOUR_SUPABASE_URL" || 
-        SUPABASE_CONFIG.ANON_KEY === "YOUR_SUPABASE_ANON_KEY") {
+    if (SUPABASE_CONFIG.URL === "YOUR_SUPABASE_URL" ||
+      SUPABASE_CONFIG.ANON_KEY === "YOUR_SUPABASE_ANON_KEY") {
       console.error("Supabase credentials not configured. Check .env file or js/config.js");
       return null;
     }
 
     const supabaseLib = window.supabase || supabase;
     if (supabaseLib && typeof supabaseLib.createClient === "function") {
+      const rawUrl = SUPABASE_CONFIG.URL || "";
+      const cleanedUrl = rawUrl.replace(/\/+$/, ""); // remove trailing slash(es)
+
       supabaseClient = supabaseLib.createClient(
-        SUPABASE_CONFIG.URL,
+        cleanedUrl,
         SUPABASE_CONFIG.ANON_KEY
       );
+
+      window.__supabaseClient = supabaseClient; // TEMP: expose for console debugging
+
       return supabaseClient;
     } else {
       console.error("Supabase library not found. Make sure the CDN script is loaded.");

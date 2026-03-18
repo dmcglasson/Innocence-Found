@@ -13,6 +13,8 @@ import { getSupabaseClient } from './supabase.js';
 import { showPage } from './navigation.js';
 import { updateNavForLoggedIn, updateNavForLoggedOut } from './ui.js';
 
+let authStateListeners = [];
+
 /**
  * Check if user is authenticated
  * @returns {Promise<Object|null>} Session object or null
@@ -37,9 +39,18 @@ export async function checkAuthState() {
   const session = await getCurrentSession();
   if (session) {
     updateNavForLoggedIn(session.user);
+
+    // If user was trying to go back somewhere (ex: #chapters), go there
+    const returnTo = sessionStorage.getItem("returnTo");
+    if (returnTo) {
+      sessionStorage.removeItem("returnTo");
+      window.location.hash = returnTo; // ex: "#chapters"
+      return;
+    }
+
     const currentPage = window.location.hash.substring(1) || "home";
     if (currentPage === "login") {
-      showPage("dashboard");
+      window.location.hash = "chapters";   //go to chapter list after login
     }
   } else {
     updateNavForLoggedOut();
@@ -73,8 +84,14 @@ export async function signIn(email, password) {
 
 /**
  * Sign up a new user
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @param {string} firstName - User first name
+ * @param {string} lastName - User last name
+ * @param {boolean} parent - Indicates if the user is a parent
+ * @returns {Promise<Object>} Result object with success status and message
  */
-export async function signUp(email, password, name) {
+export async function signUp(email, password, firstName, lastName, parent) {
   const supabase = getSupabaseClient();
   if (!supabase) {
     return { success: false, message: "Supabase client not initialized" };
@@ -86,7 +103,13 @@ export async function signUp(email, password, name) {
       password,
       options: {
         data: {
-          name,
+          name: [firstName, lastName].filter(Boolean).join(' '),
+          first_name: firstName,
+          last_name: lastName,
+          parent: parent,
+          subscriber: false, // Default to false, can be updated later
+          admin: false // Default to false, can be updated later
+          name: firstName + ' ' + lastName,
         },
       },
     });
@@ -135,7 +158,20 @@ export function initAuthStateListener(callback) {
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_IN") {
       updateNavForLoggedIn(session.user);
-      showPage("dashboard");
+
+      const returnTo = sessionStorage.getItem("returnTo");
+      if (returnTo) {
+        sessionStorage.removeItem("returnTo");
+        window.location.hash = returnTo; // ex: "#chapters"
+        return;
+      }
+
+      // Only force dashboard if user is currently on login (or no hash)
+      const currentPage = window.location.hash.substring(1) || "home";
+      if (currentPage === "login") {
+        window.location.hash = "chapters";
+      }
+      // otherwise: do nothing, let the current hash page stay (ex: chapters)
     }
 
     if (event === "SIGNED_OUT") {
@@ -221,4 +257,33 @@ export async function updatePasswordSecurely({ currentPassword, newPassword }) {
   }
 
   return { success: true, message: "Password updated successfully." };
+}
+
+/**
+ * Read subscriber status from Supabase Auth user_metadata
+ * NOTE: Right now your user_metadata has NO subscriber key.
+ * This function safely returns false unless a known key exists.
+ */
+export async function getSubscriberStatus() {
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) return { isSubscriber: false };
+
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return { isSubscriber: false };
+
+    const meta = data?.user?.user_metadata || {};
+    const val = meta.subscriber;
+
+    const isSubscriber =
+      val === true ||
+      val === 1 ||
+      (typeof val === "string" &&
+        ["true", "1", "subscriber", "active", "paid"].includes(val.trim().toLowerCase()));
+
+    return { isSubscriber };
+  } catch (e) {
+    console.error("getSubscriberStatus() error:", e);
+    return { isSubscriber: false };
+  }
 }
