@@ -260,6 +260,16 @@ async function handleLogout() {
  * @param {string} pageId - ID of the loaded page
  */
 async function initializeScreen(pageId) {
+  // Bookreader screen (supports direct hash and DOM detection)
+  if (pageId === 'bookreader' || document.getElementById('bookSelect')) {
+    try {
+      const { initBookReader } = await import('./modules/bookreader.js');
+      await initBookReader();
+    } catch (error) {
+      console.warn('Bookreader screen failed to initialize:', error);
+    }
+  }
+
   // Dashboard screen
   if (pageId === 'dashboard') {
     try {
@@ -440,7 +450,7 @@ function setupScreenInitialization() {
       e.preventDefault();
       const pageId = pageLink.getAttribute('data-page');
       if (pageId) {
-        wrappedShowPage(pageId);
+        window.showPage(pageId);
       }
     }
 
