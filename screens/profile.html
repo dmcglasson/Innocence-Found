@@ -89,16 +89,6 @@
               </div>
 
               <div class="field-row">
-                <div class="field-label">Phone</div>
-                <div class="field-value" id="viewPhone">—</div>
-              </div>
-
-              <div class="field-row">
-                <div class="field-label">Password</div>
-                <div class="field-value">********</div>
-              </div>
-
-              <div class="field-row">
                 <div class="field-label">Enrolled</div>
                 <div class="field-value" id="viewEnrolled">—</div>
               </div>
@@ -117,13 +107,6 @@
               <label class="field-label" for="nameInput">Name</label>
               <input class="input" id="nameInput" name="name" type="text" />
               <div class="error-text" id="nameError" style="display:none;">Name is required.</div>
-            </div>
-
-            <div class="form-row">
-              <label class="field-label" for="phoneInput">Phone</label>
-              <input class="input" id="phoneInput" name="phone" type="tel" />
-              <div class="hint">Optional. Digits only (no dashes).</div>
-              <div class="error-text" id="phoneError" style="display:none;">Enter a valid 10-digit phone number.</div>
             </div>
 
             <div class="form-row">
@@ -234,7 +217,19 @@
   .menu-arrow{ opacity: 0.7; }
   .menu-footer{ margin-top: 18px; display:flex; justify-content:center; }
   .settings-content{ flex:1; min-width:0; }
-  .profile-header{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 14px; }
+  .profile-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom: 14px;
+    position: sticky;
+    top: 10px;
+    z-index: 20;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(255, 248, 238, 0.92);
+    backdrop-filter: blur(2px);
+  }
   .profile-title{ margin:0; font-size: 34px; color: var(--brown-dark); }
   .profile-subtitle{ margin:6px 0 0 0; color: var(--muted); }
   .panel{
@@ -300,222 +295,3 @@
     .field-row{ flex-direction: column; }
   }
 </style>
-
-<!-- ✅ NON-MODULE SCRIPT so buttons ALWAYS work -->
-<script>
-  (function () {
-    const $ = (id) => document.getElementById(id);
-
-    // Default (your info)
-    const DEFAULT_PROFILE = {
-      name: "Mandee Jauregui",
-      email: "mandeejauregui@icloud.com",
-      phone: "7073301137",
-      subscription: "Free",
-      emailUpdates: true
-    };
-
-    // Load from localStorage (persist after refresh)
-    const saved = localStorage.getItem("IF_PROFILE");
-    const PROFILE = saved ? { ...DEFAULT_PROFILE, ...JSON.parse(saved) } : { ...DEFAULT_PROFILE };
-
-    // Enrolled date = TODAY (always)
-    const enrolledToday = new Date().toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" });
-    $("viewEnrolled").textContent = enrolledToday;
-
-    function renderView() {
-      $("viewName").textContent = PROFILE.name || "—";
-      $("viewName2").textContent = PROFILE.name || "—";
-      $("viewEmail").textContent = PROFILE.email || "—";
-      $("viewPhone").textContent = PROFILE.phone || "—";
-      $("viewSubscription").textContent = `Subscription: ${PROFILE.subscription || "Free"}`;
-
-      $("nameInput").value = PROFILE.name || "";
-      $("phoneInput").value = PROFILE.phone || "";
-      $("emailInput").value = PROFILE.email || "";
-
-      $("prefEmailUpdates").checked = PROFILE.emailUpdates === true;
-    }
-
-    function saveLocal() {
-      localStorage.setItem("IF_PROFILE", JSON.stringify(PROFILE));
-    }
-
-    // Tabs
-    const tabs = Array.from(document.querySelectorAll(".tab-section"));
-    const menuButtons = Array.from(document.querySelectorAll(".menu-item"));
-
-    function showTab(tabId) {
-      tabs.forEach(t => t.style.display = (t.id === tabId) ? "block" : "none");
-      menuButtons.forEach(b => b.classList.toggle("active", b.getAttribute("data-tab") === tabId));
-    }
-
-    menuButtons.forEach(btn => btn.addEventListener("click", () => showTab(btn.getAttribute("data-tab"))));
-    showTab("tab-profile");
-
-    // Edit show/hide
-    $("editBtn").addEventListener("click", () => {
-      $("profileForm").style.display = "block";
-    });
-
-    $("cancelProfileBtn").addEventListener("click", () => {
-      $("profileForm").style.display = "none";
-      $("toggleEmailEdit").checked = false;
-      $("emailInput").disabled = true;
-      renderView();
-    });
-
-    // Email toggle
-    $("toggleEmailEdit").addEventListener("change", () => {
-      $("emailInput").disabled = !$("toggleEmailEdit").checked;
-      $("emailError").style.display = "none";
-    });
-
-    // Validation helpers
-    function validEmail(v) {
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-    }
-    function digitsOnlyPhone(v) {
-      return (v || "").replace(/\D/g, "");
-    }
-
-    // Save profile (LOCAL always works)
-    $("profileForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-
-      const newName = ($("nameInput").value || "").trim();
-      const phoneDigits = digitsOnlyPhone($("phoneInput").value);
-      const wantsEmailChange = !$("emailInput").disabled;
-      const newEmail = ($("emailInput").value || "").trim();
-
-      // validate
-      $("nameError").style.display = newName ? "none" : "block";
-
-      const phoneOk = !phoneDigits || phoneDigits.length === 10;
-      $("phoneError").style.display = phoneOk ? "none" : "block";
-
-      const emailOk = !wantsEmailChange || validEmail(newEmail);
-      $("emailError").style.display = emailOk ? "none" : "block";
-
-      if (!newName || !phoneOk || !emailOk) return;
-
-      PROFILE.name = newName;
-      PROFILE.phone = phoneDigits || "";
-      if (wantsEmailChange) PROFILE.email = newEmail;
-
-      saveLocal();
-      renderView();
-
-      $("profileForm").style.display = "none";
-      $("toggleEmailEdit").checked = false;
-      $("emailInput").disabled = true;
-
-      // Tell module script (if it loaded) to sync with Supabase
-      window.__IF_PROFILE_SYNC__ && window.__IF_PROFILE_SYNC__({ ...PROFILE, wantsEmailChange });
-    });
-
-    // Preferences
-    $("prefsForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      PROFILE.emailUpdates = $("prefEmailUpdates").checked === true;
-      saveLocal();
-      renderView();
-
-      window.__IF_PREFS_SYNC__ && window.__IF_PREFS_SYNC__({ emailUpdates: PROFILE.emailUpdates });
-    });
-
-    // Password (UI only here; Supabase sync handled in module if available)
-    $("passwordForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const pw = ($("newPasswordInput").value || "").trim();
-      if (!pw) return;
-      $("newPasswordInput").value = "";
-      window.__IF_PASSWORD_SYNC__ && window.__IF_PASSWORD_SYNC__({ password: pw });
-    });
-
-    // Logout (if Supabase loaded, module will handle too)
-    $("logoutBtn").addEventListener("click", () => {
-      window.__IF_LOGOUT__ && window.__IF_LOGOUT__();
-      // still navigate for now
-      window.location.href = "./login.html";
-    });
-
-    renderView();
-  })();
-</script>
-
-<!-- ✅ MODULE SCRIPT: tries Supabase but NEVER breaks UI if path is wrong -->
-<script type="module">
-  let supabase = null;
-
-  try {
-    const mod = await import("../js/modules/supabase.js");
-    supabase = mod.supabase;
-  } catch (e) {
-    // If this fails, the UI STILL works via the non-module script.
-    console.log("Supabase import failed (buttons still work):", e?.message || e);
-  }
-
-  if (!supabase) {
-    // No Supabase — just exit.
-    window.__IF_PROFILE_SYNC__ = null;
-    window.__IF_PREFS_SYNC__ = null;
-    window.__IF_PASSWORD_SYNC__ = null;
-    window.__IF_LOGOUT__ = null;
-  } else {
-    // Save profile to Supabase if logged in
-    window.__IF_PROFILE_SYNC__ = async (payload) => {
-      try {
-        const { data } = await supabase.auth.getUser();
-        const user = data?.user;
-        if (!user) return;
-
-        const updatePayload = {
-          data: {
-            full_name: payload.name,
-            phone: payload.phone || null
-          }
-        };
-
-        if (payload.wantsEmailChange && payload.email && payload.email !== user.email) {
-          updatePayload.email = payload.email;
-        }
-
-        const { error } = await supabase.auth.updateUser(updatePayload);
-        if (error) throw error;
-      } catch (e) {
-        console.log("Supabase profile save failed:", e?.message || e);
-      }
-    };
-
-    window.__IF_PREFS_SYNC__ = async (payload) => {
-      try {
-        const { data } = await supabase.auth.getUser();
-        if (!data?.user) return;
-
-        const { error } = await supabase.auth.updateUser({
-          data: { email_updates: payload.emailUpdates === true }
-        });
-        if (error) throw error;
-      } catch (e) {
-        console.log("Supabase prefs save failed:", e?.message || e);
-      }
-    };
-
-    window.__IF_PASSWORD_SYNC__ = async (payload) => {
-      try {
-        const { data } = await supabase.auth.getUser();
-        if (!data?.user) return;
-
-        const { error } = await supabase.auth.updateUser({ password: payload.password });
-        if (error) throw error;
-      } catch (e) {
-        console.log("Supabase password update failed:", e?.message || e);
-      }
-    };
-
-    window.__IF_LOGOUT__ = async () => {
-      try { await supabase.auth.signOut(); } catch (e) {}
-    };
-  }
-</script>
