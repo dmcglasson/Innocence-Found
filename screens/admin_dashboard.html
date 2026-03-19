@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard</title>
+
+  <style>
+    :root{
+      --paper:#f3e8d7;
+      --paper-2:#fff8ee;
+      --ink:#2a1f18;
+      --muted:#6a5a4f;
+      --border:rgba(60,35,20,0.20);
+      --shadow:0 10px 30px rgba(0,0,0,0.10);
+      --brown:#6b4a2f;
+      --brown-dark:#4a321f;
+      --amber:#d77c2f;
+      --amber-dark:#b7631d;
+      --danger:#b42318;
+      --danger-soft:rgba(180,35,24,0.08);
+      --ok:#1f5a35;
+      --ok-soft:rgba(31,90,53,0.08);
+      --card:#ffffffb3;
+    }
+
+    * { box-sizing: border-box; }
+
+    body{
+      margin:0;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 20% 10%, rgba(215,124,47,0.12), transparent 55%),
+        radial-gradient(circle at 80% 20%, rgba(161,75,42,0.10), transparent 60%),
+        linear-gradient(180deg, var(--paper), var(--paper-2));
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      min-height:100vh;
+    }
+
+    .admin-page{
+      padding: 22px 16px;
+    }
+
+    .admin-layout{
+      max-width: 1200px;
+      margin: 0 auto;
+      display:flex;
+      gap:18px;
+      align-items:flex-start;
+    }
+
+    .admin-menu{
+      width: 290px;
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding:16px;
+    }
+
+    .admin-menu-title{
+      margin:0;
+      font-size:28px;
+      color: var(--brown-dark);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .admin-menu-sub{
+      margin: 6px 0 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .menu-section-title{
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      opacity: .75;
+      margin: 10px 0;
+    }
+
+    .menu-item{
+      width:100%;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding: 11px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(60,35,20,0.16);
+      background: rgba(255,255,255,0.68);
+      cursor:pointer;
+      margin-bottom:10px;
+      font-weight:800;
+      color: var(--brown-dark);
+      transition: transform 0.05s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .menu-item:hover{
+      border-color: rgba(215,124,47,0.45);
+    }
+
+    .menu-item.active{
+      border-color: rgba(215,124,47,0.65);
+      box-shadow: 0 0 0 3px rgba(215,124,47,0.12);
+    }
+
+    .menu-actions{
+      margin-top:16px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .admin-content{
+      flex:1;
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .admin-header{
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding:18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+    }
+
+    .admin-title{
+      margin:0;
+      font-size:48px;
+      color: var(--brown-dark);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.02;
+    }
+
+    .admin-subtitle{
+      margin:8px 0 0;
+      color: var(--muted);
+    }
+
+    .badge{
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(60,35,20,0.18);
+      background: rgba(215,124,47,0.10);
+      font-weight: 800;
+      color: var(--brown-dark);
+      white-space: nowrap;
+    }
+
+    .panel{
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius:18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .panel-header{
+      padding:14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(215,124,47,0.08), rgba(255,255,255,0.35));
+    }
+
+    .panel-title{
+      margin:0;
+      color: var(--brown-dark);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 28px;
+    }
+
+    .panel-body{
+      padding:16px;
+    }
+
+    .status-panel{
+      display:none;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(60,35,20,0.16);
+      background: rgba(255,255,255,0.72);
+      font-weight:700;
+    }
+
+    .status-panel.ok{
+      color: var(--ok);
+      background: var(--ok-soft);
+      border-color: rgba(31,90,53,0.22);
+    }
+
+    .status-panel.err{
+      color: var(--danger);
+      background: var(--danger-soft);
+      border-color: rgba(180,35,24,0.24);
+    }
+
+    .toolbar{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+
+    .input{
+      flex:1 1 320px;
+      min-width: 220px;
+      padding: 11px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.80);
+      outline:none;
+    }
+
+    .btn{
+      border-radius: 14px;
+      padding: 10px 14px;
+      min-height:44px;
+      font-weight:900;
+      cursor:pointer;
+      border: 1px solid rgba(60,35,20,0.18);
+      background: rgba(255,255,255,0.70);
+      color: var(--brown-dark);
+      white-space: nowrap;
+    }
+
+    .btn-amber{
+      border:none;
+      background: var(--amber);
+      color:#fff;
+    }
+
+    .btn-amber:hover{
+      background: var(--amber-dark);
+    }
+
+    .btn-danger{
+      border:none;
+      background: var(--danger);
+      color:#fff;
+    }
+
+    .table-shell{
+      display:block;
+    }
+
+    .table-wrap{
+      border: 1px solid rgba(60,35,20,0.14);
+      border-radius: 14px;
+      overflow:auto;
+      background: rgba(255,255,255,0.55);
+    }
+
+    .table{
+      width:100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    .table th,
+    .table td{
+      padding: 12px 12px;
+      border-bottom: 1px solid rgba(60,35,20,0.10);
+      text-align:left;
+      vertical-align: top;
+    }
+
+    .table th{
+      color: var(--brown-dark);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 15px;
+      background: rgba(255,255,255,0.32);
+    }
+
+    .table tr:last-child td{
+      border-bottom:none;
+    }
+
+    .empty{
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .pillbtn{
+      padding: 8px 11px;
+      min-height:42px;
+      border-radius: 999px;
+      border: 1px solid rgba(60,35,20,0.18);
+      background: rgba(255,255,255,0.72);
+      cursor:pointer;
+      font-weight:800;
+      color: var(--brown-dark);
+      font-size:12px;
+    }
+
+    .pillbtn.danger{
+      background: var(--danger-soft);
+      border-color: rgba(180,35,24,0.24);
+      color: var(--danger);
+    }
+
+    .footer-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+      color: var(--muted);
+    }
+
+    .mobile-cards{
+      display:none;
+      gap:12px;
+    }
+
+    .admin-card{
+      border:1px solid rgba(60,35,20,0.14);
+      border-radius:16px;
+      background: rgba(255,255,255,0.62);
+      padding:14px;
+      display:grid;
+      gap:8px;
+    }
+
+    .admin-card-title{
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 20px;
+      font-weight:900;
+      color: var(--brown-dark);
+    }
+
+    .admin-card-row{
+      display:grid;
+      grid-template-columns: 105px 1fr;
+      gap:10px;
+    }
+
+    .admin-card-label{
+      font-size:12px;
+      color: var(--muted);
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing: .5px;
+    }
+
+    .admin-card-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:4px;
+    }
+
+    .backdrop{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:999;
+    }
+
+    .modal{
+      width:min(640px, 100%);
+      background: rgba(255,255,255,0.96);
+      border:1px solid var(--border);
+      border-radius:18px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.24);
+      overflow:hidden;
+    }
+
+    .modal-h{
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(215,124,47,0.10), rgba(255,255,255,0.55));
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+
+    .modal-title{
+      margin:0;
+      color: var(--brown-dark);
+      font-size:18px;
+      font-weight:900;
+    }
+
+    .xbtn{
+      border:none;
+      background:transparent;
+      font-size:18px;
+      cursor:pointer;
+      color: var(--brown-dark);
+      font-weight:900;
+    }
+
+    .modal-b{
+      padding:16px;
+      display:grid;
+      gap:12px;
+    }
+
+    .modal-field{
+      display:grid;
+      gap:6px;
+    }
+
+    .modal-field label{
+      font-size:12px;
+      color: var(--muted);
+      font-weight:800;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .modal-field input,
+    .modal-field textarea{
+      width:100%;
+      padding:11px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.88);
+      outline:none;
+      resize:vertical;
+    }
+
+    .modal-err{
+      display:none;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(180,35,24,0.24);
+      background: var(--danger-soft);
+      color: var(--danger);
+      font-weight:800;
+    }
+
+    .modal-f{
+      padding:14px 16px;
+      border-top:1px solid var(--border);
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      flex-wrap:wrap;
+      background: rgba(255,255,255,0.60);
+    }
+
+    @media (max-width: 820px){
+      .admin-layout{
+        flex-direction:column;
+      }
+
+      .admin-menu{
+        width:100%;
+      }
+
+      .admin-header{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+
+      .admin-title{
+        font-size:36px;
+      }
+
+      .toolbar{
+        flex-direction:column;
+        align-items:stretch;
+      }
+
+      .toolbar .btn,
+      .toolbar .input,
+      .menu-actions .btn,
+      .footer-row .btn{
+        width:100%;
+      }
+
+      .table-shell{
+        display:none;
+      }
+
+      .mobile-cards{
+        display:grid;
+      }
+
+      .admin-card-actions{
+        display:grid;
+        grid-template-columns: 1fr;
+      }
+
+      .footer-row{
+        flex-direction:column;
+        align-items:stretch;
+      }
+    }
+  </style>
+
+  <!-- load Supabase browser library FIRST -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+  <div class="admin-page">
+    <div class="admin-layout">
+
+      <aside class="admin-menu" aria-label="Admin menu">
+        <h2 class="admin-menu-title">Admin</h2>
+        <p class="admin-menu-sub">Manage data and documents.</p>
+
+        <div class="menu-section">
+          <div class="menu-section-title">Data</div>
+
+          <button class="menu-item active" type="button" data-tab="tab-users">Users <span>›</span></button>
+          <button class="menu-item" type="button" data-tab="tab-books">Books <span>›</span></button>
+          <button class="menu-item" type="button" data-tab="tab-chapters">Chapters <span>›</span></button>
+          <button class="menu-item" type="button" data-tab="tab-documents">Documents <span>›</span></button>
+          <button class="menu-item" type="button" data-tab="tab-comments">Comments <span>›</span></button>
+          <button class="menu-item" type="button" data-tab="tab-subscriptions">Subscriptions <span>›</span></button>
+        </div>
+
+        <div class="menu-actions">
+          <button class="btn" type="button" id="backBtn">Back</button>
+          <button class="btn btn-amber" type="button" id="logoutBtn">Logout</button>
+        </div>
+      </aside>
+
+      <main class="admin-content">
+        <header class="admin-header">
+          <div>
+            <h1 class="admin-title">Admin Dashboard</h1>
+            <p class="admin-subtitle">View and manage system tables and documents.</p>
+          </div>
+          <div class="badge" id="adminStatusBadge">Connecting…</div>
+        </header>
+
+        <div class="status-panel" id="statusPanel">
+          <p id="statusMsg" style="margin:0;"></p>
+        </div>
+
+        <section class="panel tab-section" id="tab-users">
+          <div class="panel-header"><h2 class="panel-title">Users</h2></div>
+          <div class="panel-body">
+            <div class="toolbar">
+              <input class="input" id="usersFilter" type="text" placeholder="Filter..." />
+              <button class="btn" type="button" id="usersSortBtn">Sort: Newest</button>
+              <button class="btn" type="button" id="usersRefreshBtn">Refresh</button>
+            </div>
+            <div class="table-shell">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usersTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="mobile-cards" id="usersCards"></div>
+            <div class="footer-row">
+              <div id="usersCount">Showing 0 records.</div>
+              <button class="btn btn-amber" type="button" id="usersLoadMoreBtn">Load More</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel tab-section" id="tab-books" style="display:none;">
+          <div class="panel-header"><h2 class="panel-title">Books</h2></div>
+          <div class="panel-body">
+            <div class="toolbar">
+              <input class="input" id="booksFilter" type="text" placeholder="Filter by title/name..." />
+              <button class="btn" type="button" id="booksSortBtn">Sort: Newest</button>
+              <button class="btn" type="button" id="booksRefreshBtn">Refresh</button>
+            </div>
+            <div class="table-shell">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Title</th><th>ID</th><th>Created</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="booksTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="mobile-cards" id="booksCards"></div>
+            <div class="footer-row">
+              <div id="booksCount">Showing 0 records.</div>
+              <button class="btn btn-amber" type="button" id="booksLoadMoreBtn">Load More</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel tab-section" id="tab-chapters" style="display:none;">
+          <div class="panel-header"><h2 class="panel-title">Chapters</h2></div>
+          <div class="panel-body">
+            <div class="toolbar">
+              <input class="input" id="chaptersFilter" type="text" placeholder="Filter..." />
+              <button class="btn" type="button" id="chaptersSortBtn">Sort: Newest</button>
+              <button class="btn" type="button" id="chaptersRefreshBtn">Refresh</button>
+            </div>
+            <div class="table-shell">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Title</th><th>ID</th><th>Created</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="chaptersTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="mobile-cards" id="chaptersCards"></div>
+            <div class="footer-row">
+              <div id="chaptersCount">Showing 0 records.</div>
+              <button class="btn btn-amber" type="button" id="chaptersLoadMoreBtn">Load More</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel tab-section" id="tab-documents" style="display:none;">
+          <div class="panel-header"><h2 class="panel-title">Documents</h2></div>
+          <div class="panel-body">
+            <div class="toolbar">
+              <input class="input" id="documentsFilter" type="text" placeholder="Filter..." />
+              <button class="btn" type="button" id="documentsSortBtn">Sort: Newest</button>
+              <button class="btn" type="button" id="documentsRefreshBtn">Refresh</button>
+            </div>
+            <div class="table-shell">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Name</th><th>ID</th><th>Created</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="documentsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="mobile-cards" id="documentsCards"></div>
+            <div class="footer-row">
+              <div id="documentsCount">Showing 0 records.</div>
+              <button class="btn btn-amber" type="button" id="documentsLoadMoreBtn">Load More</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel tab-section" id="tab-comments" style="display:none;">
+          <div class="panel-header"><h2 class="panel-title">Comments</h2></div>
+          <div class="panel-body">
+            <div class="toolbar">
+              <input class="input" id="commentsFilter" type="text" placeholder="Filter..." />
+              <button class="btn" type="button" id="commentsSortBtn">Sort: Newest</button>
+              <button class="btn" type="button" id="commentsRefreshBtn">Refresh</button>
+            </div>
+            <div class="table-shell">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Comment</th><th>ID</th><th>Created</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="commentsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="mobile-cards" id="commentsCards"></div>
+            <div class="footer-row">
+              <div id="commentsCount">Showing 0 records.</div>
+              <button class="btn btn-amber" type="button" id="commentsLoadMoreBtn">Load More</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel tab-section" id="tab-subscriptions" style="display:none;">
+          <div class="panel-header"><h2 class="panel-title">Subscriptions</h2></div>
+          <div class="panel-body">
+            <div class="toolbar">
+              <input class="input" id="subscriptionsFilter" type="text" placeholder="Filter..." />
+              <button class="btn" type="button" id="subscriptionsSortBtn">Sort: Newest</button>
+              <button class="btn" type="button" id="subscriptionsRefreshBtn">Refresh</button>
+            </div>
+            <div class="table-shell">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Status</th><th>User ID</th><th>ID</th><th>Created</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="subscriptionsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="mobile-cards" id="subscriptionsCards"></div>
+            <div class="footer-row">
+              <div id="subscriptionsCount">Showing 0 records.</div>
+              <button class="btn btn-amber" type="button" id="subscriptionsLoadMoreBtn">Load More</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="backdrop" id="backdrop">
+    <div class="modal">
+      <div class="modal-h">
+        <h3 class="modal-title" id="modalTitle">Manage Record</h3>
+        <button class="xbtn" type="button" id="closeModal">✕</button>
+      </div>
+      <div class="modal-b">
+        <div class="modal-field">
+          <label>ID</label>
+          <input id="modalId" disabled />
+        </div>
+        <div class="modal-field">
+          <label id="modalNameLabel">Name</label>
+          <input id="modalName" />
+        </div>
+        <div class="modal-err" id="modalErr"></div>
+      </div>
+      <div class="modal-f">
+        <button class="btn" type="button" id="cancelModal">Cancel</button>
+        <button class="btn btn-danger" type="button" id="deleteModalBtn">Delete</button>
+        <button class="btn btn-amber" type="button" id="saveModalBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+
+      const state = {
+        users: [],
+        books: [],
+        chapters: [],
+        documents: [],
+        comments: [],
+        subscriptions: [],
+        usersFilter: "",
+        booksFilter: "",
+        chaptersFilter: "",
+        documentsFilter: "",
+        commentsFilter: "",
+        subscriptionsFilter: "",
+        usersPage: 0,
+        booksPage: 0,
+        chaptersPage: 0,
+        documentsPage: 0,
+        commentsPage: 0,
+        subscriptionsPage: 0,
+        usersSort: "newest",
+        booksSort: "newest",
+        chaptersSort: "newest",
+        documentsSort: "newest",
+        commentsSort: "newest",
+        subscriptionsSort: "newest",
+        modalTable: null,
+        modalRecord: null
+      };
+
+      function setBadge(text) {
+        $("adminStatusBadge").textContent = text;
+      }
+
+      function showStatus(msg, isError = false) {
+        $("statusPanel").style.display = "block";
+        $("statusPanel").className = "status-panel " + (isError ? "err" : "ok");
+        $("statusMsg").textContent = msg;
+      }
+
+      function hideStatus() {
+        $("statusPanel").style.display = "none";
+        $("statusPanel").className = "status-panel";
+        $("statusMsg").textContent = "";
+      }
+
+      function fmtDate(v) {
+        if (!v) return "—";
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return "—";
+        return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+      }
+
+      function safe(v) {
+        return v === null || v === undefined || v === "" ? "—" : String(v);
+      }
+
+      function showTab(tabId) {
+        document.querySelectorAll(".tab-section").forEach(sec => {
+          sec.style.display = sec.id === tabId ? "block" : "none";
+        });
+
+        document.querySelectorAll(".menu-item").forEach(btn => {
+          btn.classList.toggle("active", btn.getAttribute("data-tab") === tabId);
+        });
+
+        hideStatus();
+      }
+
+      document.querySelectorAll(".menu-item").forEach(btn => {
+        btn.addEventListener("click", () => showTab(btn.getAttribute("data-tab")));
+      });
+
+      $("backBtn").addEventListener("click", () => {
+        window.location.href = "./dashboard.html";
+      });
+
+      function filterRows(key, rows) {
+        const q = (state[key + "Filter"] || "").trim().toLowerCase();
+        if (!q) return rows;
+
+        if (key === "users") return rows.filter(r => `${r.id} ${r.name || ""} ${r.email || ""} ${r.role || ""}`.toLowerCase().includes(q));
+        if (key === "books") return rows.filter(r => `${r.id} ${r.name || ""}`.toLowerCase().includes(q));
+        if (key === "chapters") return rows.filter(r => `${r.id} ${r.title || r.name || ""}`.toLowerCase().includes(q));
+        if (key === "documents") return rows.filter(r => `${r.id} ${r.name || r.title || ""}`.toLowerCase().includes(q));
+        if (key === "comments") return rows.filter(r => `${r.id} ${r.comment || r.text || r.content || ""}`.toLowerCase().includes(q));
+        if (key === "subscriptions") return rows.filter(r => `${r.id} ${r.status || ""} ${r.user_id || ""}`.toLowerCase().includes(q));
+        return rows;
+      }
+
+      function attachActions(container, key) {
+        container.querySelectorAll("[data-action]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const action = btn.getAttribute("data-action");
+            const id = btn.getAttribute("data-id");
+            const rec = state[key].find(r => String(r.id) === String(id));
+            if (!rec) {
+              showStatus("Record not found.", true);
+              return;
+            }
+            openModal(key, rec, action);
+          });
+        });
+      }
+
+      function renderUsers() {
+        const rows = filterRows("users", state.users);
+        const tbody = $("usersTbody");
+        const cards = $("usersCards");
+        tbody.innerHTML = "";
+        cards.innerHTML = "";
+
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="empty">No records found.</td></tr>`;
+          cards.innerHTML = `<div class="admin-card"><div class="admin-card-title">No records found.</div></div>`;
+          $("usersCount").textContent = "Showing 0 records.";
+          return;
+        }
+
+        rows.forEach(r => {
+          tbody.innerHTML += `
+            <tr>
+              <td>${safe(r.id)}</td>
+              <td>${safe(r.name)}</td>
+              <td>${safe(r.email)}</td>
+              <td>${safe(r.role)}</td>
+              <td>
+                <div class="actions">
+                  <button class="pillbtn" type="button" data-action="view" data-id="${safe(r.id)}">View</button>
+                  <button class="pillbtn" type="button" data-action="edit" data-id="${safe(r.id)}">Edit</button>
+                  <button class="pillbtn danger" type="button" data-action="delete" data-id="${safe(r.id)}">Delete</button>
+                </div>
+              </td>
+            </tr>
+          `;
+
+          cards.innerHTML += `
+            <div class="admin-card">
+              <div class="admin-card-title">${safe(r.name)}</div>
+              <div class="admin-card-row"><div class="admin-card-label">ID</div><div>${safe(r.id)}</div></div>
+              <div class="admin-card-row"><div class="admin-card-label">Email</div><div>${safe(r.email)}</div></div>
+              <div class="admin-card-row"><div class="admin-card-label">Role</div><div>${safe(r.role)}</div></div>
+              <div class="admin-card-actions">
+                <button class="pillbtn" type="button" data-action="view" data-id="${safe(r.id)}">View</button>
+                <button class="pillbtn" type="button" data-action="edit" data-id="${safe(r.id)}">Edit</button>
+                <button class="pillbtn danger" type="button" data-action="delete" data-id="${safe(r.id)}">Delete</button>
+              </div>
+            </div>
+          `;
+        });
+
+        attachActions(tbody, "users");
+        attachActions(cards, "users");
+        $("usersCount").textContent = `Showing ${rows.length} records.`;
+      }
+
+      function renderBooks() {
+        const rows = filterRows("books", state.books);
+        const tbody = $("booksTbody");
+        const cards = $("booksCards");
+        tbody.innerHTML = "";
+        cards.innerHTML = "";
+
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="4" class="empty">No records found.</td></tr>`;
+          cards.innerHTML = `<div class="admin-card"><div class="admin-card-title">No records found.</div></div>`;
+          $("booksCount").textContent = "Showing 0 records.";
+          return;
+        }
+
+        rows.forEach(r => {
+          tbody.innerHTML += `
+            <tr>
+              <td>${safe(r.name)}</td>
+              <td>${safe(r.id)}</td>
+              <td>${fmtDate(r.created_at)}</td>
+              <td>
+                <div class="actions">
+                  <button class="pillbtn" type="button" data-action="view" data-id="${safe(r.id)}">View</button>
+                  <button class="pillbtn" type="button" data-action="edit" data-id="${safe(r.id)}">Edit</button>
+                  <button class="pillbtn danger" type="button" data-action="delete" data-id="${safe(r.id)}">Delete</button>
+                </div>
+              </td>
+            </tr>
+          `;
+
+          cards.innerHTML += `
+            <div class="admin-card">
+              <div class="admin-card-title">${safe(r.name)}</div>
+              <div class="admin-card-row"><div class="admin-card-label">ID</div><div>${safe(r.id)}</div></div>
+              <div class="admin-card-row"><div class="admin-card-label">Created</div><div>${fmtDate(r.created_at)}</div></div>
+              <div class="admin-card-actions">
+                <button class="pillbtn" type="button" data-action="view" data-id="${safe(r.id)}">View</button>
+                <button class="pillbtn" type="button" data-action="edit" data-id="${safe(r.id)}">Edit</button>
+                <button class="pillbtn danger" type="button" data-action="delete" data-id="${safe(r.id)}">Delete</button>
+              </div>
+            </div>
+          `;
+        });
+
+        attachActions(tbody, "books");
+        attachActions(cards, "books");
+        $("booksCount").textContent = `Showing ${rows.length} records.`;
+      }
+
+      function renderGeneric(key, tbodyId, cardsId, countId, getTitle, colSpan) {
+        const rows = filterRows(key, state[key]);
+        const tbody = document.getElementById(tbodyId);
+        const cards = document.getElementById(cardsId);
+        tbody.innerHTML = "";
+        cards.innerHTML = "";
+
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty">No records found.</td></tr>`;
+          cards.innerHTML = `<div class="admin-card"><div class="admin-card-title">No records found.</div></div>`;
+          document.getElementById(countId).textContent = "Showing 0 records.";
+          return;
+        }
+
+        rows.forEach(r => {
+          const title = getTitle(r);
+
+          if (key === "subscriptions") {
+            tbody.innerHTML += `
+              <tr>
+                <td>${safe(r.status)}</td>
+                <td>${safe(r.user_id)}</td>
+                <td>${safe(r.id)}</td>
+                <td>${fmtDate(r.created_at)}</td>
+                <td>
+                  <div class="actions">
+                    <button class="pillbtn" type="button" data-action="view" data-id="${safe(r.id)}">View</button>
+                    <button class="pillbtn" type="button" data-action="edit" data-id="${safe(r.id)}">Edit</button>
+                    <button class="pillbtn danger" type="button" data-action="delete" data-id="${safe(r.id)}">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+
+            cards.innerHTML += `
+              <div class="admin-card">
+                <div class="admin-card-title">${safe(r.status)}</div>
+                <div class="admin-card-row"><div class="admin-card-label">User ID</div><div>${safe(r.user_id)}</div></div>
+                <div class="admin-card-row"><div class="admin-card-label">ID</div><div>${safe(r.id)}</div></div>
+                <div class="admin-card-row"><div class="admin-card-label">Created</div><div>${fmtDate(r.created_at)}</div></div>
+                <div class="admin-card-actions">
+                  <button class="pillbtn" type="button" data-action="view" data-id="${safe(r.id)}">View</button>
+                  <button class="pillbtn" type="button" data-action="edit" data-id="${safe(r.id)}">Edit</button>
+                  <button class="pillbtn danger" type="button" data-action="delete" data-id="${safe(r.id)}">Delete</button>
+                </div>
+              </div>
+            `;
+          } else {
+            tbody.innerHTML += `
+              <tr>
+                <td>${safe(title)}</td>
+                <td>${safe(r.id)}</td>
+                <td>${fmtDate(r.created_at)}</td>
+                <td>
+                  <div class="actions">
+                    <button class="pillbtn" type="button" data-action="view" data-id="${safe(r.id)}">View</button>
+                    <button class="pillbtn" type="button" data-action="edit" data-id="${safe(r.id)}">Edit</button>
+                    <button class="pillbtn danger" type="button" data-action="delete" data-id="${safe(r.id)}">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+
+            cards.innerHTML += `
+              <div class="admin-card">
+                <div class="admin-card-title">${safe(title)}</div>
+                <div class="admin-card-row"><div class="admin-card-label">ID</div><div>${safe(r.id)}</div></div>
+                <div class="admin-card-row"><div class="admin-card-label">Created</div><div>${fmtDate(r.created_at)}</div></div>
+                <div class="admin-card-actions">
+                  <button class="pillbtn" type="button" data-action="view" data-id="${safe(r.id)}">View</button>
+                  <button class="pillbtn" type="button" data-action="edit" data-id="${safe(r.id)}">Edit</button>
+                  <button class="pillbtn danger" type="button" data-action="delete" data-id="${safe(r.id)}">Delete</button>
+                </div>
+              </div>
+            `;
+          }
+        });
+
+        attachActions(tbody, key);
+        attachActions(cards, key);
+        document.getElementById(countId).textContent = `Showing ${rows.length} records.`;
+      }
+
+      function renderAll() {
+        renderUsers();
+        renderBooks();
+        renderGeneric("chapters", "chaptersTbody", "chaptersCards", "chaptersCount", r => r.title || r.name || "—", 4);
+        renderGeneric("documents", "documentsTbody", "documentsCards", "documentsCount", r => r.name || r.title || "—", 4);
+        renderGeneric("comments", "commentsTbody", "commentsCards", "commentsCount", r => r.comment || r.text || r.content || "—", 4);
+        renderGeneric("subscriptions", "subscriptionsTbody", "subscriptionsCards", "subscriptionsCount", r => r.status || "—", 5);
+      }
+
+      function openModal(table, record, action) {
+        state.modalTable = table;
+        state.modalRecord = record;
+
+        $("modalTitle").textContent =
+          action === "view" ? "View Record" :
+          action === "delete" ? "Delete Record" :
+          "Edit Record";
+
+        $("modalId").value = record.id ?? "";
+
+        const label =
+  table === "books" ? "Book Name" :
+  table === "users" ? "Name" :
+  table === "chapters" ? "Chapter Name" :
+  table === "documents" ? "Document Type" :
+  table === "comments" ? "Comment" :
+  table === "subscriptions" ? "Status" :
+  "Value";
+
+        $("modalNameLabel").textContent = label;
+
+        const value =
+  table === "books" ? (record.name ?? "") :
+  table === "users" ? (record.name ?? "") :
+  table === "chapters" ? (record.chapter_name ?? "") :
+  table === "documents" ? (record.name ?? record.title ?? "") :
+  table === "comments" ? (record.comment ?? record.text ?? record.content ?? "") :
+  table === "subscriptions" ? (record.status ?? "") :
+  "";
+
+        $("modalName").value = value;
+        $("modalName").disabled = action !== "edit";
+        $("saveModalBtn").style.display = action === "edit" ? "inline-flex" : "none";
+        $("deleteModalBtn").style.display = action === "delete" ? "inline-flex" : "none";
+        $("modalErr").style.display = "none";
+        $("modalErr").textContent = "";
+        $("backdrop").style.display = "flex";
+      }
+
+      function closeModal() {
+        $("backdrop").style.display = "none";
+        state.modalTable = null;
+        state.modalRecord = null;
+      }
+
+      $("closeModal").addEventListener("click", closeModal);
+      $("cancelModal").addEventListener("click", closeModal);
+      $("backdrop").addEventListener("click", (e) => {
+        if (e.target === $("backdrop")) closeModal();
+      });
+
+      function modalError(msg) {
+        $("modalErr").style.display = "block";
+        $("modalErr").textContent = msg;
+      }
+
+      $("usersFilter").addEventListener("input", () => {
+        state.usersFilter = $("usersFilter").value || "";
+        renderUsers();
+      });
+
+      $("booksFilter").addEventListener("input", () => {
+        state.booksFilter = $("booksFilter").value || "";
+        renderBooks();
+      });
+
+      $("chaptersFilter").addEventListener("input", () => {
+        state.chaptersFilter = $("chaptersFilter").value || "";
+        renderGeneric("chapters", "chaptersTbody", "chaptersCards", "chaptersCount", r => r.title || r.name || "—", 4);
+      });
+
+      $("documentsFilter").addEventListener("input", () => {
+        state.documentsFilter = $("documentsFilter").value || "";
+        renderGeneric("documents", "documentsTbody", "documentsCards", "documentsCount", r => r.name || r.title || "—", 4);
+      });
+
+      $("commentsFilter").addEventListener("input", () => {
+        state.commentsFilter = $("commentsFilter").value || "";
+        renderGeneric("comments", "commentsTbody", "commentsCards", "commentsCount", r => r.comment || r.text || r.content || "—", 4);
+      });
+
+      $("subscriptionsFilter").addEventListener("input", () => {
+        state.subscriptionsFilter = $("subscriptionsFilter").value || "";
+        renderGeneric("subscriptions", "subscriptionsTbody", "subscriptionsCards", "subscriptionsCount", r => r.status || "—", 5);
+      });
+
+      $("usersSortBtn").addEventListener("click", async () => {
+        state.usersSort = state.usersSort === "newest" ? "title" : "newest";
+        $("usersSortBtn").textContent = state.usersSort === "newest" ? "Sort: Newest" : "Sort: Title";
+        window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("users", true);
+      });
+
+      $("booksSortBtn").addEventListener("click", async () => {
+        state.booksSort = state.booksSort === "newest" ? "title" : "newest";
+        $("booksSortBtn").textContent = state.booksSort === "newest" ? "Sort: Newest" : "Sort: Title";
+        window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("books", true);
+      });
+
+      $("chaptersSortBtn").addEventListener("click", async () => {
+        state.chaptersSort = state.chaptersSort === "newest" ? "title" : "newest";
+        $("chaptersSortBtn").textContent = state.chaptersSort === "newest" ? "Sort: Newest" : "Sort: Title";
+        window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("chapters", true);
+      });
+
+      $("documentsSortBtn").addEventListener("click", async () => {
+        state.documentsSort = state.documentsSort === "newest" ? "title" : "newest";
+        $("documentsSortBtn").textContent = state.documentsSort === "newest" ? "Sort: Newest" : "Sort: Title";
+        window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("documents", true);
+      });
+
+      $("commentsSortBtn").addEventListener("click", async () => {
+        state.commentsSort = state.commentsSort === "newest" ? "title" : "newest";
+        $("commentsSortBtn").textContent = state.commentsSort === "newest" ? "Sort: Newest" : "Sort: Title";
+        window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("comments", true);
+      });
+
+      $("subscriptionsSortBtn").addEventListener("click", async () => {
+        state.subscriptionsSort = state.subscriptionsSort === "newest" ? "title" : "newest";
+        $("subscriptionsSortBtn").textContent = state.subscriptionsSort === "newest" ? "Sort: Newest" : "Sort: Title";
+        window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("subscriptions", true);
+      });
+
+      $("usersRefreshBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("users", true));
+      $("booksRefreshBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("books", true));
+      $("chaptersRefreshBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("chapters", true));
+      $("documentsRefreshBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("documents", true));
+      $("commentsRefreshBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("comments", true));
+      $("subscriptionsRefreshBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("subscriptions", true));
+
+      $("usersLoadMoreBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("users", false));
+      $("booksLoadMoreBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("books", false));
+      $("chaptersLoadMoreBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("chapters", false));
+      $("documentsLoadMoreBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("documents", false));
+      $("commentsLoadMoreBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("comments", false));
+      $("subscriptionsLoadMoreBtn").addEventListener("click", async () => window.__IF_LOAD_TABLE__ && await window.__IF_LOAD_TABLE__("subscriptions", false));
+
+      setBadge("Waiting for DB");
+      renderAll();
+      showTab("tab-users");
+
+      window.__IF_STATE__ = state;
+      window.__IF_RENDER_ALL__ = renderAll;
+      window.__IF_SET_BADGE__ = setBadge;
+      window.__IF_SHOW_STATUS__ = showStatus;
+      window.__IF_MODAL_ERROR__ = modalError;
+      window.__IF_CLOSE_MODAL__ = closeModal;
+    })();
+  </script>
+
+<script type="module">
+  import { getSupabaseClient } from "../js/modules/supabase.js";
+
+  (async () => {
+    try {
+      const state = window.__IF_STATE__;
+      const renderAll = window.__IF_RENDER_ALL__;
+      const setBadge = window.__IF_SET_BADGE__;
+      const showStatus = window.__IF_SHOW_STATUS__;
+      const modalError = window.__IF_MODAL_ERROR__;
+      const closeModal = window.__IF_CLOSE_MODAL__;
+
+      console.log("Module script started");
+
+      const supabase = getSupabaseClient();
+      window.supabase = supabase;
+
+      console.log("Resolved supabase client:", supabase);
+
+      if (!supabase) {
+        setBadge("No DB");
+        showStatus("Supabase client could not initialize. Check js/config.js and browser console.", true);
+        return;
+      }
+
+      const PAGE_SIZE = 10;
+
+      const configs = {
+        users: {
+          table: "profiles",
+          fallbackTable: "users",
+          pageKey: "usersPage",
+          sortNewest: { col: "created_at", asc: false },
+          sortTitle: { col: "name", asc: true },
+          normalize: (r) => ({
+            id: r.id ?? r.user_id ?? "",
+            name: r.name ?? r.full_name ?? "",
+            email: r.email ?? "",
+            role: r.role ?? "user",
+            created_at: r.created_at ?? null,
+            __raw: r
+          })
+        },
+        books: {
+          table: "Books",
+          pageKey: "booksPage",
+          sortNewest: { col: "created_at", asc: false },
+          sortTitle: { col: "name", asc: true },
+          normalize: (r) => ({
+            id: r.id,
+            name: r.name ?? "",
+            created_at: r.created_at ?? null,
+            __raw: r
+          })
+        },
+        chapters: {
+  table: "Chapters",
+  pageKey: "chaptersPage",
+  sortNewest: { col: "id", asc: false },
+  sortTitle: { col: "chapter_name", asc: true },
+  normalize: (r) => ({
+    id: r.id ?? "",
+    title: r.chapter_name ?? "",
+    created_at: r.created_at ?? null,
+    chapter_name: r.chapter_name ?? "",
+    chapter_num: r.chapter_num ?? "",
+    __raw: r
+  })
+},
+        documents: {
+          table: "Documents",
+          pageKey: "documentsPage",
+          sortNewest: { col: "teaching_doc_id", asc: false },
+          sortTitle: { col: "teaching_doc_id", asc: true },
+          normalize: (r) => ({
+            id: r.teaching_doc_id ?? r.worksheet_id ?? r.answer_key_id ?? "",
+            name: r.teaching_doc_id
+              ? "Teaching Document"
+              : r.worksheet_id
+              ? "Worksheet"
+              : r.answer_key_id
+              ? "Answer Key"
+              : "Document",
+            created_at: null,
+            teaching_doc_id: r.teaching_doc_id ?? "",
+            worksheet_id: r.worksheet_id ?? "",
+            answer_key_id: r.answer_key_id ?? "",
+            __raw: r
+          })
+        },
+        comments: {
+          table: "Comments",
+          pageKey: "commentsPage",
+          sortNewest: { col: "id", asc: false },
+          sortTitle: { col: "id", asc: true },
+          normalize: (r) => ({
+            id: r.id ?? "",
+            comment: r.comment ?? r.text ?? r.content ?? "",
+            created_at: r.created_at ?? null,
+            __raw: r
+          })
+        },
+        subscriptions: {
+          table: "subscriptions",
+          pageKey: "subscriptionsPage",
+          sortNewest: { col: "id", asc: false },
+          sortTitle: { col: "status", asc: true },
+          normalize: (r) => ({
+            id: r.id ?? "",
+            status: r.status ?? "",
+            user_id: r.user_id ?? "",
+            created_at: r.created_at ?? null,
+            __raw: r
+          })
+        }
+      };
+
+      window.__IF_LOGOUT__ = async () => {
+        try {
+          await supabase.auth.signOut();
+        } catch (e) {
+          console.log("Logout failed:", e);
+        }
+      };
+
+      document.getElementById("logoutBtn").addEventListener("click", async () => {
+        try {
+          await window.__IF_LOGOUT__();
+        } catch (e) {}
+        window.location.href = "./login.html";
+      });
+
+      async function checkAdmin() {
+        try {
+          const { data, error } = await supabase.auth.getUser();
+
+          if (error) {
+            console.log("Admin check failed:", error.message);
+            setBadge("Dev Mode");
+            showStatus("Auth session missing. Using temporary dev access.", false);
+            return {
+              id: "dev-admin",
+              email: "mandeejauregui@icloud.com",
+              user_metadata: { role: "admin" }
+            };
+          }
+
+          const user = data?.user;
+
+          if (!user) {
+            setBadge("Dev Mode");
+            showStatus("No logged-in user found. Using temporary dev access.", false);
+            return {
+              id: "dev-admin",
+              email: "mandeejauregui@icloud.com",
+              user_metadata: { role: "admin" }
+            };
+          }
+
+          const role =
+            user.user_metadata?.role ||
+            user.app_metadata?.role ||
+            user.user_metadata?.user_role ||
+            "";
+
+          const email = (user.email || "").toLowerCase();
+
+          const isAdmin =
+            String(role).toLowerCase() === "admin" ||
+            email === "mandeejauregui@icloud.com";
+
+          if (!isAdmin) {
+            setBadge("Unauthorized");
+            showStatus("Unauthorized. Admin role required.", true);
+            return null;
+          }
+
+          setBadge("Admin Verified");
+          return user;
+        } catch (e) {
+          console.log("Admin check failed:", e?.message || e);
+          setBadge("Dev Mode");
+          showStatus("Auth session missing. Using temporary dev access.", false);
+          return {
+            id: "dev-admin",
+            email: "mandeejauregui@icloud.com",
+            user_metadata: { role: "admin" }
+          };
+        }
+      }
+
+      async function fetchTable(key, reset = true) {
+        const cfg = configs[key];
+        if (!cfg) return;
+
+        if (reset) state[cfg.pageKey] = 0;
+
+        const sortMode = state[key + "Sort"];
+        const sortCfg = sortMode === "title" ? cfg.sortTitle : cfg.sortNewest;
+        const from = state[cfg.pageKey] * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        async function runQuery(table) {
+          return supabase
+            .from(table)
+            .select("*")
+            .order(sortCfg.col, { ascending: sortCfg.asc })
+            .range(from, to);
+        }
+
+        try {
+          let result = await runQuery(cfg.table);
+
+          if (result.error && cfg.fallbackTable) {
+            result = await runQuery(cfg.fallbackTable);
+          }
+
+          if (result.error) throw result.error;
+
+          const rows = (result.data || []).map(cfg.normalize);
+
+          if (reset) state[key] = rows;
+          else state[key] = [...state[key], ...rows];
+
+          if (rows.length > 0) state[cfg.pageKey] += 1;
+
+          console.log(`Loaded ${key}:`, rows);
+          renderAll();
+        } catch (e) {
+          console.log(`Failed to load ${key}:`, e?.message || e);
+          state[key] = [];
+          renderAll();
+          showStatus(`Failed to load ${key}. ${e?.message || ""}`.trim(), true);
+        }
+      }
+
+      async function updateRecord(tableKey, record, newValue) {
+  const cfg = configs[tableKey];
+  const raw = record.__raw || record;
+  let tableName = cfg.table;
+  let updateData = {};
+  let pkValue = raw.id ?? record.id;
+
+  if (tableKey === "users") {
+    if (cfg.fallbackTable && raw.full_name === undefined && raw.name !== undefined && raw.email !== undefined) {
+      tableName = cfg.fallbackTable;
+    }
+    if ("full_name" in raw) {
+      updateData.full_name = newValue;
+    } else {
+      updateData.name = newValue;
+    }
+
+  } else if (tableKey === "books") {
+    updateData.name = newValue;
+
+  } else if (tableKey === "chapters") {
+    updateData.chapter_name = newValue;
+
+  } else if (tableKey === "documents") {
+    return;
+
+  } else if (tableKey === "comments") {
+    if ("comment" in raw) {
+      updateData.comment = newValue;
+    } else if ("text" in raw) {
+      updateData.text = newValue;
+    } else {
+      updateData.content = newValue;
+    }
+
+  } else if (tableKey === "subscriptions") {
+    updateData.status = newValue;
+  }
+
+  const { error } = await supabase
+    .from(tableName)
+    .update(updateData)
+    .eq("id", pkValue);
+
+  if (error) throw error;
+}
+
+      async function deleteRecord(tableKey, record) {
+        const cfg = configs[tableKey];
+        const raw = record.__raw || record;
+        let tableName = cfg.table;
+        let pkValue = raw.id ?? record.id;
+
+        if (tableKey === "users" && cfg.fallbackTable && raw.full_name === undefined && raw.name !== undefined && raw.email !== undefined) {
+          tableName = cfg.fallbackTable;
+        }
+
+        if (tableKey === "documents") return;
+
+        const { error } = await supabase.from(tableName).delete().eq("id", pkValue);
+        if (error) throw error;
+      }
+
+      document.getElementById("saveModalBtn").addEventListener("click", async () => {
+        const table = state.modalTable;
+        const record = state.modalRecord;
+        if (!table || !record) return;
+
+        const value = document.getElementById("modalName").value.trim();
+        if (!value) {
+          modalError("Value cannot be empty.");
+          return;
+        }
+
+        try {
+          await updateRecord(table, record, value);
+          closeModal();
+          showStatus("Saved successfully.");
+          await fetchTable(table, true);
+        } catch (e) {
+          modalError(e?.message || "Save failed.");
+        }
+      });
+
+      document.getElementById("deleteModalBtn").addEventListener("click", async () => {
+        const table = state.modalTable;
+        const record = state.modalRecord;
+        if (!table || !record) return;
+
+        try {
+          await deleteRecord(table, record);
+          closeModal();
+          showStatus("Deleted successfully.");
+          await fetchTable(table, true);
+        } catch (e) {
+          modalError(e?.message || "Delete failed.");
+        }
+      });
+
+      window.__IF_LOAD_TABLE__ = fetchTable;
+
+      const adminUser = await checkAdmin();
+      if (!adminUser) return;
+
+      await fetchTable("users", true);
+      await fetchTable("books", true);
+      await fetchTable("chapters", true);
+      await fetchTable("documents", true);
+      await fetchTable("comments", true);
+      await fetchTable("subscriptions", true);
+
+      setBadge("Dev Mode");
+      console.log("Dashboard fully initialized");
+    } catch (err) {
+      console.error("MODULE SCRIPT CRASHED:", err);
+      window.__IF_SET_BADGE__ && window.__IF_SET_BADGE__("Script Error");
+      window.__IF_SHOW_STATUS__ && window.__IF_SHOW_STATUS__(`Script crashed: ${err.message}`, true);
+    }
+  })();
+</script>
+</body>
+</html>
