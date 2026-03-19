@@ -7,7 +7,6 @@ export async function submitComment({ chapterId, message, parentCommentId = null
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) return { ok: false, status: 401, message: "Not authenticated" };
 
-  console.log("AUTH USER:", userData.user);
   const trimmed = (message ?? "").trim();
   if (!trimmed) return { ok: false, status: 400, message: "Message cannot be empty." };
 
