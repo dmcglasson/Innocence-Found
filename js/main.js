@@ -275,6 +275,14 @@ async function handleLogout() {
 async function initializeScreen(pageId) {
   if (pageId === 'profile') {
     await initializeProfileScreen();
+  // Bookreader screen (supports direct hash and DOM detection)
+  if (pageId === 'bookreader' || document.getElementById('bookSelect')) {
+    try {
+      const { initBookReader } = await import('./modules/bookreader.js');
+      await initBookReader();
+    } catch (error) {
+      console.warn('Bookreader screen failed to initialize:', error);
+    }
   }
 
   // Dashboard screen

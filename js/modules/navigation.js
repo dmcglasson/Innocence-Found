@@ -127,11 +127,13 @@ export async function showPage(pageId, onLoadCallback = null) {
     return;
   }
 
-  // Validate pageId
-  if (!pageId || typeof pageId !== 'string') {
-    console.error('Invalid page ID');
+  pageId = normalizePageId(pageId);
+  if (!pageId) {
+    console.error("Invalid page ID");
     return;
   }
+
+  applyScreenStyle(pageId);
 
   // Show loading state
   pageContainer.textContent = 'Loading...'; // Use textContent instead of innerHTML for safety
@@ -148,10 +150,28 @@ export async function showPage(pageId, onLoadCallback = null) {
     if (cb && typeof cb === 'function') {
       await cb(pageId);
     }
+
+    // Call global callback for all screen loads (including hash navigation)
+    if (
+      globalScreenLoadCallback &&
+      typeof globalScreenLoadCallback === "function" &&
+      globalScreenLoadCallback !== onLoadCallback
+    ) {
+      await globalScreenLoadCallback(pageId);
+    }
   } catch (error) {
     console.error("Error showing page:", error);
     pageContainer.textContent = 'Error loading page.'; // Use textContent for safety
   }
+}
+
+/**
+ * Register a global callback to run after every screen load
+ * @param {Function|null} callback - Callback with signature (pageId) => Promise<void>|void
+ */
+export function setScreenLoadCallback(callback) {
+  globalScreenLoadCallback =
+    typeof callback === "function" ? callback : null;
 }
 
 /**
