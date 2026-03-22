@@ -183,6 +183,62 @@ export async function downloadWorksheet(worksheetId) {
     };
   }
 }
+
+// ================================
+// Admin Upload Worksheet
+// ================================
+
+const uploadForm = document.getElementById("uploadWorksheetForm");
+
+if (uploadForm) {
+  uploadForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const title = document.getElementById("worksheetTitle").value;
+    const description = document.getElementById("worksheetDescription").value;
+    const fileInput = document.getElementById("worksheetFile");
+    const message = document.getElementById("uploadMessage");
+
+    const file = fileInput.files[0];
+
+    if (!file) {
+      message.textContent = "Please select a file.";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("file", file);
+
+    try {
+      const session = await window.supabase.auth.getSession();
+
+      const response = await fetch(
+        `${APP_CONFIG.SUPABASE_URL}/functions/v1/upload-document`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.data.session.access_token}`,
+          },
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        message.textContent = data.error || "Upload failed";
+        return;
+      }
+
+      message.textContent = "Upload successful!";
+    } catch (error) {
+      console.error(error);
+      message.textContent = "Upload error.";
+    }
+  });
+}
  * Worksheets screen module.
  * Mirrors chapters flow for worksheet list, access checks, and worksheet-reader PDF rendering.
  */

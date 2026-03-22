@@ -5,6 +5,8 @@
  * It coordinates between different modules and handles the application lifecycle.
  */
 
+console.log("✅ main.js loaded");
+console.log("✅ imports finished, about to run init()");
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
@@ -19,6 +21,12 @@ let worksheetsLoadToken = 0;
 /**
  * Initialize the application
  */
+const APP_CONFIG = window.APP_CONFIG || {
+  FREE_CHAPTER_COUNT: 2,
+  TOTAL_CHAPTERS: 8
+};
+
+const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
 async function init() {
   // Wait a moment for env vars to be available
   await new Promise(resolve => setTimeout(resolve, 100));
@@ -47,7 +55,7 @@ async function init() {
 
   // Initialize UI
   initUI();
-  setGlobalOnLoadCallback(initializeScreen);
+
   // Initialize page from URL hash
   // Set up screen initialization FIRST
   setupScreenInitialization();
@@ -75,10 +83,6 @@ async function init() {
 
   // Set up event listeners
   setupEventListeners();
-
-  // Set up screen initialization callback
-  setupScreenInitialization();
-
 }
 
 /**
@@ -87,14 +91,17 @@ async function init() {
 function setupEventListeners() {
   // Login form
   document.addEventListener('submit', async (e) => {
-    if (e.target.id === 'loginForm') {
-      e.preventDefault();
-      await handleLogin(e.target);
-    } else if (e.target.id === 'signupForm') {
-      e.preventDefault();
-      await handleSignup(e.target);
-    }
-  });
+  if (e.target.id === 'loginForm') {
+    e.preventDefault();
+    await handleLogin(e.target);
+  } else if (e.target.id === 'signupForm') {
+    e.preventDefault();
+    await handleSignup(e.target);
+  } else if (e.target.id === 'uploadWorksheetForm') {
+    e.preventDefault();
+    await handleWorksheetUpload(e.target);
+  }
+});
 
   // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
@@ -282,6 +289,80 @@ async function handleLogout() {
   }
 }
 
+async function handleWorksheetUpload(form) {
+  const titleInput = form.querySelector('#worksheetTitle');
+  const descriptionInput = form.querySelector('#worksheetDescription');
+  const fileInput = form.querySelector('#worksheetFile');
+  const uploadMsg = document.getElementById('uploadMessage');
+  const uploadBtn = form.querySelector('button[type="submit"]');
+
+  if (!titleInput || !descriptionInput || !fileInput || !uploadBtn) {
+    console.error('Upload form elements not found');
+    return;
+  }
+
+  const file = fileInput.files?.[0];
+
+  if (!file) {
+    if (uploadMsg) uploadMsg.textContent = 'Please choose a PDF file.';
+    return;
+  }
+
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = 'Uploading...';
+  if (uploadMsg) uploadMsg.textContent = '';
+
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    const safeFileName = `${Date.now()}-${file.name}`;
+
+    const { error: storageError } = await supabase.storage
+      .from('Worksheets')
+      .upload(safeFileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (storageError) {
+      throw storageError;
+    }
+
+    const { error: dbError } = await supabase
+      .from('worksheets')
+      .insert([
+        {
+          title: titleInput.value.trim(),
+          description: descriptionInput.value.trim(),
+          file_path: safeFileName
+        }
+      ]);
+
+    if (dbError) {
+      throw dbError;
+    }
+
+    if (uploadMsg) uploadMsg.textContent = 'Worksheet uploaded successfully.';
+    form.reset();
+
+    const wsBox = document.getElementById('worksheetsContainer');
+    if (wsBox) {
+      wsBox.dataset.loaded = 'false';
+    }
+
+    await initializeScreen('dashboard');
+  } catch (error) {
+    console.error('Worksheet upload error:', error);
+    if (uploadMsg) uploadMsg.textContent = error.message || 'Upload failed.';
+  } finally {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload Worksheet';
+  }
+}
+
 /**
  * Initialize screen-specific logic after screen loads
  * @param {string} pageId - ID of the loaded page
@@ -308,16 +389,15 @@ async function initializeScreen(pageId) {
   // Dashboard screen
   if (pageId === "dashboard") {
     try {
-      await waitForElement('#userName', 1000);
-      await waitForElement('#userEmail', 1000);
+      await waitForElement("#userName", 1000);
+      await waitForElement("#userEmail", 1000);
 
       const session = await getCurrentSession();
       if (session && session.user) {
         updateDashboardUserInfo(session.user);
       }
     } catch (error) {
-      console.warn('Dashboard elements not found:', error);
-
+      console.warn("Dashboard elements not found:", error);
     }
 
     try {
@@ -399,8 +479,8 @@ async function initializeScreen(pageId) {
     try {
       await waitForElement("#loginBox", 1000);
 
-      const signupLink = document.getElementById('signupSwitchLink');
-      const loginLink = document.getElementById('loginSwitchLink');
+      const signupLink = document.getElementById("signupSwitchLink");
+      const loginLink = document.getElementById("loginSwitchLink");
 
       if (signupLink) {
         signupLink.addEventListener("click", (e) => {
@@ -477,8 +557,7 @@ function setupScreenInitialization() {
       return;
     }
 
-    // Handle logout link
-    if (e.target.id === 'logoutLink' || e.target.closest('#logoutLink')) {
+    if (e.target.id === "logoutLink" || e.target.closest("#logoutLink")) {
       e.preventDefault();
       handleLogout();
     }

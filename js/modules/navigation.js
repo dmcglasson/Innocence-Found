@@ -142,14 +142,14 @@ export async function loadScreen(screenName) {
   }
 
   try {
-        const url = `${APP_CONFIG.SCREENS_PATH}${screenName}.html`;
-    console.log("🌐 fetching screen:", url);
+    const url = `${APP_CONFIG.SCREENS_PATH}${screenName}.html`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to load screen: ${screenName}`);
     }
     const html = await response.text();
 
+    console.log("📄 loaded HTML length for", screenName, "=", html.length);
     // Sanitize HTML before caching/using
     const sanitizedHtml = sanitizeHTML(html);
 
@@ -195,6 +195,21 @@ export async function showPage(pageId, onLoadCallback = null) {
     const screenHtml = await loadScreen(pageId);
     pageContainer.innerHTML = screenHtml;
 
+    // Hide current page nav button
+    const worksheetBtn = document.querySelector('[data-page="dashboard"]');
+    const uploadBtn = document.querySelector('[data-page="admin-upload"]');
+
+    if (worksheetBtn) worksheetBtn.style.display = 'inline-block';
+    if (uploadBtn) uploadBtn.style.display = 'inline-block';
+
+    if (pageId === "dashboard" && worksheetBtn) {
+      worksheetBtn.style.display = "none";
+    }
+
+    if (pageId === "admin-upload" && uploadBtn) {
+      uploadBtn.style.display = "none";
+    }
+
     // Call the callback (screen init). Prefer the passed callback, otherwise use global one.
     const cb = onLoadCallback || globalOnLoadCallback;
 
@@ -233,8 +248,8 @@ export async function initPageFromHash() {
 
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
 
-// remove query string from hash (anything after ?)
-const pageOnly = hash.split('?')[0];
+  // remove query string from hash (anything after ?)
+  const pageOnly = hash.split('?')[0];
 
 // sanitize only the page name
 const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
