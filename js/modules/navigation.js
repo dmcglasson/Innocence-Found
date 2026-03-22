@@ -142,7 +142,9 @@ export async function loadScreen(screenName) {
   }
 
   try {
-    const response = await fetch(`${APP_CONFIG.SCREENS_PATH}${screenName}.html`);
+        const url = `${APP_CONFIG.SCREENS_PATH}${screenName}.html`;
+    console.log("🌐 fetching screen:", url);
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to load screen: ${screenName}`);
     }

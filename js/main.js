@@ -14,7 +14,8 @@ import { initializeWorksheetsScreen, initializeWorksheetReaderScreen, handleLock
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
-
+import { fetchWorksheetMetadata, downloadWorksheet } from "./modules/worksheets.js";
+let worksheetsLoadToken = 0;
 /**
  * Initialize the application
  */
@@ -48,7 +49,11 @@ async function init() {
   initUI();
   setGlobalOnLoadCallback(initializeScreen);
   // Initialize page from URL hash
-  await initPageFromHash();
+  // Set up screen initialization FIRST
+  setupScreenInitialization();
+
+  // Initialize page from URL hash
+  await window.showPage(window.location.hash.replace('#', '') || 'home');
 
   // Check authentication state
   await checkAuthState();
@@ -94,6 +99,19 @@ function setupEventListeners() {
   // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
     const target = e.target;
+
+    // Download worksheet button
+    const dlBtn = target.closest && target.closest(".downloadWorksheetBtn");
+    if (dlBtn) {
+      e.preventDefault();
+      const id = dlBtn.getAttribute("data-id");
+      const result = await downloadWorksheet(id);
+
+      if (!result.success) {
+        alert(result.message);
+      }
+      return;
+    }
 
     // Logout button
     if (target.id === 'logoutBtn' || (target.closest && target.closest('#logoutBtn'))) {
@@ -288,7 +306,7 @@ async function initializeScreen(pageId) {
   }
 
   // Dashboard screen
-  if (pageId === 'dashboard') {
+  if (pageId === "dashboard") {
     try {
       await waitForElement('#userName', 1000);
       await waitForElement('#userEmail', 1000);
@@ -301,6 +319,72 @@ async function initializeScreen(pageId) {
       console.warn('Dashboard elements not found:', error);
 
     }
+
+    try {
+      await waitForElement("#worksheetsContainer", 2000);
+      const wsBox = document.getElementById("worksheetsContainer");
+
+      if (!wsBox) {
+        console.warn("worksheetsContainer not found");
+        return;
+      }
+
+      wsBox.dataset.loading = "true";
+      const currentLoadToken = ++worksheetsLoadToken;
+
+      // Always reload worksheets when entering dashboard
+      wsBox.dataset.loaded = "false";
+
+      wsBox.innerHTML = "<p>Loading worksheets...</p>";
+
+      const res = await fetchWorksheetMetadata({ includeAnswerKeys: true });
+      if (currentLoadToken !== worksheetsLoadToken) return;
+
+
+      if (!res || !res.success) {
+        wsBox.innerHTML = `<p>${res?.message || "Failed to load worksheets."}</p>`;
+        wsBox.dataset.loading = "false";
+        return;
+      }
+
+      if (!Array.isArray(res.data) || res.data.length === 0) {
+        wsBox.innerHTML = "<p>No worksheets available.</p>";
+        wsBox.dataset.loading = "false";
+        return;
+      }
+
+      const worksheetHtml = res.data
+        .map((w) => {
+          const title = w?.title || "Worksheet";
+          const description = w?.description || "";
+          const id = w?.id || "";
+
+          return `
+        <div class="worksheet-item" style="margin-bottom:12px;">
+          <div><strong>${title}</strong></div>
+          <div style="font-size:14px; opacity:0.8;">${description}</div>
+          <button class="btn btn-primary downloadWorksheetBtn" data-id="${id}">
+            Download
+          </button>
+        </div>
+      `;
+        })
+        .join("");
+
+      wsBox.innerHTML = worksheetHtml;
+      wsBox.dataset.loaded = "true";
+      wsBox.dataset.loading = "false";
+
+    } catch (err) {
+      console.error("Worksheet load error:", err);
+
+      const wsBox = document.getElementById("worksheetsContainer");
+      if (wsBox) {
+        wsBox.innerHTML = "<p>Failed to load worksheets.</p>";
+      }
+    }
+
+    return;
   }
   if (pageId === 'chapter-reader') {
     await initializeChapterReaderScreen();
@@ -311,30 +395,29 @@ async function initializeScreen(pageId) {
   }
 
   // Login / Signup screen
-  if (pageId === 'login') {
+  if (pageId === "login") {
     try {
-      // Wait for the auth boxes to exist
-      await waitForElement('#loginBox', 1000);
+      await waitForElement("#loginBox", 1000);
 
       const signupLink = document.getElementById('signupSwitchLink');
       const loginLink = document.getElementById('loginSwitchLink');
 
       if (signupLink) {
-        signupLink.addEventListener('click', (e) => {
+        signupLink.addEventListener("click", (e) => {
           e.preventDefault();
-          toggleAuthForm('signup');
+          toggleAuthForm("signup");
         });
       }
 
 
       if (loginLink) {
-        loginLink.addEventListener('click', (e) => {
+        loginLink.addEventListener("click", (e) => {
           e.preventDefault();
-          toggleAuthForm('login');
+          toggleAuthForm("login");
         });
       }
     } catch (error) {
-      console.warn('Auth screen elements not found:', error);
+      console.warn("Auth screen elements not found:", error);
     }
   }
 
@@ -391,6 +474,7 @@ function setupScreenInitialization() {
       if (pageId) {
         navigateToPage(pageId);
       }
+      return;
     }
 
     // Handle logout link
@@ -399,6 +483,11 @@ function setupScreenInitialization() {
       handleLogout();
     }
   });
+
+  window.addEventListener("hashchange", async () => {
+    const pageId = window.location.hash.replace("#", "") || "home";
+    await initializeScreen(pageId);
+  });
 }
 
 // Global functions for programmatic access
@@ -406,6 +495,7 @@ window.showLogin = () => {
   navigateToPage('login');
   setTimeout(() => toggleAuthForm('login'), 100);
 };
+
 window.showSignup = () => {
   navigateToPage('login');
   setTimeout(() => toggleAuthForm('signup'), 100);
