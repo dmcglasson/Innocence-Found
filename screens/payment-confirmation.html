@@ -7,7 +7,7 @@
         You’re about to subscribe to the <strong>Paid Plan</strong> for <strong>$4.99 / month</strong>.
       </p>
 
-      <div class="grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start;">
+      <div class="grid mobile-confirm-grid">
         <article class="feature" style="min-height: auto;">
           <span class="tag">Included</span>
           <h3>Paid Plan Benefits</h3>
@@ -23,17 +23,17 @@
           <span class="tag">Summary</span>
           <h3>Payment Confirmation</h3>
 
-          <div style="margin-top: 10px; font-size: 15px; line-height: 1.8;">
-            <div><strong>Plan:</strong> Paid Plan</div>
-            <div><strong>Price:</strong> $4.99 / month</div>
+          <div class="summary-box">
+            <div><strong>Plan:</strong> <span id="planName"></span></div>
+            <div><strong>Price:</strong> <span id="planPrice"></span></div>
             <div><strong>Billing:</strong> Monthly recurring</div>
             <div><strong>Cancel anytime:</strong> Yes</div>
           </div>
 
           <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
-            <a class="btn primary" href="#" id="confirmPaymentBtn">Confirm Payment</a>
-            <a class="btn ghost" href="#subscribe" data-page="subscribe">Back</a>
-          </div>
+  <a class="btn primary" href="#" id="confirmPaymentBtn">Confirm Payment</a>
+  <a class="btn ghost" href="#subscribe" data-page="subscribe">Back</a>
+</div>
 
           <p style="margin-top: 14px; font-size: 13px; opacity: 0.85;">
             This is a mock checkout for Sprint 1. No real payment is processed.

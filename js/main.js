@@ -17,6 +17,18 @@ import { validateForm, sanitizeString } from "./utils/validators.js";
  * Initialize screen-specific logic after a screen loads
  */
 async function initializeScreen(pageId) {
+
+  if (pageId === "payment-confirmation") {
+  const planData = JSON.parse(localStorage.getItem("selectedPlan"));
+
+  if (planData) {
+    const nameEl = document.getElementById("planName");
+    const priceEl = document.getElementById("planPrice");
+
+    if (nameEl) nameEl.textContent = planData.name;
+    if (priceEl) priceEl.textContent = planData.price;
+  }
+}
   if (pageId === "dashboard") {
     try {
       await waitForElement("#userName", 1000);
@@ -75,33 +87,44 @@ function setupEventListeners() {
     }
 
     const paidPlanBtn = target.closest && target.closest("#select-paid-plan");
-    if (paidPlanBtn) {
-      e.preventDefault();
-      const session = await getCurrentSession();
-      if (session) {
-        await window.showPage("payment-confirmation");
-      } else {
-        await window.showPage("login");
-      }
-      return;
-    }
-    
+if (paidPlanBtn) {
+  e.preventDefault();
+
+  // STORE selected plan
+  localStorage.setItem("selectedPlan", JSON.stringify({
+    name: "Paid Plan",
+    price: "$4.99 / month"
+  }));
+
+  const session = await getCurrentSession();
+  if (session) {
+    await window.showPage("payment-confirmation");
+  } else {
+    await window.showPage("login");
+  }
+  return;
+}
 
     // ADD THIS RIGHT HERE ↓↓↓
 
     // IF-96: Confirm payment button -> success page
-const confirmBtn = target.closest && target.closest('#confirmPaymentBtn');
 if (confirmBtn) {
   e.preventDefault();
 
-  // Mark user as subscriber
-  localStorage.setItem("isSubscriber", "true");
+const text = confirmBtn.querySelector("#btnText");
+const spinner = confirmBtn.querySelector("#btnSpinner");
 
-  // Update navbar badge immediately
-  updateSubscriberBadge();
+if (text) text.textContent = "LOADING...";
+if (spinner) spinner.style.display = "inline-block";
 
-  // Go to success page
-  await window.showPage('payment-success');
+confirmBtn.style.pointerEvents = "none";
+
+  setTimeout(async () => {
+    localStorage.setItem("isSubscriber", "true");
+    updateSubscriberBadge();
+    await window.showPage('payment-success');
+  }, 3000);
+
   return;
 }
 
@@ -280,3 +303,21 @@ if (document.readyState === "loading") {
 } else {
   init();
 }
+
+// ===== Hide header on scroll =====
+let lastScrollY = window.scrollY;
+
+window.addEventListener("scroll", () => {
+  const header = document.getElementById("siteHeader");
+  if (!header) return;
+
+  if (window.scrollY > lastScrollY) {
+    // scrolling down → hide
+    header.classList.add("header-hidden");
+  } else {
+    // scrolling up → show
+    header.classList.remove("header-hidden");
+  }
+
+  lastScrollY = window.scrollY;
+});
