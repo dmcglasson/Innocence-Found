@@ -4,8 +4,8 @@
  * This file initializes the application and sets up all modules.
  * It coordinates between different modules and handles the application lifecycle.
  */
-
-import { initPageFromHash, showPage, setGlobalOnLoadCallback, initMobileNav } from './modules/navigation.js';
+import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
+import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, getCommentsByChapter, deleteCommentById, updateCommentById } from './modules/auth.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
@@ -45,7 +45,6 @@ async function init() {
 
   // Initialize UI
   initUI();
-  initMobileNav();
   setGlobalOnLoadCallback(initializeScreen);
 
   // Initialize page from URL hash
@@ -456,7 +455,7 @@ async function initializeScreen(pageId) {
     chaptersResult.data.forEach((chapter) => {
       const option = document.createElement('option');
       option.value = chapter.id;
-      option.textContent = chapter.title || `Chapter ${chapter.id}`;
+      option.textContent = `Chapter ${chapter.id}`;
       chapterSelect.appendChild(option);
     });
 
