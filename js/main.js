@@ -275,6 +275,8 @@ async function handleLogout() {
 async function initializeScreen(pageId) {
   if (pageId === 'profile') {
     await initializeProfileScreen();
+  }
+
   // Bookreader screen (supports direct hash and DOM detection)
   if (pageId === 'bookreader' || document.getElementById('bookSelect')) {
     try {

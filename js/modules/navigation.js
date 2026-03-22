@@ -11,9 +11,58 @@ import { APP_CONFIG } from '../config.js';
 const screenCache = {};
 // Global screen init callback (set once from main.js)
 let globalOnLoadCallback = null;
+// Optional callback API used by setScreenLoadCallback
+let globalScreenLoadCallback = null;
+
+const KNOWN_SCREENS = new Set([
+  'home',
+  'about',
+  'contact',
+  'login',
+  'profile',
+  'dashboard',
+  'bookreader',
+  'chapters',
+  'chapter-reader',
+  'worksheets',
+  'worksheet-reader'
+]);
 
 export function setGlobalOnLoadCallback(cb) {
   globalOnLoadCallback = cb;
+}
+
+function normalizePageId(pageId) {
+  return String(pageId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+function isKnownScreen(pageId) {
+  return KNOWN_SCREENS.has(pageId);
+}
+
+function normalizeIndexUrl() {
+  const pathname = window.location.pathname || '';
+  if (!pathname.endsWith('/index.html')) {
+    return;
+  }
+
+  const cleanPath = pathname.slice(0, -'index.html'.length) || '/';
+  const cleanUrl = `${cleanPath}${window.location.search}${window.location.hash}`;
+
+  // Keep SPA state but clean the visible URL.
+  window.history.replaceState(window.history.state, '', cleanUrl);
+}
+
+function applyScreenStyle(pageId) {
+  const body = document.body;
+  if (!body) return;
+
+  const classPrefix = 'screen-';
+  [...body.classList]
+    .filter(cls => cls.startsWith(classPrefix))
+    .forEach(cls => body.classList.remove(cls));
+
+  body.classList.add(`${classPrefix}${pageId}`);
 }
 
 /**
@@ -178,6 +227,8 @@ export function setScreenLoadCallback(callback) {
  * Initialize page from URL hash
  */
 export async function initPageFromHash() {
+  normalizeIndexUrl();
+
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
 
 // remove query string from hash (anything after ?)
@@ -185,8 +236,9 @@ const pageOnly = hash.split('?')[0];
 
 // sanitize only the page name
 const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+const initialPage = sanitized || APP_CONFIG.DEFAULT_PAGE;
 
-await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
+await showPage(isKnownScreen(initialPage) ? initialPage : APP_CONFIG.DEFAULT_PAGE);
 }
 
 /**
@@ -201,5 +253,9 @@ window.addEventListener("hashchange", async () => {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
 const pageOnly = hash.split('?')[0];
 const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+if (!isKnownScreen(sanitized)) {
+  return;
+}
+
 await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
 });
