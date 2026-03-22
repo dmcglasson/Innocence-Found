@@ -5,11 +5,12 @@
  * It coordinates between different modules and handles the application lifecycle.
  */
 
-console.log("✅ main.js loaded");
-console.log("✅ imports finished, about to run init()");
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
-import { initPageFromHash, showPage } from './modules/navigation.js';
+import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
+import { initializeProfileScreen } from './modules/profile.js';
+import { initializeChaptersScreen, initializeChapterReaderScreen, handleLockedChapter } from './modules/chapters.js';
+import { initializeWorksheetsScreen, initializeWorksheetReaderScreen, handleLockedWorksheet } from './modules/worksheets.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
@@ -46,7 +47,7 @@ async function init() {
 
   // Initialize UI
   initUI();
-
+  setGlobalOnLoadCallback(initializeScreen);
   // Initialize page from URL hash
   // Set up screen initialization FIRST
   setupScreenInitialization();
@@ -58,10 +59,26 @@ async function init() {
   await checkAuthState();
 
   // Initialize auth state listener
-  initAuthStateListener();
+  initAuthStateListener(async (event) => {
+    const currentPage = window.location.hash.substring(1) || 'home';
+    if (currentPage !== 'profile') return;
+
+    if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+      await initializeProfileScreen();
+      return;
+    }
+
+    if (event === 'SIGNED_OUT') {
+      await initializeProfileScreen();
+    }
+  });
 
   // Set up event listeners
   setupEventListeners();
+
+  // Set up screen initialization callback
+  setupScreenInitialization();
+
 }
 
 /**
@@ -161,7 +178,14 @@ async function handleLogin(form) {
     if (result.success) {
       showMessage('loginMessage', result.message, 'success');
       setTimeout(() => {
-        showPage('dashboard');
+        const returnTo = sessionStorage.getItem('returnTo');
+
+        if (returnTo) {
+          sessionStorage.removeItem('returnTo');
+          window.location.hash = returnTo.replace(/^#/, '');
+        } else {
+          window.location.hash = 'chapters';
+        }
       }, 1000);
     } else {
       showMessage('loginMessage', result.message, 'error');
@@ -179,31 +203,37 @@ async function handleLogin(form) {
  * @param {HTMLFormElement} form - Signup form element
  */
 async function handleSignup(form) {
-  const nameInput = form.querySelector('#signupName');
+  const fNameInput = form.querySelector('#signupFirstName');
+  const lNameInput = form.querySelector('#signupLastName');
   const emailInput = form.querySelector('#signupEmail');
   const passwordInput = form.querySelector('#signupPassword');
+  const parentInput = form.querySelector('#signupParent');
   const signupBtn = form.querySelector('#signupBtn');
   const signupMsg = document.getElementById('signupMessage');
 
-  if (!nameInput || !emailInput || !passwordInput || !signupBtn) return;
+  if (!fNameInput || !lNameInput || !emailInput || !passwordInput || !parentInput || !signupBtn) return;
 
   // Sanitize and get input values
-  const name = sanitizeString(nameInput.value);
+  const firstName = sanitizeString(fNameInput.value);
+  const lastName = sanitizeString(lNameInput.value);
   const email = sanitizeString(emailInput.value);
   const password = passwordInput.value; // Don't sanitize password, but validate
+  const parent = parentInput.checked;
 
   // Validate form
   const validation = validateForm(
-    { name, email, password },
+    { firstName, lastName, email, password, parent },
     {
-      name: { required: true, minLength: 2 },
+      firstName: { required: true, minLength: 2 },
+      lastName: { required: true, minLength: 2 },
       email: { required: true, type: 'email' },
       password: {
         required: true,
         type: 'password',
         minLength: 8,
         pattern: /\d/ // must include at least one number
-      }
+      },
+      parent: { type: 'boolean' }
     }
   );
 
@@ -218,7 +248,7 @@ async function handleSignup(form) {
   showMessage('signupMessage', '', 'success');
 
   try {
-    const result = await signUp(email, password, name);
+    const result = await signUp(email, password, firstName, lastName, parent);
 
     if (result.success) {
       showMessage('signupMessage', result.message, 'success');
@@ -261,19 +291,33 @@ async function handleLogout() {
  * @param {string} pageId - ID of the loaded page
  */
 async function initializeScreen(pageId) {
-  console.log("🔥 initializeScreen called with:", pageId);
+  if (pageId === 'profile') {
+    await initializeProfileScreen();
+  }
+
+  // Bookreader screen (supports direct hash and DOM detection)
+  if (pageId === 'bookreader' || document.getElementById('bookSelect')) {
+    try {
+      const { initBookReader } = await import('./modules/bookreader.js');
+      await initBookReader();
+    } catch (error) {
+      console.warn('Bookreader screen failed to initialize:', error);
+    }
+  }
+
   // Dashboard screen
   if (pageId === "dashboard") {
     try {
-      await waitForElement("#userName", 1000);
-      await waitForElement("#userEmail", 1000);
+      await waitForElement('#userName', 1000);
+      await waitForElement('#userEmail', 1000);
 
       const session = await getCurrentSession();
       if (session && session.user) {
         updateDashboardUserInfo(session.user);
       }
     } catch (error) {
-      console.warn("Dashboard elements not found:", error);
+      console.warn('Dashboard elements not found:', error);
+
     }
 
     try {
@@ -342,14 +386,21 @@ async function initializeScreen(pageId) {
 
     return;
   }
+  if (pageId === 'chapter-reader') {
+    await initializeChapterReaderScreen();
+  }
+
+  if (pageId === 'worksheet-reader') {
+    await initializeWorksheetReaderScreen();
+  }
 
   // Login / Signup screen
   if (pageId === "login") {
     try {
       await waitForElement("#loginBox", 1000);
 
-      const signupLink = document.getElementById("signupSwitchLink");
-      const loginLink = document.getElementById("loginSwitchLink");
+      const signupLink = document.getElementById('signupSwitchLink');
+      const loginLink = document.getElementById('loginSwitchLink');
 
       if (signupLink) {
         signupLink.addEventListener("click", (e) => {
@@ -357,6 +408,7 @@ async function initializeScreen(pageId) {
           toggleAuthForm("signup");
         });
       }
+
 
       if (loginLink) {
         loginLink.addEventListener("click", (e) => {
@@ -368,31 +420,65 @@ async function initializeScreen(pageId) {
       console.warn("Auth screen elements not found:", error);
     }
   }
+
+  if (pageId === 'chapters') {
+    await initializeChaptersScreen();
+  }
+
+  if (pageId === 'worksheets') {
+    await initializeWorksheetsScreen();
+  }
 }
 
 /**
  * Set up screen initialization callback for navigation
  */
+function navigateToPage(pageId) {
+  const safePage = String(pageId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safePage) return;
+
+  const nextHash = `#${safePage}`;
+
+  // If hash is unchanged, hashchange will not fire, so render directly.
+  if (window.location.hash === nextHash) {
+    showPage(safePage);
+    return;
+  }
+
+  window.location.hash = safePage;
+}
+
 function setupScreenInitialization() {
-  const originalShowPage = showPage;
+  // Expose globally for onclick handlers and navigation
+  window.showPage = navigateToPage;
 
-  window.showPage = async function (pageId) {
-    await originalShowPage(pageId);
-    await initializeScreen(pageId);
-  };
-
-  document.addEventListener("click", (e) => {
-    const pageLink = e.target.closest("[data-page]");
+  // Set up navigation event delegation
+  document.addEventListener('click', (e) => {
+    const pageLink = e.target.closest('[data-page]');
     if (pageLink) {
+      const pageId = pageLink.getAttribute('data-page');
+      const href = pageLink.getAttribute('href') || '';
+
+      // For normal hash anchors (ex: #about), let browser update the URL.
+      if (href.startsWith('#')) {
+        // If user clicks the current hash, manually re-render because hashchange won't fire.
+        if (window.location.hash === href && pageId) {
+          e.preventDefault();
+          showPage(pageId);
+        }
+        return;
+      }
+
+      // Fallback for non-anchor or non-hash navigation triggers.
       e.preventDefault();
-      const pageId = pageLink.getAttribute("data-page");
       if (pageId) {
-        window.showPage(pageId);
+        navigateToPage(pageId);
       }
       return;
     }
 
-    if (e.target.id === "logoutLink" || e.target.closest("#logoutLink")) {
+    // Handle logout link
+    if (e.target.id === 'logoutLink' || e.target.closest('#logoutLink')) {
       e.preventDefault();
       handleLogout();
     }
@@ -406,17 +492,17 @@ function setupScreenInitialization() {
 
 // Global functions for programmatic access
 window.showLogin = () => {
-  window.showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('login'), 100);
-  });
+  navigateToPage('login');
+  setTimeout(() => toggleAuthForm('login'), 100);
 };
 
 window.showSignup = () => {
-  window.showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('signup'), 100);
-  });
+  navigateToPage('login');
+  setTimeout(() => toggleAuthForm('signup'), 100);
 };
 window.handleLogout = handleLogout;
+window.handleLockedChapter = handleLockedChapter;
+window.handleLockedWorksheet = handleLockedWorksheet;
 
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {

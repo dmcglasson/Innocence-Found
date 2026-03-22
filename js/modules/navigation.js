@@ -9,6 +9,61 @@ import { APP_CONFIG } from '../config.js';
 
 // Cache for loaded screens
 const screenCache = {};
+// Global screen init callback (set once from main.js)
+let globalOnLoadCallback = null;
+// Optional callback API used by setScreenLoadCallback
+let globalScreenLoadCallback = null;
+
+const KNOWN_SCREENS = new Set([
+  'home',
+  'about',
+  'contact',
+  'login',
+  'profile',
+  'dashboard',
+  'bookreader',
+  'chapters',
+  'chapter-reader',
+  'worksheets',
+  'worksheet-reader'
+]);
+
+export function setGlobalOnLoadCallback(cb) {
+  globalOnLoadCallback = cb;
+}
+
+function normalizePageId(pageId) {
+  return String(pageId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+function isKnownScreen(pageId) {
+  return KNOWN_SCREENS.has(pageId);
+}
+
+function normalizeIndexUrl() {
+  const pathname = window.location.pathname || '';
+  if (!pathname.endsWith('/index.html')) {
+    return;
+  }
+
+  const cleanPath = pathname.slice(0, -'index.html'.length) || '/';
+  const cleanUrl = `${cleanPath}${window.location.search}${window.location.hash}`;
+
+  // Keep SPA state but clean the visible URL.
+  window.history.replaceState(window.history.state, '', cleanUrl);
+}
+
+function applyScreenStyle(pageId) {
+  const body = document.body;
+  if (!body) return;
+
+  const classPrefix = 'screen-';
+  [...body.classList]
+    .filter(cls => cls.startsWith(classPrefix))
+    .forEach(cls => body.classList.remove(cls));
+
+  body.classList.add(`${classPrefix}${pageId}`);
+}
 
 /**
  * Sanitize HTML to prevent XSS attacks
@@ -20,20 +75,20 @@ function sanitizeHTML(html) {
   if (!html || typeof html !== 'string') {
     return '';
   }
-  
+
   try {
     // Use DOMParser for better control
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    
+
     // Remove script tags
     const scripts = doc.querySelectorAll('script');
     scripts.forEach(script => script.remove());
-    
+
     // Remove iframe tags (potential XSS vector)
     const iframes = doc.querySelectorAll('iframe');
     iframes.forEach(iframe => iframe.remove());
-    
+
     // Remove dangerous event handlers from all elements
     const allElements = doc.querySelectorAll('*');
     const dangerousAttrs = [
@@ -42,7 +97,7 @@ function sanitizeHTML(html) {
       'onabort', 'onkeydown', 'onkeypress', 'onkeyup', 'onmousedown',
       'onmousemove', 'onmouseout', 'onmouseup'
     ];
-    
+
     allElements.forEach(el => {
       // Remove event handler attributes
       dangerousAttrs.forEach(attr => {
@@ -50,7 +105,7 @@ function sanitizeHTML(html) {
           el.removeAttribute(attr);
         }
       });
-      
+
       // Remove javascript: protocol from href/src
       ['href', 'src', 'action'].forEach(attr => {
         const value = el.getAttribute(attr);
@@ -59,7 +114,7 @@ function sanitizeHTML(html) {
         }
       });
     });
-    
+
     return doc.body.innerHTML;
   } catch (error) {
     console.error('Error sanitizing HTML:', error);
@@ -94,15 +149,15 @@ export async function loadScreen(screenName) {
       throw new Error(`Failed to load screen: ${screenName}`);
     }
     const html = await response.text();
-    console.log("📄 loaded HTML length for", screenName, "=", html.length);
+
     // Sanitize HTML before caching/using
     const sanitizedHtml = sanitizeHTML(html);
-    
+
     // Cache the screen if caching is enabled
     if (APP_CONFIG.CACHE_ENABLED) {
       screenCache[screenName] = sanitizedHtml;
     }
-    
+
     return sanitizedHtml;
   } catch (error) {
     console.error(`Error loading screen ${screenName}:`, error);
@@ -117,35 +172,43 @@ export async function loadScreen(screenName) {
  * @returns {Promise<void>}
  */
 export async function showPage(pageId, onLoadCallback = null) {
-    console.log("🧭 showPage called with:", pageId);
   const pageContainer = document.getElementById("pageContainer");
-    console.log("📦 pageContainer exists?", !!pageContainer);
   if (!pageContainer) {
     console.error("Page container not found");
     return;
   }
 
-  // Validate pageId
-  if (!pageId || typeof pageId !== 'string') {
-    console.error('Invalid page ID');
+  pageId = normalizePageId(pageId);
+  if (!pageId) {
+    console.error("Invalid page ID");
     return;
   }
+
+  applyScreenStyle(pageId);
 
   // Show loading state
   pageContainer.textContent = 'Loading...'; // Use textContent instead of innerHTML for safety
   pageContainer.classList.add("active");
-
-  // Update URL hash
-  window.location.hash = pageId;
 
   try {
     // Load the screen
     const screenHtml = await loadScreen(pageId);
     pageContainer.innerHTML = screenHtml;
 
-    // Call the callback if provided (for initializing screen-specific logic)
-    if (onLoadCallback && typeof onLoadCallback === 'function') {
-      await onLoadCallback(pageId);
+    // Call the callback (screen init). Prefer the passed callback, otherwise use global one.
+    const cb = onLoadCallback || globalOnLoadCallback;
+
+    if (cb && typeof cb === 'function') {
+      await cb(pageId);
+    }
+
+    // Call global callback for all screen loads (including hash navigation)
+    if (
+      globalScreenLoadCallback &&
+      typeof globalScreenLoadCallback === "function" &&
+      globalScreenLoadCallback !== onLoadCallback
+    ) {
+      await globalScreenLoadCallback(pageId);
     }
   } catch (error) {
     console.error("Error showing page:", error);
@@ -154,13 +217,30 @@ export async function showPage(pageId, onLoadCallback = null) {
 }
 
 /**
+ * Register a global callback to run after every screen load
+ * @param {Function|null} callback - Callback with signature (pageId) => Promise<void>|void
+ */
+export function setScreenLoadCallback(callback) {
+  globalScreenLoadCallback =
+    typeof callback === "function" ? callback : null;
+}
+
+/**
  * Initialize page from URL hash
  */
 export async function initPageFromHash() {
+  normalizeIndexUrl();
+
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash to prevent XSS
-  const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+
+// remove query string from hash (anything after ?)
+const pageOnly = hash.split('?')[0];
+
+// sanitize only the page name
+const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+const initialPage = sanitized || APP_CONFIG.DEFAULT_PAGE;
+
+await showPage(isKnownScreen(initialPage) ? initialPage : APP_CONFIG.DEFAULT_PAGE);
 }
 
 /**
@@ -173,7 +253,11 @@ export function clearScreenCache() {
 // Listen for hash changes
 window.addEventListener("hashchange", async () => {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
-  // Sanitize hash
-  const sanitizedHash = hash.replace(/[^a-zA-Z0-9_-]/g, '');
-  await showPage(sanitizedHash || APP_CONFIG.DEFAULT_PAGE);
+const pageOnly = hash.split('?')[0];
+const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+if (!isKnownScreen(sanitized)) {
+  return;
+}
+
+await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
 });

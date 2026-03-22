@@ -205,9 +205,10 @@
       </div>
 
       <nav class="row" aria-label="Primary">
-        <a href="#chapters">Book Chapters</a>
-        <a href="#worksheets">Worksheets</a>
+        <a href="#chapters" data-page="chapters">Book Chapters</a>
+        <a href="#worksheets" data-page="worksheets">Worksheets</a>
         <a href="#readers">Reader’s Corner</a>
+        <a href="#bookreader">Reader’s Corner</a>
         <a href="#about">About / Contact</a>
         <a class="cta" href="#subscribe">Subscribe / Login</a>
       </nav>
@@ -227,8 +228,8 @@
           and creativity.
         </p>
         <div class="ctaRow">
-          <a class="btn primary" href="#chapters">Start Reading</a>
-          <a class="btn ghost" href="#worksheets">Try Worksheets</a>
+        <a class="btn primary" href="#chapters" data-page="chapters">Start Reading</a>
+          <a class="btn ghost" href="#worksheets" data-page="worksheets">Try Worksheets</a>
         </div>
       </div>
     </div>
@@ -253,7 +254,7 @@
           An interactive reading platform with gentle animations, chapter saves,
           and vocabulary helpers. Perfect for solo reading or parent time.
         </p>
-        <a class="btn ghost" href="#chapters">Open Chapters</a>
+        <a class="btn ghost" href="#chapters" data-page="chapters">Open Chapters</a>
       </article>
 
       <article id="worksheets" class="feature" aria-labelledby="f2">
@@ -263,7 +264,7 @@
           Printable comprehension, grammar, and creative writing sheets aligned
           to each chapter. Classroom-friendly and parent-approved.
         </p>
-        <a class="btn ghost" href="#worksheets">Browse Worksheets</a>
+        <a class="btn ghost" href="#worksheets" data-page="worksheets">Browse Worksheets</a>
       </article>
 
       <article id="readers" class="feature" aria-labelledby="f3">
@@ -273,7 +274,7 @@
           Join contests, leave kind comments, and share drawings. A moderated,
           family-safe space to celebrate reading.
         </p>
-        <a class="btn ghost" href="#readers">Visit Reader’s Corner</a>
+        <a class="btn ghost" href="#bookreader">Visit Reader’s Corner</a>
       </article>
 
       <article id="about" class="feature" aria-labelledby="f4">
@@ -324,21 +325,8 @@
     <div class="wrap copyright">© <span id="year"></span> Innocence Found. All rights reserved.</div>
   </footer>
 
-  <script>
-    // Current year in footer
-    document.getElementById('year').textContent = new Date().getFullYear();
-
-    // Optional: smooth scroll for in-page “nav to section”
-    document.querySelectorAll('a[href^="#"]').forEach(a=>{
-      a.addEventListener('click', e=>{
-        const id = a.getAttribute('href').slice(1);
-        const el = document.getElementById(id);
-        if(el){
-          e.preventDefault();
-          el.scrollIntoView({behavior:'smooth', block:'start'});
-        }
-      })
-    });
-  </script>
+ <script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
 </body>
 </html>
