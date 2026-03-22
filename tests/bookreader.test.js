@@ -1,5 +1,10 @@
 import { jest } from "@jest/globals";
 
+//FIX alert BEFORE anything runs
+window.alert = jest.fn();
+
+global.alert = jest.fn();
+
 const BOOK_ONE = "../book reader/books/book1.pdf";
 
 function buildBookReaderDom() {
@@ -91,9 +96,145 @@ describe("bookreader comments", () => {
 
   beforeEach(async () => {
     jest.resetModules();
+    window.alert = jest.fn();
     document.head.innerHTML = "";
     buildBookReaderDom();
     mockPdfJs();
+
+    await jest.unstable_mockModule("../js/modules/supabase.js", () => {
+      const commentsByBook = {
+        "../book reader/books/book1.pdf": [
+          { id: 3, author: "Jules", content: "Jules comment", parent_id: null, replies: 0 },
+          { id: 2, author: "Marco", content: "Marco comment", parent_id: null, replies: 0 },
+          { id: 1, author: "Priya", content: "Priya comment", parent_id: null, replies: 0 }
+        ],
+        "../book reader/books/book2.pdf": [
+          { id: 4, author: "Anita", content: "Anita comment", parent_id: null, replies: 0 }
+        ]
+      };
+
+      let currentRows = commentsByBook["../book reader/books/book1.pdf"];
+
+      const query = {
+        select: jest.fn(() => query),
+        eq: jest.fn((field, value) => {
+          if (field === "chapter_path" && commentsByBook[value]) {
+            currentRows = commentsByBook[value];
+          }
+          return query;
+        }),
+        maybeSingle: jest.fn(async () => ({ data: null, error: null })),
+        order: jest.fn(async () => ({ data: currentRows, error: null })),
+        insert: jest.fn((rows) => {
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          const newRow = {
+            id: Date.now(),
+            author: row.author ?? "Test User",
+            content: row.content,
+            parent_id: row.parent_id ?? null,
+            replies: 0
+          };
+          currentRows.push(newRow);
+          return {
+            select: jest.fn(() => ({
+              single: jest.fn(async () => ({ data: newRow, error: null }))
+            }))
+          };
+        })
+      };
+
+      return {
+        getSupabaseClient: jest.fn(() => ({
+          from: jest.fn(() => query),
+          auth: {
+            getUser: jest.fn(async () => ({
+              data: { user: { id: "test-user" } },
+              error: null
+            }))
+          }
+        }))
+      };
+    });
+
+    await jest.unstable_mockModule("../js/modules/comments.js", () => {
+      const commentsByBook = {
+        "../book reader/books/book1.pdf": [
+          { id: 3, author: "Jules", content: "Jules comment", parent_id: null, replies: 0 },
+          { id: 2, author: "Marco", content: "Marco comment", parent_id: null, replies: 0 },
+          { id: 1, author: "Priya", content: "Priya comment", parent_id: null, replies: 0 }
+        ],
+        "../book reader/books/book2.pdf": [
+          { id: 4, author: "Anita", content: "Anita comment", parent_id: null, replies: 0 }
+        ]
+      };
+
+      let currentBook = "../book reader/books/book1.pdf";
+
+      return {
+        getCommentsByChapter: jest.fn(async (chapterId) => {
+          const bookPath =
+            chapterId === 14
+              ? currentBook
+              : "../book reader/books/book1.pdf";
+
+          const rows = (commentsByBook[bookPath] || []).map((item, index) => ({
+            id: item.id ?? index + 1,
+            uid: item.author === "Test User" ? "test-user" : "other-user",
+            created_at: `2026-02-${10 + index}T10:00:00`,
+            message: item.content
+          }));
+
+          return {
+            ok: true,
+            data: rows
+          };
+        }),
+        addComment: jest.fn(async (comment) => {
+          const newComment = {
+            id: Date.now(),
+            author: "Test User",
+            content: comment.content,
+            parent_id: comment.parent_id ?? null,
+            replies: 0
+          };
+          if (!commentsByBook[currentBook]) {
+            commentsByBook[currentBook] = [];
+          }
+          commentsByBook[currentBook].push(newComment);
+          return newComment;
+        }),
+
+        addReply: jest.fn(async (reply) => {
+          const newReply = {
+            id: Date.now(),
+            author: "Test User",
+            content: reply.content,
+            parent_id: reply.parent_id,
+            replies: 0
+          };
+          if (!commentsByBook[currentBook]) {
+            commentsByBook[currentBook] = [];
+          }
+          commentsByBook[currentBook].push(newReply);
+          return newReply;
+        }),
+
+        submitComment: jest.fn(async (comment) => {
+          const newComment = {
+            id: Date.now(),
+            author: "Test User",
+            content: comment.content,
+            parent_id: comment.parent_id ?? null,
+            replies: 0
+          };
+          if (!commentsByBook[currentBook]) {
+            commentsByBook[currentBook] = [];
+          }
+          commentsByBook[currentBook].push(newComment);
+          return newComment;
+        })
+      };
+    });
 
     global.requestAnimationFrame = (cb) => cb();
     HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
@@ -112,6 +253,7 @@ describe("bookreader comments", () => {
 
     input.value = "This is a new test comment";
     submit.click();
+    await flush();
 
     expect(document.querySelectorAll(".comment-card")).toHaveLength(
       startingCount + 1
@@ -193,7 +335,6 @@ describe("bookreader comments", () => {
   });
 
   test("keeps comment posting available when PDF.js initialization fails", async () => {
-    jest.resetModules();
     document.head.innerHTML = "";
     buildBookReaderDom();
 
