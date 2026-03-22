@@ -5,8 +5,6 @@
  * It coordinates between different modules and handles the application lifecycle.
  */
 
-console.log("✅ main.js loaded");
-console.log("✅ imports finished, about to run init()");
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
@@ -34,37 +32,23 @@ async function init() {
   // Check Supabase initialization
   const client = getSupabaseClient();
   if (!client) {
-    console.error("Failed to initialize Supabase client. Check your .env file or config.");
-    // Show user-friendly error
-    const pageContainer = document.getElementById("pageContainer");
-    if (pageContainer) {
-      pageContainer.innerHTML = `
-        <div class="content-section">
-          <h2>Configuration Error</h2>
-          <p>Supabase credentials not configured. Please:</p>
-          <ol>
-            <li>Create a <code>.env</code> file (copy from <code>.env.example</code>)</li>
-            <li>Add your <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code></li>
-            <li>Refresh this page</li>
-          </ol>
-        </div>
-      `;
-    }
-    return;
+    console.warn("Supabase client unavailable; continuing with screen routing only.");
   }
 
   // Initialize UI
   initUI();
+  setGlobalOnLoadCallback(initializeScreen);
 
-  // Initialize page from URL hash
-  // Set up screen initialization FIRST
+  // Set up navigation handlers before first route render
   setupScreenInitialization();
 
-  // Initialize page from URL hash
-  await window.showPage(window.location.hash.replace('#', '') || 'home');
+  // Render initial route
+  await initPageFromHash();
 
-  // Check authentication state
-  await checkAuthState();
+  // Check authentication state only when backend client is available
+  if (client) {
+    await checkAuthState();
+  }
 
   // Initialize auth state listener
   initAuthStateListener(async (event) => {
@@ -563,10 +547,6 @@ function setupScreenInitialization() {
     }
   });
 
-  window.addEventListener("hashchange", async () => {
-    const pageId = window.location.hash.replace("#", "") || "home";
-    await initializeScreen(pageId);
-  });
 }
 
 // Global functions for programmatic access

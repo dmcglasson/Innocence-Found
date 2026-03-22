@@ -6,7 +6,14 @@
  */
 
 import { getSupabaseClient } from "./supabase.js";
-import { WORKSHEETS_CONFIG } from "../config.js";
+import { APP_CONFIG, SUPABASE_CONFIG } from "../config.js";
+
+const WORKSHEETS_CONFIG = {
+  TABLE: "worksheets",
+  BUCKET: "worksheets",
+  SIGNED_URL_EXPIRES_IN: 60 * 5,
+  FUNCTIONS_BASE_URL: `${String(SUPABASE_CONFIG?.URL || "").replace(/\/+$/, "")}/functions/v1`,
+};
 
 const ALLOWED_PROTECTED_ROLES = ["admin", "parent", "subscriber"];
 
@@ -239,13 +246,13 @@ if (uploadForm) {
     }
   });
 }
+
+/**
  * Worksheets screen module.
  * Mirrors chapters flow for worksheet list, access checks, and worksheet-reader PDF rendering.
  */
 
 import { getCurrentSession, getSubscriberStatus } from "./auth.js";
-import { getSupabaseClient } from "./supabase.js";
-import { APP_CONFIG } from "../config.js";
 import { waitForElement } from "../utils/dom.js";
 
 const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;

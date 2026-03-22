@@ -7,23 +7,23 @@ const getSubscriberStatusMock = jest.fn();
 const getSupabaseClientMock = jest.fn();
 const waitForElementMock = jest.fn().mockResolvedValue(undefined);
 
-jest.unstable_mockModule("./auth.js", () => ({
+jest.unstable_mockModule("../js/modules/auth.js", () => ({
   getCurrentSession: getCurrentSessionMock,
   getSubscriberStatus: getSubscriberStatusMock,
 }));
 
-jest.unstable_mockModule("./supabase.js", () => ({
+jest.unstable_mockModule("../js/modules/supabase.js", () => ({
   getSupabaseClient: getSupabaseClientMock,
 }));
 
-jest.unstable_mockModule("../config.js", () => ({
+jest.unstable_mockModule("../js/config.js", () => ({
   APP_CONFIG: {
     FREE_CHAPTER_COUNT: 2,
     TOTAL_CHAPTERS: 3,
   },
 }));
 
-jest.unstable_mockModule("../utils/dom.js", () => ({
+jest.unstable_mockModule("../js/utils/dom.js", () => ({
   waitForElement: waitForElementMock,
 }));
 
@@ -31,7 +31,7 @@ const {
   handleLockedChapter,
   initializeChaptersScreen,
   initializeChapterReaderScreen,
-} = await import("./chapters.js");
+} = await import("../js/modules/chapters.js");
 
 // Minimal DOM container used by the chapters listing screen.
 function buildChaptersListDom() {

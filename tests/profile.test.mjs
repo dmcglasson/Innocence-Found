@@ -4,11 +4,11 @@ import { jest } from "@jest/globals";
 
 const getCurrentSessionMock = jest.fn();
 
-jest.unstable_mockModule("./auth.js", () => ({
+jest.unstable_mockModule("../js/modules/auth.js", () => ({
   getCurrentSession: getCurrentSessionMock,
 }));
 
-const { initializeProfileScreen } = await import("./profile.js");
+const { initializeProfileScreen } = await import("../js/modules/profile.js");
 
 function buildProfileDom() {
   document.body.innerHTML = `

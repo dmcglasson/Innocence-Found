@@ -26,7 +26,7 @@ export function getSupabaseClient() {
       return null;
     }
 
-    const supabaseLib = window.supabase || supabase;
+    const supabaseLib = window.supabase;
     if (supabaseLib && typeof supabaseLib.createClient === "function") {
       const rawUrl = SUPABASE_CONFIG.URL || "";
       const cleanedUrl = rawUrl.replace(/\/+$/, ""); // remove trailing slash(es)
