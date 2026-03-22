@@ -1,0 +1,41 @@
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-menu-card">
+      <h3>Menu</h3>
+      <button type="button" class="admin-menu-btn">Books & Chapters</button>
+      <button type="button" class="admin-menu-btn">Worksheets</button>
+      <button type="button" class="admin-menu-btn">Blog Posts</button>
+      <button type="button" class="admin-menu-btn">Comments & Contests</button>
+      <button type="button" class="admin-menu-btn">Users & Subscriptions</button>
+      <button type="button" class="admin-menu-btn">Analytics</button>
+    </div>
+  </aside>
+
+  <section class="admin-main">
+    <div>
+      <div class="admin-panel__header">
+        <h1>View Reader Responses</h1>
+        <p>Select a chapter to view submitted responses.</p>
+      </div>
+
+
+
+      <div class="admin-controls">
+        <label for="chapterSelect" class="admin-controls__label">Chapter</label>
+        <div class="admin-select-wrap">
+          <select id="chapterSelect" class="admin-select">
+            <option value="">Choose a chapter</option>
+          </select>
+        </div>
+      </div>
+
+      <p id="adminResponsesMessage" class="admin-message" aria-live="polite"></p>
+
+      <div id="responsesContainer" class="admin-table-wrap">
+        <div class="admin-empty-state">
+          No chapter selected yet.
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

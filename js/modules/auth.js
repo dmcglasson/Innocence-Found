@@ -108,7 +108,7 @@ export async function signUp(email, password, firstName, lastName, parent) {
           last_name: lastName,
           parent: parent,
           subscriber: false, // Default to false, can be updated later
-          admin: false // Default to false, can be updated later
+          admin: false, // Default to false, can be updated later
           name: firstName + ' ' + lastName,
         },
       },
@@ -259,6 +259,61 @@ export async function updatePasswordSecurely({ currentPassword, newPassword }) {
   return { success: true, message: "Password updated successfully." };
 }
 
+export async function isCurrentUserAdmin() {
+  const supabase = getSupabaseClient();
+  if (!supabase) return false;
+
+  const session = await getCurrentSession();
+  const userId = session?.user?.id;
+  if (!userId) return false;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !data) return false;
+
+  return data.role === 'admin';
+}
+
+export async function getAllChapters() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, data: [], message: 'Supabase client not initialized' };
+  }
+
+  const { data, error } = await supabase
+    .from('Chapters')
+    .select('*')
+    .order('id', { ascending: true });
+
+  if (error) {
+    return { success: false, data: [], message: error.message };
+  }
+
+  return { success: true, data };
+}
+
+export async function getCommentsByChapter(chapterId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, data: [], message: 'Supabase client not initialized' };
+  }
+
+  const { data, error } = await supabase
+    .from('Comments')
+    .select('id, message, created_at, uid, chapter_id')
+    .eq('chapter_id', chapterId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { success: false, data: [], message: error.message };
+  }
+
+  return { success: true, data };
+}
 /**
  * Read subscriber status from Supabase Auth user_metadata
  * NOTE: Right now your user_metadata has NO subscriber key.
@@ -286,4 +341,39 @@ export async function getSubscriberStatus() {
     console.error("getSubscriberStatus() error:", e);
     return { isSubscriber: false };
   }
+}
+export async function deleteCommentById(commentId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client not initialized' };
+  }
+
+  const { error } = await supabase
+    .from('Comments')
+    .delete()
+    .eq('id', commentId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  return { success: true, message: 'Response deleted successfully.' };
+}
+
+export async function updateCommentById(commentId, newMessage) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client not initialized' };
+  }
+
+  const { error } = await supabase
+    .from('Comments')
+    .update({ message: newMessage })
+    .eq('id', commentId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  return { success: true, message: 'Response updated successfully.' };
 }

@@ -8,13 +8,21 @@
  */
 
 function hasSupabaseEnv() {
-  return (
-    window.ENV &&
-    typeof window.ENV.SUPABASE_URL === "string" &&
-    window.ENV.SUPABASE_URL.trim().length > 0 &&
-    typeof window.ENV.SUPABASE_ANON_KEY === "string" &&
-    window.ENV.SUPABASE_ANON_KEY.trim().length > 0
-  );
+  const url = window.ENV?.SUPABASE_URL?.trim();
+  const key = window.ENV?.SUPABASE_ANON_KEY?.trim();
+
+  if (!url || !key) return false;
+
+  if (
+    url === "YOUR_SUPABASE_URL" ||
+    url === "YOUR_SUPABASE_URL_HERE" ||
+    key === "YOUR_SUPABASE_ANON_KEY" ||
+    key === "YOUR_SUPABASE_ANON_KEY_HERE"
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 /**

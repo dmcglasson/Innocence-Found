@@ -5,12 +5,12 @@
  * It coordinates between different modules and handles the application lifecycle.
  */
 
-import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
-import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus } from './modules/auth.js';
+import { initPageFromHash, showPage, setGlobalOnLoadCallback, initMobileNav } from './modules/navigation.js';
+import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, getCommentsByChapter, deleteCommentById, updateCommentById } from './modules/auth.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
+import { fetchWorksheetMetadata, downloadWorksheet } from "./modules/worksheets.js";
 import { APP_CONFIG } from './config.js';
 
 /**
@@ -45,12 +45,11 @@ async function init() {
 
   // Initialize UI
   initUI();
+  initMobileNav();
   setGlobalOnLoadCallback(initializeScreen);
+
   // Initialize page from URL hash
   await initPageFromHash();
-
-  // Check authentication state
-  await checkAuthState();
 
   // Initialize auth state listener
   initAuthStateListener();
@@ -69,19 +68,99 @@ async function init() {
 function setupEventListeners() {
   // Login form
   document.addEventListener('submit', async (e) => {
+
     if (e.target.id === 'loginForm') {
       e.preventDefault();
       await handleLogin(e.target);
+
     } else if (e.target.id === 'signupForm') {
       e.preventDefault();
       await handleSignup(e.target);
+
+    } else if (e.target.id === 'uploadWorksheetForm') {
+      e.preventDefault();
+      await handleWorksheetUpload(e.target);
     }
+
   });
 
   // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
     const target = e.target;
 
+    // Download worksheet
+    const dlBtn = e.target.closest && e.target.closest(".downloadWorksheetBtn");
+    if (dlBtn) {
+      e.preventDefault();
+      const id = dlBtn.getAttribute("data-id");
+
+      const result = await downloadWorksheet(id);
+
+      if (!result.success) {
+        alert(result.message);
+      }
+
+      return;
+    }
+    const editBtn = e.target.closest && e.target.closest('.edit-response-btn');
+    if (editBtn) {
+      e.preventDefault();
+
+      const commentId = editBtn.getAttribute('data-id');
+
+      const currentRow = document.querySelector(`tr[data-comment-id="${commentId}"]`);
+      const currentText = currentRow ? currentRow.children[1].innerText : '';
+
+      const newMessage = window.prompt('Edit response:', currentText);
+
+      if (!newMessage || newMessage.trim() === '') return;
+
+      const result = await updateCommentById(commentId, newMessage);
+
+      if (!result.success) {
+        alert(result.message || 'Failed to update.');
+        return;
+      }
+
+      // update UI instantly
+      if (currentRow) {
+        currentRow.children[1].innerText = newMessage;
+      }
+
+      return;
+    }
+
+    const deleteBtn = e.target.closest && e.target.closest('.delete-response-btn');
+    if (deleteBtn) {
+      e.preventDefault();
+
+      const commentId = deleteBtn.getAttribute('data-id');
+      const confirmed = window.confirm('Delete this response?');
+
+      if (!confirmed) return;
+
+      const result = await deleteCommentById(commentId);
+
+      if (!result.success) {
+        alert(result.message || 'Failed to delete response.');
+        return;
+      }
+
+      const row = document.querySelector(`tr[data-comment-id="${commentId}"]`);
+      if (row) {
+        const tbody = row.closest('tbody');
+        row.remove();
+
+        if (tbody && tbody.querySelectorAll('tr').length === 0) {
+          const responsesContainer = document.getElementById('responsesContainer');
+          if (responsesContainer) {
+            responsesContainer.innerHTML = `<div class="admin-empty-state">No responses submitted yet.</div>`;
+          }
+        }
+      }
+
+      return;
+    }
     // Logout button
     if (target.id === 'logoutBtn' || (target.closest && target.closest('#logoutBtn'))) {
       e.preventDefault();
@@ -236,10 +315,59 @@ async function handleSignup(form) {
   }
 }
 
+async function handleWorksheetUpload(form) {
+  const titleInput = form.querySelector('#worksheetTitle');
+  const descriptionInput = form.querySelector('#worksheetDescription');
+  const fileInput = form.querySelector('#worksheetFile');
+  const uploadMsg = document.getElementById('uploadMessage');
+  const uploadBtn = form.querySelector('button[type="submit"]');
+
+  const file = fileInput.files?.[0];
+
+  if (!file) {
+    if (uploadMsg) uploadMsg.textContent = 'Please choose a PDF file.';
+    return;
+  }
+
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = 'Uploading...';
+
+  try {
+    const supabase = getSupabaseClient();
+
+    const safeFileName = `${Date.now()}-${file.name}`;
+
+    const { error: storageError } = await supabase.storage
+      .from('Worksheets')
+      .upload(safeFileName, file);
+
+    if (storageError) throw storageError;
+
+    const { error: dbError } = await supabase
+      .from('worksheets')
+      .insert([{
+        title: titleInput.value.trim(),
+        description: descriptionInput.value.trim(),
+        file_path: safeFileName
+      }]);
+
+    if (dbError) throw dbError;
+
+    if (uploadMsg) uploadMsg.textContent = 'Upload successful!';
+    form.reset();
+
+  } catch (err) {
+    if (uploadMsg) uploadMsg.textContent = err.message || 'Upload failed';
+  } finally {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload Worksheet';
+  }
+}
 /**
  * Handle logout
  */
 async function handleLogout() {
+
   try {
     const result = await signOut();
     if (!result.success) {
@@ -275,6 +403,120 @@ async function initializeScreen(pageId) {
 
     }
   }
+
+  if (pageId === 'admin-responses') {
+    const isAdmin = await isCurrentUserAdmin();
+
+    if (!isAdmin) {
+      const pageContainer = document.getElementById('pageContainer');
+      if (pageContainer) {
+        pageContainer.innerHTML = `
+        <div class="content-section">
+          <div class="auth-box">
+            <h2>Access Denied</h2>
+            <p>This page is for admins only.</p>
+          </div>
+        </div>
+      `;
+      }
+      return;
+    }
+
+    await waitForElement('#chapterSelect', 1000);
+    await waitForElement('#responsesContainer', 1000);
+
+    const chapterSelect = document.getElementById('chapterSelect');
+    const responsesContainer = document.getElementById('responsesContainer');
+    const messageEl = document.getElementById('adminResponsesMessage');
+
+    if (!chapterSelect || !responsesContainer) return;
+
+    const renderEmptyState = (text) => {
+      responsesContainer.innerHTML = `<div class="admin-empty-state">${text}</div>`;
+    };
+
+    const renderLoadingState = (text = 'Loading responses...') => {
+      responsesContainer.innerHTML = `<div class="admin-loading-state">${text}</div>`;
+    };
+
+    const renderErrorState = (text = 'Error loading responses.') => {
+      responsesContainer.innerHTML = `<div class="admin-error-state">${text}</div>`;
+    };
+
+    const chaptersResult = await getAllChapters();
+
+    if (!chaptersResult.success) {
+      if (messageEl) messageEl.textContent = chaptersResult.message || 'Unable to load chapters.';
+      renderErrorState('Unable to load chapters.');
+      return;
+    }
+
+    chapterSelect.innerHTML = `<option value="">Choose a chapter</option>`;
+
+    chaptersResult.data.forEach((chapter) => {
+      const option = document.createElement('option');
+      option.value = chapter.id;
+      option.textContent = chapter.title || `Chapter ${chapter.id}`;
+      chapterSelect.appendChild(option);
+    });
+
+    renderEmptyState('No chapter selected yet.');
+
+    chapterSelect.addEventListener('change', async () => {
+      const chapterId = chapterSelect.value;
+
+      if (messageEl) messageEl.textContent = '';
+
+      if (!chapterId) {
+        renderEmptyState('No chapter selected yet.');
+        return;
+      }
+
+      renderLoadingState();
+
+      const commentsResult = await getCommentsByChapter(chapterId);
+
+      if (!commentsResult.success) {
+        if (messageEl) {
+          messageEl.textContent = commentsResult.message || 'Unable to load responses.';
+        }
+        renderErrorState('Unable to load responses for this chapter.');
+        return;
+      }
+
+      if (!commentsResult.data.length) {
+        renderEmptyState('No responses submitted yet.');
+        return;
+      }
+
+      responsesContainer.innerHTML = `
+  <table class="responses-table">
+    <thead>
+      <tr>
+        <th>User ID</th>
+        <th>Response</th>
+        <th>Timestamp</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${commentsResult.data.map((comment) => `
+        <tr data-comment-id="${comment.id}">
+          <td>${comment.uid ?? ''}</td>
+          <td>${comment.message ?? ''}</td>
+          <td>${comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ''}</td>
+          <td>
+            <button type="button" class="action-btn edit-response-btn" data-id="${comment.id}">Edit</button>
+            <button type="button" class="action-btn delete-response-btn" data-id="${comment.id}">Delete</button>
+          </td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+`;
+    });
+  }
+
   if (pageId === 'chapter-reader') {
     await waitForElement('#chapterTitle', 1000);
 
@@ -398,6 +640,7 @@ async function initializeScreen(pageId) {
       console.warn('Auth screen elements not found:', error);
     }
   }
+
 
   if (pageId === 'chapters') {
     await waitForElement('#chapterList', 1000);
@@ -530,3 +773,4 @@ async function handleLockedChapter(chapterNumber) {
   window.location.hash = 'chapter-reader';
 }
 window.handleLockedChapter = handleLockedChapter;
+
