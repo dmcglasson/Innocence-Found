@@ -1,0 +1,66 @@
+<main class="background-area">
+  <div class="book-container">
+    <div class="book-selector">
+      <label for="bookSelect">Choose a book:</label>
+      <select id="bookSelect">
+        <!-- for testing purposes the only options are book1 and book2,
+         once the backend is established the book selector should
+         fetch book and chapter options from the back end -->
+        <option value="../book reader/books/book1.pdf">Book 1 (PDF)</option>
+        <option value="../book reader/books/book2.pdf">Book 2 (PDF)</option>
+        <option value="locked">Locked Chapter</option>
+      </select>
+    </div>
+
+    <div class="book">
+      <div class="page left-page">
+        <canvas id="leftPage"></canvas>
+      </div>
+      <div class="page right-page">
+        <canvas id="rightPage"></canvas>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="prevPage">Previous</button>
+      <span id="pageInfo">Page 1-2</span>
+      <button id="nextPage">Next</button>
+    </div>
+
+    <section class="comments-panel" aria-labelledby="commentsTitle">
+      <div class="comments-header">
+        <div>
+          <p class="eyebrow">Chapter comments</p>
+          <h3 id="commentsTitle" class="comments-title">Book 1 - Section</h3>
+          <p id="commentsMeta" class="comments-meta">All pages</p>
+        </div>
+        <div class="comment-controls">
+          <label for="filterComments" class="sr-only">Sort comments</label>
+          <select id="filterComments">
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+            <option value="popular">Most replies</option>
+          </select>
+          <button id="refreshComments" type="button" class="ghost-btn">Refresh</button>
+        </div>
+      </div>
+
+      <div id="commentsList" class="comments-list"></div>
+      <div id="noComments" class="empty-state hidden">
+        No comments yet for this section. Be the first to start the thread.
+      </div>
+      <div id="subscriberNotice" class="subscriber-notice hidden">
+        Only subscribers can post or reply to comments.
+      </div>
+      <div id="newCommentArea" class="comment-compose">
+        <label for="newCommentText">Add a comment</label>
+        <textarea
+          id="newCommentText"
+          rows="3"
+          placeholder="Share your thoughts on this section..."
+        ></textarea>
+        <button id="submitComment" type="button">Post comment</button>
+      </div>
+    </section>
+  </div>
+</main>

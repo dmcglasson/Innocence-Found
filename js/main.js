@@ -9,7 +9,10 @@ console.log("✅ main.js loaded");
 console.log("✅ imports finished, about to run init()");
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus } from './modules/auth.js';
+import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
+import { initializeProfileScreen } from './modules/profile.js';
+import { initializeChaptersScreen, initializeChapterReaderScreen, handleLockedChapter } from './modules/chapters.js';
+import { initializeWorksheetsScreen, initializeWorksheetReaderScreen, handleLockedWorksheet } from './modules/worksheets.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
@@ -64,7 +67,19 @@ async function init() {
   await checkAuthState();
 
   // Initialize auth state listener
-  initAuthStateListener();
+  initAuthStateListener(async (event) => {
+    const currentPage = window.location.hash.substring(1) || 'home';
+    if (currentPage !== 'profile') return;
+
+    if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+      await initializeProfileScreen();
+      return;
+    }
+
+    if (event === 'SIGNED_OUT') {
+      await initializeProfileScreen();
+    }
+  });
 
   // Set up event listeners
   setupEventListeners();
@@ -357,7 +372,20 @@ async function handleWorksheetUpload(form) {
  * @param {string} pageId - ID of the loaded page
  */
 async function initializeScreen(pageId) {
-  console.log("🔥 initializeScreen called with:", pageId);
+  if (pageId === 'profile') {
+    await initializeProfileScreen();
+  }
+
+  // Bookreader screen (supports direct hash and DOM detection)
+  if (pageId === 'bookreader' || document.getElementById('bookSelect')) {
+    try {
+      const { initBookReader } = await import('./modules/bookreader.js');
+      await initBookReader();
+    } catch (error) {
+      console.warn('Bookreader screen failed to initialize:', error);
+    }
+  }
+
   // Dashboard screen
   if (pageId === "dashboard") {
     try {
@@ -438,6 +466,13 @@ async function initializeScreen(pageId) {
 
     return;
   }
+  if (pageId === 'chapter-reader') {
+    await initializeChapterReaderScreen();
+  }
+
+  if (pageId === 'worksheet-reader') {
+    await initializeWorksheetReaderScreen();
+  }
 
   // Login / Signup screen
   if (pageId === "login") {
@@ -465,26 +500,59 @@ async function initializeScreen(pageId) {
       console.warn("Auth screen elements not found:", error);
     }
   }
+
+  if (pageId === 'chapters') {
+    await initializeChaptersScreen();
+  }
+
+  if (pageId === 'worksheets') {
+    await initializeWorksheetsScreen();
+  }
 }
 
 /**
  * Set up screen initialization callback for navigation
  */
+function navigateToPage(pageId) {
+  const safePage = String(pageId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safePage) return;
+
+  const nextHash = `#${safePage}`;
+
+  // If hash is unchanged, hashchange will not fire, so render directly.
+  if (window.location.hash === nextHash) {
+    showPage(safePage);
+    return;
+  }
+
+  window.location.hash = safePage;
+}
+
 function setupScreenInitialization() {
-  const originalShowPage = showPage;
+  // Expose globally for onclick handlers and navigation
+  window.showPage = navigateToPage;
 
-  window.showPage = async function (pageId) {
-    await originalShowPage(pageId);
-    await initializeScreen(pageId);
-  };
-
-  document.addEventListener("click", (e) => {
-    const pageLink = e.target.closest("[data-page]");
+  // Set up navigation event delegation
+  document.addEventListener('click', (e) => {
+    const pageLink = e.target.closest('[data-page]');
     if (pageLink) {
+      const pageId = pageLink.getAttribute('data-page');
+      const href = pageLink.getAttribute('href') || '';
+
+      // For normal hash anchors (ex: #about), let browser update the URL.
+      if (href.startsWith('#')) {
+        // If user clicks the current hash, manually re-render because hashchange won't fire.
+        if (window.location.hash === href && pageId) {
+          e.preventDefault();
+          showPage(pageId);
+        }
+        return;
+      }
+
+      // Fallback for non-anchor or non-hash navigation triggers.
       e.preventDefault();
-      const pageId = pageLink.getAttribute("data-page");
       if (pageId) {
-        window.showPage(pageId);
+        navigateToPage(pageId);
       }
       return;
     }
@@ -503,17 +571,17 @@ function setupScreenInitialization() {
 
 // Global functions for programmatic access
 window.showLogin = () => {
-  window.showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('login'), 100);
-  });
+  navigateToPage('login');
+  setTimeout(() => toggleAuthForm('login'), 100);
 };
 
 window.showSignup = () => {
-  window.showPage('login').then(() => {
-    setTimeout(() => toggleAuthForm('signup'), 100);
-  });
+  navigateToPage('login');
+  setTimeout(() => toggleAuthForm('signup'), 100);
 };
 window.handleLogout = handleLogout;
+window.handleLockedChapter = handleLockedChapter;
+window.handleLockedWorksheet = handleLockedWorksheet;
 
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
@@ -521,62 +589,3 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
-function renderChapters({ isSubscriber = false } = {}) {
-  const chapterList = document.getElementById("chapterList");
-  if (!chapterList) return;
-
-  let html = "";
-
-  for (let i = 1; i <= APP_CONFIG.TOTAL_CHAPTERS; i++) {
-    const isLocked = !isSubscriber && i > APP_CONFIG.FREE_CHAPTER_COUNT;
-    html += `
-      <div class="chapter-item">
-        <h3>${isLocked ? "🔒 " : ""}Chapter ${i}</h3>
-        <button 
-  type="button" 
-  class="chapter-button" 
-  data-chapter="${i}"
->
-  ${isLocked ? "Subscribers Only" : "Read for Free"}
-</button>
-      </div>
-    `;
-  }
-
-  chapterList.innerHTML = html;
-  //One click listener for all chapter buttons (no inline onclick)
-  if (!chapterList.dataset.listenerAttached) {
-    chapterList.addEventListener("click", (e) => {
-      const btn = e.target.closest(".chapter-button");
-      if (!btn) return;
-
-      const chapterNumber = Number(btn.dataset.chapter);
-      if (Number.isNaN(chapterNumber)) return;
-
-      handleLockedChapter(chapterNumber);
-    });
-
-    chapterList.dataset.listenerAttached = "true";
-  }
-}
-
-async function handleLockedChapter(chapterNumber) {
-  // Chapters 1–2 are free
-  const isFreeChapter = chapterNumber <= FREE_LIMIT;
-
-  // Only require login for locked chapters (3+)
-  if (!isFreeChapter) {
-    const session = await getCurrentSession();
-    if (!session || !session.user) {
-      sessionStorage.setItem('returnTo', '#chapters');
-      sessionStorage.setItem('requestedChapter', String(chapterNumber));
-      window.showLogin();
-      return;
-    }
-  }
-
-  // Open the chapter
-  sessionStorage.setItem('activeChapter', String(chapterNumber));
-  window.location.hash = 'chapter-reader';
-}
-window.handleLockedChapter = handleLockedChapter;
