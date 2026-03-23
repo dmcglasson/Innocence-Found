@@ -503,6 +503,9 @@ function navigateToPage(pageId) {
 
   const nextHash = `#${safePage}`;
 
+  // Clear scroll position from history to prevent browser restoration
+  window.history.replaceState(window.history.state, '', window.location.href);
+
   // If hash is unchanged, hashchange will not fire, so render directly.
   if (window.location.hash === nextHash) {
     showPage(safePage);
@@ -523,12 +526,12 @@ function setupScreenInitialization() {
       const pageId = pageLink.getAttribute('data-page');
       const href = pageLink.getAttribute('href') || '';
 
-      // For normal hash anchors (ex: #about), let browser update the URL.
+      // Handle hash links via SPA router to avoid native anchor scroll retention.
       if (href.startsWith('#')) {
-        // If user clicks the current hash, manually re-render because hashchange won't fire.
-        if (window.location.hash === href && pageId) {
-          e.preventDefault();
-          showPage(pageId);
+        e.preventDefault();
+
+        if (pageId) {
+          navigateToPage(pageId);
         }
         return;
       }
