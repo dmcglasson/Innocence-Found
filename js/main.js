@@ -15,6 +15,12 @@ import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
 import { fetchWorksheetMetadata, downloadWorksheet } from "./modules/worksheets.js";
+import {
+  startSubscriptionCheckout,
+  initializeSubscribeScreen,
+  initializeSubscriptionSuccessScreen,
+  initializeSubscriptionCancelScreen,
+} from "./modules/subscription.js";
 let worksheetsLoadToken = 0;
 /**
  * Initialize the application
@@ -100,6 +106,20 @@ function setupEventListeners() {
 
       if (!result.success) {
         alert(result.message);
+      }
+      return;
+    }
+
+    const subscribeBtn = target.closest && target.closest(".subscribePlanBtn");
+    if (subscribeBtn) {
+      e.preventDefault();
+      const planId = subscribeBtn.getAttribute("data-plan-id");
+      const msgEl = document.getElementById("subscribeMessage");
+      if (msgEl) msgEl.textContent = "";
+      if (!planId) return;
+      const result = await startSubscriptionCheckout(planId);
+      if (!result.success && result.message && msgEl) {
+        msgEl.textContent = result.message;
       }
       return;
     }
@@ -491,6 +511,18 @@ async function initializeScreen(pageId) {
 
   if (pageId === 'worksheets') {
     await initializeWorksheetsScreen();
+  }
+
+  if (pageId === "subscribe") {
+    await initializeSubscribeScreen();
+  }
+
+  if (pageId === "subscription-success") {
+    await initializeSubscriptionSuccessScreen();
+  }
+
+  if (pageId === "subscription-cancel") {
+    await initializeSubscriptionCancelScreen();
   }
 }
 

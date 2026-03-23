@@ -1,4 +1,21 @@
-<section class="page active">
-  <h2>Subscribe</h2>
-  <p>Subscribe to access premium content.</p>
+<section class="page active content-section">
+  <h2>Subscription plans</h2>
+  <p>Subscribe for full access to protected worksheets and premium content. Checkout is handled securely by Stripe.</p>
+
+  <p id="subscribeAuthHint" class="form-hint" hidden>You need an account to subscribe. Use Login to sign in or create one.</p>
+
+  <div class="subscription-plans" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;margin-top:1.25rem;">
+    <article class="subscription-plan-card" style="border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:1.25rem;background:#fff;">
+      <h3 style="margin-top:0;">Monthly</h3>
+      <p style="opacity:.85;">Flexible billing every month.</p>
+      <button type="button" class="btn btn-primary subscribePlanBtn" data-plan-id="monthly">Choose monthly</button>
+    </article>
+    <article class="subscription-plan-card" style="border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:1.25rem;background:#fff;">
+      <h3 style="margin-top:0;">Annual</h3>
+      <p style="opacity:.85;">Best value with yearly billing.</p>
+      <button type="button" class="btn btn-primary subscribePlanBtn" data-plan-id="annual">Choose annual</button>
+    </article>
+  </div>
+
+  <p id="subscribeMessage" class="form-message" role="status" style="margin-top:1rem;"></p>
 </section>
