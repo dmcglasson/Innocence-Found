@@ -1,4 +1,6 @@
 module.exports = {
   testEnvironment: "jsdom",
-  testMatch: ["**/tests/**/*.test.js"],
+  roots: ["<rootDir>/tests"],
+  testMatch: ["**/*.test.js", "**/*.test.mjs"],
+  clearMocks: true,
 };
