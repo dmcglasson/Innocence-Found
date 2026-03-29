@@ -25,7 +25,10 @@ const KNOWN_SCREENS = new Set([
   'chapters',
   'chapter-reader',
   'worksheets',
-  'worksheet-reader'
+  'worksheet-reader',
+  'subscribe',
+  'payment-confirmation',
+  'payment-success'
 ]);
 
 export function setGlobalOnLoadCallback(cb) {

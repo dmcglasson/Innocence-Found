@@ -91,6 +91,34 @@ function setupEventListeners() {
   document.addEventListener('click', async (e) => {
     const target = e.target;
 
+        const paidPlanBtn = target.closest && target.closest('#select-paid-plan');
+    if (paidPlanBtn) {
+      e.preventDefault();
+
+      localStorage.setItem('selectedPlan', JSON.stringify({
+        name: 'Paid Plan',
+        price: '$4.99 / month'
+      }));
+
+      const session = await getCurrentSession();
+      if (session) {
+        window.location.hash = 'payment-confirmation';
+      } else {
+        sessionStorage.setItem('returnTo', '#payment-confirmation');
+        window.location.hash = 'login';
+      }
+      return;
+    }
+
+    const confirmBtn = target.closest && target.closest('#confirmPaymentBtn');
+    if (confirmBtn) {
+      e.preventDefault();
+
+      localStorage.setItem('isSubscriber', 'true');
+      window.location.hash = 'payment-success';
+      return;
+    }
+
     // Download worksheet button
     const dlBtn = target.closest && target.closest(".downloadWorksheetBtn");
     if (dlBtn) {
@@ -355,9 +383,44 @@ async function handleWorksheetUpload(form) {
  * Initialize screen-specific logic after screen loads
  * @param {string} pageId - ID of the loaded page
  */
+
+
 async function initializeScreen(pageId) {
-  if (pageId === 'profile') {
-    await initializeProfileScreen();
+
+
+
+// Profile screen
+
+  if (pageId === 'payment-success') {
+    const isSubscriber = localStorage.getItem('isSubscriber') === 'true';
+    if (!isSubscriber) {
+      window.location.hash = 'subscribe';
+      return;
+    }
+  }
+
+  if (pageId === 'payment-confirmation') {
+    try {
+      const session = await getCurrentSession();
+      if (!session) {
+        sessionStorage.setItem('returnTo', '#payment-confirmation');
+        window.location.hash = 'login';
+        return;
+      }
+
+      const rawPlan = localStorage.getItem('selectedPlan');
+      const planData = rawPlan ? JSON.parse(rawPlan) : null;
+
+      const nameEl = document.getElementById('planName');
+      const priceEl = document.getElementById('planPrice');
+
+      if (planData) {
+        if (nameEl) nameEl.textContent = planData.name || 'Paid Plan';
+        if (priceEl) priceEl.textContent = planData.price || '$4.99 / month';
+      }
+    } catch (error) {
+      console.warn('Could not load selected plan:', error);
+    }
   }
 
   // Bookreader screen (supports direct hash and DOM detection)
