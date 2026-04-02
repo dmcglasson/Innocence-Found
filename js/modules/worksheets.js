@@ -293,7 +293,7 @@ async function fetchWorksheets(supabase) {
   const data = await runWorksheetsQuery(supabase, (tableName) => {
     return supabase
       .from(tableName)
-      .select("id,created_at,title,description,file_path")
+      .select("*")
       .order("created_at", { ascending: true });
   });
 
@@ -510,9 +510,8 @@ export async function initializeWorksheetReaderScreen() {
         <iframe
           title="${worksheetTitle} PDF"
           src="${pdfUrl}#toolbar=1&navpanes=0"
-          style="width: 100%; min-height: 78vh; border: 1px solid #ddd; border-radius: 8px;"
         ></iframe>
-        <p style="margin-top: 12px;">
+        <p class="worksheet-reader-page__fallbackLink">
           Having trouble viewing this file?
           <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer">Open worksheet PDF in a new tab</a>.
         </p>
@@ -520,8 +519,10 @@ export async function initializeWorksheetReaderScreen() {
     } catch (error) {
       console.error(`Failed to load worksheet ${worksheetTitle} from storage:`, error);
       bodyEl.innerHTML = `
-        <p><em>${worksheetTitle}</em></p>
-        <p>This worksheet PDF is not available yet. Please check back later.</p>
+        <article class="worksheet-state worksheet-state--error" role="alert">
+          <h3>${worksheetTitle}</h3>
+          <p>This worksheet PDF is not available yet. Please check back later.</p>
+        </article>
       `;
     }
   }
@@ -543,6 +544,14 @@ export async function initializeWorksheetReaderScreen() {
  */
 export async function initializeWorksheetsScreen() {
   await waitForElement("#worksheetList", 1000);
+  const worksheetList = document.getElementById("worksheetList");
+  if (worksheetList) {
+    worksheetList.innerHTML = `
+      <article class="worksheet-state worksheet-state--loading" role="status">
+        <p>Loading worksheets...</p>
+      </article>
+    `;
+  }
 
   const supabase = getSupabaseClient();
   if (!supabase) {
@@ -557,7 +566,14 @@ export async function initializeWorksheetsScreen() {
     isSubscriber = subInfo.isSubscriber;
   }
 
-  const worksheets = await fetchWorksheets(supabase);
+  let worksheets = [];
+  try {
+    worksheets = await fetchWorksheets(supabase);
+  } catch (error) {
+    renderWorksheetError(error);
+    return;
+  }
+
   renderWorksheets({ worksheets, isSubscriber });
 
   const requestedWorksheetId = sessionStorage.getItem("requestedWorksheetId");
@@ -574,26 +590,91 @@ export async function initializeWorksheetsScreen() {
  * Render worksheets list with lock state.
  * @param {{worksheets:Array<{id:string|number,title?:string,description?:string}>,isSubscriber?:boolean}} options
  */
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatWorksheetDate(value) {
+  if (!value) return "Recently updated";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recently updated";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function renderWorksheetError(error) {
+  const worksheetList = document.getElementById("worksheetList");
+  if (!worksheetList) return;
+
+  const message = String(error?.message || "Failed to load worksheets. Please try again.");
+  worksheetList.innerHTML = `
+    <article class="worksheet-state worksheet-state--error" role="alert">
+      <h3>Could not load worksheets</h3>
+      <p>${escapeHtml(message)}</p>
+    </article>
+  `;
+}
+
 function renderWorksheets({ worksheets, isSubscriber = false }) {
   const worksheetList = document.getElementById("worksheetList");
   if (!worksheetList) return;
+
+  if (!Array.isArray(worksheets) || worksheets.length === 0) {
+    worksheetList.innerHTML = `
+      <article class="worksheet-state worksheet-state--empty" role="status">
+        <h3>No worksheets available</h3>
+        <p>Please check back soon for new worksheet activities.</p>
+      </article>
+    `;
+    return;
+  }
 
   let html = "";
 
   worksheets.forEach((worksheet, index) => {
     const worksheetOrder = index + 1;
     const isLocked = !isSubscriber && worksheetOrder > FREE_LIMIT;
-    const title = String(worksheet.title || "").trim() || `Worksheet ${worksheetOrder}`;
-    const description = String(worksheet.description || "").trim();
+    const title = escapeHtml(String(worksheet.title || "").trim() || `Worksheet ${worksheetOrder}`);
+    const description = escapeHtml(String(worksheet.description || "").trim());
+    const statusText = isLocked ? "Locked" : "Available";
+    const statusClass = isLocked ? "worksheet-card__status--locked" : "worksheet-card__status--available";
+    const ctaLabel = isLocked ? "Subscribers Only" : "Open Worksheet";
+    const updatedLabel = escapeHtml(formatWorksheetDate(worksheet.created_at));
 
     html += `
-      <div class="chapter-item">
-        <h3>${isLocked ? "[LOCKED] " : ""}${title}</h3>
-        ${description ? `<p>${description}</p>` : ""}
-        <button type="button" class="worksheet-button" data-worksheet-id="${worksheet.id}" data-worksheet-order="${worksheetOrder}">
-          ${isLocked ? "Subscribers Only" : "Open Worksheet"}
+      <article class="worksheet-card ${isLocked ? "worksheet-card--locked" : ""}">
+        <div class="worksheet-card__metaRow">
+          <h3 class="worksheet-card__title worksheet-card__title--inline">${title}</h3>
+          <span class="worksheet-card__status ${statusClass}">${statusText}</span>
+        </div>
+
+        <div class="worksheet-card__tags" aria-label="Worksheet metadata">
+          <span class="worksheet-card__tag">PDF</span>
+          <span class="worksheet-card__tag">Updated ${updatedLabel}</span>
+        </div>
+
+        ${description ? `<p class="worksheet-card__description">${description}</p>` : ""}
+
+        <button
+          type="button"
+          class="worksheet-button worksheet-card__cta"
+          data-worksheet-id="${worksheet.id}"
+          data-worksheet-order="${worksheetOrder}"
+          ${isLocked ? "disabled aria-disabled=\"true\"" : ""}
+        >
+          ${ctaLabel}
         </button>
-      </div>
+      </article>
     `;
   });
 
@@ -603,6 +684,7 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
     worksheetList.addEventListener("click", (e) => {
       const btn = e.target.closest(".worksheet-button");
       if (!btn) return;
+      if (btn.disabled) return;
 
       const worksheetId = btn.dataset.worksheetId;
       const worksheetOrder = Number(btn.dataset.worksheetOrder || "1");
@@ -630,6 +712,12 @@ export async function handleLockedWorksheet(worksheetId, worksheetOrder = 1) {
       sessionStorage.setItem("returnTo", "#worksheets");
       sessionStorage.setItem("requestedWorksheetId", String(worksheetId));
       window.showLogin();
+      return;
+    }
+
+    const subInfo = await getSubscriberStatus();
+    if (!subInfo?.isSubscriber) {
+      alert("Subscribers only.");
       return;
     }
   }

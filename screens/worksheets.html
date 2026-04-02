@@ -1,6 +1,26 @@
-<div class="content-section">
-  <h1>Worksheets</h1>
-  <p>Select a worksheet to open.</p>
+<section class="worksheets-page">
+  <img
+    class="worksheets-page__bgImg"
+    src="./images/worksheets-bg1.png"
+    alt=""
+    aria-hidden="true"
+  />
 
-  <div id="worksheetList"></div>
-</div>
+  <div class="worksheets-page__wrap">
+    <div class="worksheets-page__top">
+      <h2 class="worksheets-page__banner">WORKSHEETS</h2>
+
+      <div class="worksheets-page__quote">
+        <p>Choose an activity and keep your reading journey moving.</p>
+      </div>
+    </div>
+
+    <main class="worksheets-page__stack">
+      <section id="worksheetList" class="worksheets-page__list" aria-live="polite">
+        <article class="worksheet-state worksheet-state--loading" role="status">
+          <p>Loading worksheets...</p>
+        </article>
+      </section>
+    </main>
+  </div>
+</section>

@@ -10,6 +10,7 @@ body {
     color: #3b2f23;
     min-height: 100vh;
     line-height: 1.6;
+  overflow-x: hidden;
 }
 
 /* Header and Navigation */
@@ -107,6 +108,76 @@ header .nav-links {
     color: #666666;
     font-size: 14px;
     font-style: italic;
+}
+
+@media (max-width: 900px) {
+  header {
+    padding: 12px 0;
+  }
+
+  nav {
+    grid-template-columns: 72px 1fr;
+    grid-template-areas:
+      "brand title"
+      "links links";
+    row-gap: 10px;
+    padding: 0 12px;
+  }
+
+  header .brand {
+    grid-area: brand;
+    width: 72px;
+    justify-content: center;
+  }
+
+  header .brand img {
+    width: 56px;
+  }
+
+  header .site-title {
+    grid-area: title;
+    text-align: left;
+    font-size: 28px;
+    white-space: normal;
+    line-height: 1.1;
+  }
+
+  .nav-right {
+    grid-area: links;
+    align-items: center;
+    width: 100%;
+  }
+
+  header .nav-links {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+
+  header .nav-links a {
+    font-size: 20px;
+  }
+
+  .user-menu {
+    justify-content: center;
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}
+
+@media (max-width: 520px) {
+  main {
+    padding: 24px 12px;
+  }
+
+  header .site-title {
+    font-size: 24px;
+  }
+
+  header .nav-links a {
+    font-size: 18px;
+  }
 }
 
 /* Main Content */
@@ -546,6 +617,363 @@ footer p {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* =========================
+   WORKSHEETS PAGE
+   ========================= */
+
+.worksheets-page {
+  position: relative;
+  min-height: 100vh;
+  padding: 3.5rem 1.25rem 4.5rem;
+}
+
+.worksheets-page__bgImg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.14;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.worksheets-page__wrap {
+  position: relative;
+  z-index: 2;
+}
+
+.worksheets-page__top {
+  margin: 0 0 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.worksheets-page__banner {
+  display: inline-block;
+  width: auto;
+  max-width: 92vw;
+  padding: 0.85rem 1.25rem;
+  background: #4B2E05;
+  color: #f3e6d3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 600;
+  font-size: clamp(1.25rem, 2.1vw, 2.1rem);
+}
+
+.worksheets-page__quote {
+  display: inline-block;
+  width: auto;
+  max-width: min(760px, 92vw);
+  background: rgba(243, 230, 211, 0.92);
+  border: 1px solid rgba(75, 46, 5, 0.15);
+  padding: 0.75rem 1.15rem;
+  border-radius: 8px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  text-align: center;
+}
+
+.worksheets-page__quote p {
+  margin: 0;
+  color: #4B2E05;
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 600;
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+}
+
+.worksheets-page__stack {
+  margin-top: 1.8rem;
+  display: grid;
+  justify-items: stretch;
+}
+
+.worksheets-page__list {
+  width: min(760px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.worksheet-card {
+  background: rgba(243, 230, 211, 0.9);
+  border: 1px solid rgba(75, 46, 5, 0.14);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(2px);
+}
+
+.worksheet-card--locked {
+  opacity: 0.9;
+}
+
+.worksheet-card__metaRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+}
+
+.worksheet-card__status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.worksheet-card__status--available {
+  background: rgba(46, 125, 50, 0.16);
+  color: #1b5e20;
+  border: 1px solid rgba(46, 125, 50, 0.45);
+}
+
+.worksheet-card__status--locked {
+  background: rgba(185, 122, 32, 0.14);
+  color: #8c4f05;
+  border: 1px solid rgba(140, 79, 5, 0.35);
+}
+
+.worksheet-card__title {
+  margin: 0.5rem 0 0;
+  color: #4B2E05;
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 700;
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+  line-height: 1.2;
+}
+
+.worksheet-card__title--inline {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.worksheet-card__tags {
+  margin-top: 0.45rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.worksheet-card__tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.16rem 0.58rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(75, 46, 5, 0.9);
+  border: 1px solid rgba(75, 46, 5, 0.2);
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.worksheet-card__description {
+  margin: 0.35rem 0 0;
+  color: rgba(75, 46, 5, 0.9);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.worksheet-card__cta {
+  margin-top: 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #d07a2b;
+  background: #d07a2b;
+  color: #ffffff;
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  width: 100%;
+  max-width: 240px;
+}
+
+.worksheet-card__cta:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.worksheet-card__cta:disabled {
+  background: #ece2d1;
+  border-color: #ccb58f;
+  color: #7a6645;
+}
+
+.worksheet-state {
+  background: rgba(243, 230, 211, 0.9);
+  border: 1px solid rgba(75, 46, 5, 0.14);
+  border-radius: 12px;
+  padding: 1.1rem;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.14);
+}
+
+.worksheet-state h3 {
+  margin: 0 0 0.35rem;
+  color: #4B2E05;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.35rem;
+}
+
+.worksheet-state p {
+  margin: 0;
+  color: rgba(75, 46, 5, 0.9);
+}
+
+.worksheet-state--loading {
+  animation: worksheetPulse 1.4s ease-in-out infinite;
+}
+
+.worksheet-state--error {
+  border-color: rgba(176, 34, 34, 0.3);
+}
+
+@keyframes worksheetPulse {
+  0% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.75;
+  }
+}
+
+/* =========================
+   WORKSHEET READER PAGE
+   ========================= */
+
+.worksheet-reader-page {
+  position: relative;
+  min-height: 100vh;
+  padding: 3rem 1.25rem 4.5rem;
+}
+
+.worksheet-reader-page__bgImg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.14;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.worksheet-reader-page__wrap {
+  position: relative;
+  z-index: 2;
+  width: min(1040px, 100%);
+  margin: 0 auto;
+}
+
+.worksheet-reader-page__card {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  background: rgba(243, 230, 211, 0.92);
+  border: 1px solid rgba(75, 46, 5, 0.15);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.14);
+}
+
+.worksheet-reader-page__backBtn {
+  border-radius: 999px;
+  border: 1px solid rgba(75, 46, 5, 0.35);
+  background: rgba(255, 255, 255, 0.7);
+  color: #4B2E05;
+  padding: 0.45rem 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.worksheet-reader-page__title {
+  margin: 0.8rem 0 0;
+  color: #4B2E05;
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 700;
+  font-size: clamp(1.45rem, 3.2vw, 2.2rem);
+}
+
+.worksheet-reader-page__body {
+  margin-top: 0.75rem;
+  line-height: 1.7;
+  color: rgba(75, 46, 5, 0.9);
+}
+
+.worksheet-reader-page__fallbackLink {
+  margin-top: 0.75rem;
+}
+
+.worksheet-reader-page__fallbackLink a {
+  color: #4B2E05;
+}
+
+.worksheet-reader-page__body iframe {
+  width: 100%;
+  min-height: 72vh;
+  border: 1px solid rgba(75, 46, 5, 0.25);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+@media (max-width: 700px) {
+  .worksheets-page {
+    padding: 2.75rem 1rem 3.5rem;
+  }
+
+  .worksheets-page__list {
+    width: min(760px, 100%);
+    gap: 0.75rem;
+  }
+
+  .worksheet-card {
+    padding: 0.9rem;
+  }
+
+  .worksheet-card__metaRow {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .worksheet-card__title--inline {
+    width: 100%;
+  }
+
+  .worksheet-card__cta {
+    max-width: none;
+  }
+
+  .worksheet-reader-page {
+    padding: 2.35rem 0.7rem 3.5rem;
+  }
+
+  .worksheet-reader-page__card {
+    width: 100%;
+    padding: 0.75rem;
+  }
+
+  .worksheet-reader-page__body iframe {
+    min-height: 62vh;
+  }
 }
 
 /* =========================
