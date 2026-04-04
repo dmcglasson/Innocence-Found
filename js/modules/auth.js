@@ -50,7 +50,7 @@ export async function checkAuthState() {
 
     const currentPage = window.location.hash.substring(1) || "home";
     if (currentPage === "login") {
-      window.location.hash = "bookreader";
+      window.location.hash = "home";
     }
   } else {
     updateNavForLoggedOut();
@@ -168,7 +168,7 @@ export function initAuthStateListener(callback) {
       // Only force dashboard if user is currently on login (or no hash)
       const currentPage = window.location.hash.substring(1) || "home";
       if (currentPage === "login") {
-        window.location.hash = "bookreader";
+        window.location.hash = "home";
       }
       // otherwise: do nothing, let the current hash page stay (ex: chapters)
     }
