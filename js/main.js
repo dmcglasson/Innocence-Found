@@ -601,3 +601,20 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+
+// ===== Navbar Mobile Toggle =====
+function setupMobileNavToggle() {
+  const navToggle = document.getElementById("navToggle");
+  const navRight = document.getElementById("navRight");
+
+  if (!navToggle || !navRight) return;
+
+  navToggle.addEventListener("click", () => {
+    navRight.classList.toggle("open");
+
+    const isOpen = navRight.classList.contains("open");
+    navToggle.setAttribute("aria-expanded", String(isOpen));
+  });
+}
+
+setupMobileNavToggle();
