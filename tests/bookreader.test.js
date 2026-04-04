@@ -150,7 +150,7 @@ describe("bookreader module", () => {
     ],
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
