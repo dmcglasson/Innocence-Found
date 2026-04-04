@@ -62,19 +62,8 @@
     <!-- Supabase JS Client Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-    <script>
-        // NOTE:
-        // Do not commit real Supabase credentials here.
-        // This stub defines the expected shape of window.ENV and should be
-        // overridden by env-loader.js or by your hosting platform at deploy time.
-        window.ENV = window.ENV || {
-            SUPABASE_URL: "YOUR_SUPABASE_URL_HERE",
-            SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY_HERE"
-        };
-    </script>
-
-    <!-- Set environment variables (load from .env or set here for local dev) -->
-    <!-- For production, set these via your hosting platform's environment variables -->
+    <!-- Public client runtime configuration -->
+    <script src="./env.js"></script>
 
 
     <!-- Load environment variables and initialize app -->

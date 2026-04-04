@@ -20,9 +20,17 @@ export function getSupabaseClient() {
 
   try {
     // Check if config has valid values
-    if (SUPABASE_CONFIG.URL === "YOUR_SUPABASE_URL" ||
-      SUPABASE_CONFIG.ANON_KEY === "YOUR_SUPABASE_ANON_KEY") {
-      console.error("Supabase credentials not configured. Check .env file or js/config.js");
+    const invalidUrl =
+      !SUPABASE_CONFIG.URL ||
+      SUPABASE_CONFIG.URL === "YOUR_SUPABASE_URL" ||
+      SUPABASE_CONFIG.URL === "YOUR_SUPABASE_URL_HERE";
+    const invalidAnonKey =
+      !SUPABASE_CONFIG.ANON_KEY ||
+      SUPABASE_CONFIG.ANON_KEY === "YOUR_SUPABASE_ANON_KEY" ||
+      SUPABASE_CONFIG.ANON_KEY === "YOUR_SUPABASE_ANON_KEY_HERE";
+
+    if (invalidUrl || invalidAnonKey) {
+      console.error("Supabase credentials not configured. Set public values in env.js (window.ENV).");
       return null;
     }
 
