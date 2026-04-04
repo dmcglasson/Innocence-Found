@@ -15,6 +15,19 @@ const WORKSHEETS_CONFIG = {
   FUNCTIONS_BASE_URL: `${String(SUPABASE_CONFIG?.URL || "").replace(/\/+$/, "")}/functions/v1`,
 };
 
+/**
+ * Clears and revokes the active in-memory worksheet Blob URL, if one exists.
+ */
+function clearActiveWorksheetBlobUrl() {
+  if (!activeWorksheetBlobUrl) return;
+
+  URL.revokeObjectURL(activeWorksheetBlobUrl);
+  activeWorksheetBlobUrl = null;
+}
+
+/**
+ * Runs a worksheet query against known table name candidates and returns the first successful result.
+ */
 async function runWorksheetsQuery(run) {
   let lastError = null;
 
@@ -35,6 +48,9 @@ async function runWorksheetsQuery(run) {
   throw new Error(`Worksheet table lookup failed: ${lastError?.message || "Unknown error"}`);
 }
 
+/**
+ * Fetches all worksheets ordered by creation date.
+ */
 async function fetchWorksheets(supabase) {
   const data = await runWorksheetsQuery((tableName) => {
     return supabase
@@ -46,6 +62,9 @@ async function fetchWorksheets(supabase) {
   return Array.isArray(data) ? data : [];
 }
 
+/**
+ * Fetches a single worksheet by ID while supporting both numeric and string identifiers.
+ */
 async function fetchWorksheetById(supabase, worksheetId) {
   const idAsNumber = Number(worksheetId);
   const isNumericId = !Number.isNaN(idAsNumber) && String(idAsNumber) === String(worksheetId);
@@ -63,6 +82,9 @@ async function fetchWorksheetById(supabase, worksheetId) {
   return data || null;
 }
 
+/**
+ * Parses a worksheet file path into an external URL or storage bucket/path pair.
+ */
 function parseWorksheetFilePath(rawFilePath) {
   const filePath = String(rawFilePath || "").trim();
   if (!filePath) return {};
@@ -98,6 +120,9 @@ function parseWorksheetFilePath(rawFilePath) {
   };
 }
 
+/**
+ * Performs a lightweight request to check whether a public URL is accessible.
+ */
 async function isPublicUrlReadable(url) {
   try {
     const response = await fetch(url, {
@@ -111,6 +136,9 @@ async function isPublicUrlReadable(url) {
   }
 }
 
+/**
+ * Resolves a storage file into a browser-openable URL using download, signed URL, then public URL fallback.
+ */
 async function resolveStorageUrl(supabase, bucket, path, options = {}) {
   const cleanBucket = String(bucket || "").trim();
   const cleanPath = String(path || "").trim().replace(/^\/+/, "");
@@ -121,10 +149,7 @@ async function resolveStorageUrl(supabase, bucket, path, options = {}) {
     .download(cleanPath);
 
   if (!blobError && blobData) {
-    if (activeWorksheetBlobUrl) {
-      URL.revokeObjectURL(activeWorksheetBlobUrl);
-      activeWorksheetBlobUrl = null;
-    }
+    clearActiveWorksheetBlobUrl();
 
     activeWorksheetBlobUrl = URL.createObjectURL(blobData);
     return activeWorksheetBlobUrl;
@@ -150,6 +175,9 @@ async function resolveStorageUrl(supabase, bucket, path, options = {}) {
   return null;
 }
 
+/**
+ * Returns the resolved PDF URL for a worksheet file path.
+ */
 async function getWorksheetPdfUrl(worksheet, options = {}) {
   const supabase = getSupabaseClient();
   if (!supabase) {
@@ -170,6 +198,9 @@ async function getWorksheetPdfUrl(worksheet, options = {}) {
   return url;
 }
 
+/**
+ * Escapes text for safe HTML rendering.
+ */
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -179,6 +210,9 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * Formats a worksheet date for card metadata.
+ */
 function formatWorksheetDate(value) {
   if (!value) return "Recently updated";
 
@@ -192,6 +226,9 @@ function formatWorksheetDate(value) {
   }).format(date);
 }
 
+/**
+ * Renders a user-friendly worksheet loading error state.
+ */
 function renderWorksheetError(error) {
   const worksheetList = document.getElementById("worksheetList");
   if (!worksheetList) return;
@@ -205,6 +242,9 @@ function renderWorksheetError(error) {
   `;
 }
 
+/**
+ * Renders worksheet cards and wires click handling for opening accessible worksheets.
+ */
 function renderWorksheets({ worksheets, isSubscriber = false }) {
   const worksheetList = document.getElementById("worksheetList");
   if (!worksheetList) return;
@@ -276,6 +316,9 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
   }
 }
 
+/**
+ * Retrieves worksheet metadata for list views.
+ */
 export async function fetchWorksheetMetadata() {
   const supabase = getSupabaseClient();
   if (!supabase) {
@@ -294,6 +337,9 @@ export async function fetchWorksheetMetadata() {
   }
 }
 
+/**
+ * Resolves a worksheet's file URL by worksheet ID.
+ */
 export async function getWorksheetFileUrl(worksheetId, options = {}) {
   const supabase = getSupabaseClient();
   if (!supabase) {
@@ -316,6 +362,9 @@ export async function getWorksheetFileUrl(worksheetId, options = {}) {
   }
 }
 
+/**
+ * Opens a worksheet file in a new tab for download or viewing.
+ */
 export async function downloadWorksheet(worksheetId) {
   const result = await getWorksheetFileUrl(worksheetId, { expiresIn: 60 });
   if (!result.success || !result.data?.url) {
@@ -326,6 +375,9 @@ export async function downloadWorksheet(worksheetId) {
   return { success: true, message: "Download started" };
 }
 
+/**
+ * Initializes the worksheet reader screen and enforces worksheet access rules.
+ */
 export async function initializeWorksheetReaderScreen() {
   await waitForElement("#worksheetTitle", 1000);
 
@@ -403,15 +455,15 @@ export async function initializeWorksheetReaderScreen() {
 
   if (backBtn) {
     backBtn.onclick = () => {
-      if (activeWorksheetBlobUrl) {
-        URL.revokeObjectURL(activeWorksheetBlobUrl);
-        activeWorksheetBlobUrl = null;
-      }
+      clearActiveWorksheetBlobUrl();
       window.location.hash = "worksheets";
     };
   }
 }
 
+/**
+ * Initializes the worksheets list screen, subscription state, and deferred worksheet routing.
+ */
 export async function initializeWorksheetsScreen() {
   await waitForElement("#worksheetList", 1000);
   const worksheetList = document.getElementById("worksheetList");
@@ -457,6 +509,9 @@ export async function initializeWorksheetsScreen() {
   }
 }
 
+/**
+ * Handles worksheet navigation and access control for free and subscriber-only worksheets.
+ */
 export async function handleLockedWorksheet(worksheetId, worksheetOrder = 1) {
   const isFreeWorksheet = worksheetOrder <= FREE_LIMIT;
 

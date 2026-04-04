@@ -1,4 +1,4 @@
-const { renderResponsesTable } = require('../js/adminResponses.helpers.js');
+import { renderResponsesTable } from '../js/adminResponses.helpers.js';
 
 describe('Admin Responses UI', () => {
 

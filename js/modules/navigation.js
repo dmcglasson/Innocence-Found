@@ -13,6 +13,7 @@ const screenCache = {};
 let globalOnLoadCallback = null;
 // Optional callback API used by setScreenLoadCallback
 let globalScreenLoadCallback = null;
+let currentRenderedPageId = '';
 
 const KNOWN_SCREENS = new Set([
   'home',
@@ -22,6 +23,7 @@ const KNOWN_SCREENS = new Set([
   'subscribe',
   'profile',
   'dashboard',
+  'admin-responses',
   'admin-upload',
   'bookreader',
   'chapters',
@@ -225,6 +227,8 @@ export async function showPage(pageId, onLoadCallback = null) {
     return;
   }
 
+  currentRenderedPageId = pageId;
+
   applyScreenStyle(pageId);
   resetScrollOnNavigation(pageId);
 
@@ -316,6 +320,10 @@ window.addEventListener("hashchange", async () => {
 const pageOnly = hash.split('?')[0];
 const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
 if (!isKnownScreen(sanitized)) {
+  return;
+}
+
+if (sanitized === currentRenderedPageId) {
   return;
 }
 

@@ -720,6 +720,7 @@ function navigateToPage(pageId) {
   }
 
   window.location.hash = safePage;
+  showPage(safePage);
 }
 
 function setupScreenInitialization() {

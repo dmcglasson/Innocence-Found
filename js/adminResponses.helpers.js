@@ -1,4 +1,4 @@
-function renderResponsesTable(data, container) {
+export function renderResponsesTable(data, container) {
   if (!data || data.length === 0) {
     container.innerHTML = `
       <div class="admin-empty-state">
@@ -40,5 +40,3 @@ function renderResponsesTable(data, container) {
     </table>
   `;
 }
-
-module.exports = { renderResponsesTable };
