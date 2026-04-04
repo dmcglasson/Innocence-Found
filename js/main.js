@@ -47,11 +47,6 @@ function syncScreenStyles(pageId) {
 /**
  * Initialize the application
  */
-const APP_CONFIG = window.APP_CONFIG || {
-  FREE_CHAPTER_COUNT: 2,
-  TOTAL_CHAPTERS: 8
-};
-
 const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
 async function init() {
   // Wait a moment for env vars to be available
@@ -349,54 +344,6 @@ async function handleSignup(form) {
   }
 }
 
-async function handleWorksheetUpload(form) {
-  const titleInput = form.querySelector('#worksheetTitle');
-  const descriptionInput = form.querySelector('#worksheetDescription');
-  const fileInput = form.querySelector('#worksheetFile');
-  const uploadMsg = document.getElementById('uploadMessage');
-  const uploadBtn = form.querySelector('button[type="submit"]');
-
-  const file = fileInput.files?.[0];
-
-  if (!file) {
-    if (uploadMsg) uploadMsg.textContent = 'Please choose a PDF file.';
-    return;
-  }
-
-  uploadBtn.disabled = true;
-  uploadBtn.textContent = 'Uploading...';
-
-  try {
-    const supabase = getSupabaseClient();
-
-    const safeFileName = `${Date.now()}-${file.name}`;
-
-    const { error: storageError } = await supabase.storage
-      .from('Worksheets')
-      .upload(safeFileName, file);
-
-    if (storageError) throw storageError;
-
-    const { error: dbError } = await supabase
-      .from('worksheets')
-      .insert([{
-        title: titleInput.value.trim(),
-        description: descriptionInput.value.trim(),
-        file_path: safeFileName
-      }]);
-
-    if (dbError) throw dbError;
-
-    if (uploadMsg) uploadMsg.textContent = 'Upload successful!';
-    form.reset();
-
-  } catch (err) {
-    if (uploadMsg) uploadMsg.textContent = err.message || 'Upload failed';
-  } finally {
-    uploadBtn.disabled = false;
-    uploadBtn.textContent = 'Upload Worksheet';
-  }
-}
 /**
  * Handle logout
  */
@@ -847,26 +794,5 @@ function setupMobileNavToggle() {
     navToggle.setAttribute("aria-expanded", String(isOpen));
   });
 }
-
-async function handleLockedChapter(chapterNumber) {
-  // Chapters 1–2 are free
-  const isFreeChapter = chapterNumber <= FREE_LIMIT;
-
-  // Only require login for locked chapters (3+)
-  if (!isFreeChapter) {
-    const session = await getCurrentSession();
-    if (!session || !session.user) {
-      sessionStorage.setItem('returnTo', '#chapters');
-      sessionStorage.setItem('requestedChapter', String(chapterNumber));
-      window.showLogin();
-      return;
-    }
-  }
-
-  // Open the chapter
-  sessionStorage.setItem('activeChapter', String(chapterNumber));
-  window.location.hash = 'chapter-reader';
-}
-window.handleLockedChapter = handleLockedChapter;
 
 setupMobileNavToggle();

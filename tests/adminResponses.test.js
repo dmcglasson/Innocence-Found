@@ -1,4 +1,4 @@
-const { renderResponsesTable } = require('../adminResponses.helpers.js');
+const { renderResponsesTable } = require('../js/adminResponses.helpers.js');
 
 describe('Admin Responses UI', () => {
 
