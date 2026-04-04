@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net; frame-src 'self' blob:; object-src 'none'; base-uri 'self';">
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net; frame-src 'self' blob:; object-src 'none'; base-uri 'self';">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
     <!-- Note: X-Frame-Options and frame-ancestors must be set via HTTP headers, not meta tags -->
@@ -62,19 +62,8 @@
     <!-- Supabase JS Client Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-    <script>
-        // NOTE:
-        // Do not commit real Supabase credentials here.
-        // This stub defines the expected shape of window.ENV and should be
-        // overridden by env-loader.js or by your hosting platform at deploy time.
-        window.ENV = window.ENV || {
-            SUPABASE_URL: "YOUR_SUPABASE_URL_HERE",
-            SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY_HERE"
-        };
-    </script>
-
-    <!-- Set environment variables (load from .env or set here for local dev) -->
-    <!-- For production, set these via your hosting platform's environment variables -->
+    <!-- Public client runtime configuration -->
+    <script src="./env.js"></script>
 
 
     <!-- Load environment variables and initialize app -->

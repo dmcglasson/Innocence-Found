@@ -109,6 +109,7 @@ header .nav-links {
   }
 
   nav {
+    display: grid;
     grid-template-columns: 72px 1fr;
     grid-template-areas:
       "brand title"
@@ -435,12 +436,17 @@ footer p {
 /* Responsive */
 @media (max-width: 768px) {
   header nav.nav {
+    display: grid;
     grid-template-columns: 80px 1fr 60px;
+    grid-template-areas:
+      "brand title toggle"
+      "links links links";
     gap: 10px;
     padding: 0 16px;
   }
 
   header .brand {
+    grid-area: brand;
     width: 80px;
   }
 
@@ -449,18 +455,20 @@ footer p {
   }
 
   header .site-title {
+    grid-area: title;
     font-size: 24px;
     white-space: normal;
     line-height: 1.1;
   }
 
   .nav-toggle {
+    grid-area: toggle;
     display: block;
   }
 
   header .nav-right {
     display: none !important;
-    grid-column: 1 / -1;
+    grid-area: links;
     width: 100%;
     margin-top: 12px;
   }
@@ -1688,7 +1696,6 @@ footer p {
 
 .admin-panel h2 {
   margin-bottom: 15px;
-  }
 }
 
 /* =========================

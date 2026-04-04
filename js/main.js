@@ -261,7 +261,7 @@ async function handleLogin(form) {
           sessionStorage.removeItem('returnTo');
           window.location.hash = returnTo.replace(/^#/, '');
         } else {
-          window.location.hash = 'bookreader';
+          window.location.hash = 'home';
         }
       }, 1000);
     } else {
