@@ -1,7 +1,10 @@
+const supabase = window.supabase.createClient(window.ENV.SUPABASE_URL, window.ENV.SUPABASE_ANON_KEY);
 const form = document.getElementById("registrationForm");
 const errorMessage = document.getElementById("errorMessage");
+const successMessage = document.getElementById("successMessage");
 
-form.addEventListener("submit", function (e) {
+
+form.addEventListener("submit", async function (e) {
   e.preventDefault(); // prevent form submit for now
 
   const name = document.getElementById("name").value.trim();
@@ -11,6 +14,8 @@ form.addEventListener("submit", function (e) {
 
   // Clear previous errors
   errorMessage.textContent = "";
+  successMessage.textContent = "";
+
 
   // ===========================
   // NAME CHECK: Full name required
@@ -67,11 +72,24 @@ form.addEventListener("submit", function (e) {
     return;
   }
 
-  // ===========================
-  // SUCCESS
-  // ===========================
-  errorMessage.style.color = "green";
-  errorMessage.textContent = "Registration successful! 🎉";
-
-  // Later we connect this to Supabase
+// ===========================
+// SUCCESS
+// ===========================
+const { data, error } = await supabase.auth.signUp({
+  email,
+  password,
+  options: {
+    data: { name }
+  }
 });
+
+if (error) {
+  errorMessage.style.color = "red";
+  errorMessage.textContent = error.message;
+  return;
+}
+
+successMessage.textContent = "Registration successful!";
+form.reset();
+});
+

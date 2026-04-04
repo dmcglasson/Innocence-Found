@@ -1,54 +1,385 @@
-<!-- Create class for Profile Page -->
 <div class="profile-page">
-  <header class="profile-header"> <!-- Create header for page, holds Profile Settings + Manage your account settings. -->
-    <div>
-      <h1 class="profile-title">Profile Settings</h1>
-      <p class="profile-subtitle">Manage your account settings.</p>
-    </div>
+  <div class="profile-layout">
 
-    <!-- Button for Edit Profile -->
-    <button class="btn btn-amber" type="button"> 
-      Edit Profile
-    </button>
-  </header>
+    <!-- LEFT SIDEBAR -->
+    <aside class="settings-menu" aria-label="Settings menu">
+      <h2 class="settings-title">Settings</h2>
 
-  <!-- Create panel for Account Information -->
-  <section class="panel" aria-labelledby="accountInfoTitle"> 
-    <div class="panel-header">
-      <h2 id="accountInfoTitle" class="panel-title">Account Information</h2> <!-- Title for panel, says Account Information -->
-    </div>
+      <div class="menu-section">
+        <div class="menu-section-title">Account</div>
 
-    <div class="panel-body">
-      <div>
-        <div class="field-row">
-          <div class="field-label">Name</div> <!-- Field for Name and name value -->
-          <div class="field-value">—</div>
-        </div>
+        <button class="menu-item active" type="button" data-tab="tab-profile" id="tabBtnProfile">
+          Edit profile
+          <span class="menu-arrow">›</span>
+        </button>
 
-        <div class="field-row">
-          <div class="field-label">Email</div> <!-- Field for Email and email value -->
-          <div class="field-value">—</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Create panel for Security -->
-  <section class="panel" aria-labelledby="securityTitle"> 
-    <div class="panel-header">
-      <h2 id="securityTitle" class="panel-title">Security</h2> <!-- Title for Security panel -->
-    </div>
-
-    <div class="panel-body">
-      <div class="field-row">
-        <div class="field-label">Password</div> <!-- Field for Password and password value -->
-        <div class="field-value">••••••••</div>
+        <button class="menu-item" type="button" data-tab="tab-password" id="tabBtnPassword">
+          Change password
+          <span class="menu-arrow">›</span>
+        </button>
       </div>
 
-      <!-- Button for Change Password -->
-      <button class="btn btn-amber" type="button"> 
-        Change Password
-      </button>
-    </div>
-  </section>
+      <div class="menu-section">
+        <div class="menu-section-title">More</div>
+
+        <button class="menu-item" type="button" data-tab="tab-preferences" id="tabBtnPrefs">
+          Preferences
+          <span class="menu-arrow">›</span>
+        </button>
+      </div>
+
+      <div class="menu-footer">
+        <button class="btn btn-outline" type="button" id="logoutBtn">Logout</button>
+      </div>
+    </aside>
+
+    <!-- RIGHT CONTENT -->
+    <main class="settings-content">
+
+      <header class="profile-header">
+        <div>
+          <h1 class="profile-title">Profile Settings</h1>
+          <p class="profile-subtitle">Manage your account settings.</p>
+        </div>
+      </header>
+
+      <!-- Status messages -->
+      <div class="panel" id="statusPanel" style="display:none;">
+        <div class="panel-body">
+          <p id="statusMsg" style="margin:0;"></p>
+        </div>
+      </div>
+
+      <!-- ========================= -->
+      <!-- TAB 1: PROFILE             -->
+      <!-- ========================= -->
+      <section class="panel tab-section" id="tab-profile">
+        <div class="panel-header">
+          <h2 class="panel-title">Profile</h2>
+        </div>
+
+        <div class="panel-body">
+
+          <!-- SUMMARY CARD -->
+          <div class="summary-card">
+            <div class="summary-left">
+              <div class="avatar" aria-hidden="true">👤</div>
+              <div>
+                <div class="summary-name" id="viewName">—</div>
+                <div class="summary-sub" id="viewSubscription">Subscription: —</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CURRENT INFO (VIEW ONLY) -->
+          <section class="panel inner-panel" aria-label="Current information">
+            <div class="panel-header">
+              <h3 class="panel-title">Current Information</h3>
+            </div>
+
+            <div class="panel-body">
+              <div class="field-row">
+                <div class="field-label">Name</div>
+                <div class="field-value" id="viewName2">—</div>
+              </div>
+
+              <div class="field-row">
+                <div class="field-label">Email</div>
+                <div class="field-value" id="viewEmail">—</div>
+              </div>
+
+              <div class="field-row">
+                <div class="field-label">Enrolled</div>
+                <div class="field-value" id="viewEnrolled">—</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- EDIT BUTTON -->
+          <div class="row-between" style="margin-top:12px;">
+            <p class="muted" style="margin:0;">Need to update something? Click Edit.</p>
+            <button class="btn btn-amber" type="button" id="editBtn">Edit</button>
+          </div>
+
+          <!-- EDIT FORM -->
+          <form id="profileForm" class="form" style="display:none;" novalidate>
+            <div class="form-row">
+              <label class="field-label" for="nameInput">Name</label>
+              <input class="input" id="nameInput" name="name" type="text" />
+              <div class="error-text" id="nameError" style="display:none;">Name is required.</div>
+            </div>
+
+            <div class="form-row">
+              <div class="row-between">
+                <label class="field-label" for="emailInput">Email</label>
+                <label class="mini-check">
+                  <input type="checkbox" id="toggleEmailEdit" />
+                  <span>Change email</span>
+                </label>
+              </div>
+
+              <input class="input" id="emailInput" name="email" type="email" disabled />
+              <div class="hint">Email only updates if “Change email” is enabled.</div>
+              <div class="error-text" id="emailError" style="display:none;">Enter a valid email address.</div>
+            </div>
+
+            <div class="actions-row">
+              <button class="btn btn-amber" type="submit" id="saveProfileBtn">Save</button>
+              <button class="btn btn-outline" type="button" id="cancelProfileBtn">Cancel</button>
+            </div>
+          </form>
+
+        </div>
+      </section>
+
+      <!-- ========================= -->
+      <!-- TAB 2: PASSWORD            -->
+      <!-- ========================= -->
+      <section class="panel tab-section" id="tab-password" style="display:none;">
+        <div class="panel-header">
+          <h2 class="panel-title">Change Password</h2>
+        </div>
+
+        <div class="panel-body">
+          <p class="muted">Update your password here.</p>
+
+          <form id="passwordForm" class="form" novalidate>
+            <div class="form-row">
+              <label class="field-label" for="newPasswordInput">New Password</label>
+              <input class="input" id="newPasswordInput" type="password" placeholder="New password" />
+            </div>
+
+            <div class="actions-row">
+              <button class="btn btn-amber" type="submit">Update Password</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ========================= -->
+      <!-- TAB 3: PREFERENCES         -->
+      <!-- ========================= -->
+      <section class="panel tab-section" id="tab-preferences" style="display:none;">
+        <div class="panel-header">
+          <h2 class="panel-title">Preferences</h2>
+        </div>
+
+        <div class="panel-body">
+          <p class="muted">Customize your experience.</p>
+
+          <form id="prefsForm" class="form" novalidate>
+            <label class="check-row">
+              <input type="checkbox" id="prefEmailUpdates" />
+              <span>Receive email updates</span>
+            </label>
+
+            <div class="actions-row">
+              <button class="btn btn-amber" type="submit">Save Preferences</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+    </main>
+  </div>
 </div>
+
+<!-- FALL THEME STYLES -->
+<style>
+  * {
+  box-sizing: border-box;
+}
+
+html, body {
+  overflow-x: hidden;
+}
+  :root{
+    --paper:#f3e8d7; --paper-2:#fff8ee; --ink:#2a1f18; --muted:#6a5a4f;
+    --border:rgba(60,35,20,0.20); --shadow:0 10px 30px rgba(0,0,0,0.10);
+    --brown:#6b4a2f; --brown-dark:#4a321f; --amber:#d77c2f; --amber-dark:#b7631d;
+  }
+  .profile-page{
+    min-height: calc(100vh - 80px);
+    padding: 22px 16px;
+    background:
+      radial-gradient(circle at 20% 10%, rgba(215,124,47,0.12), transparent 55%),
+      radial-gradient(circle at 80% 20%, rgba(161,75,42,0.10), transparent 60%),
+      linear-gradient(180deg, var(--paper), var(--paper-2));
+    color: var(--ink);
+  }
+.profile-layout {
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+  .settings-menu{
+    width:280px; background: rgba(255,255,255,0.62); border:1px solid var(--border);
+    border-radius:14px; padding:14px; box-shadow: var(--shadow);
+  }
+  .settings-title{ margin: 4px 0 10px 0; font-size: 20px; color: var(--brown-dark); }
+  .menu-section{ margin-bottom: 14px; }
+  .menu-section-title{ font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.75; margin: 10px 0; }
+  .menu-item{
+    width:100%; display:flex; justify-content:space-between; align-items:center; padding: 10px 10px;
+    border-radius: 12px; border: 1px solid rgba(60,35,20,0.16); background: rgba(255,255,255,0.65);
+    cursor:pointer; margin-bottom: 8px; font-weight: 700; color: var(--brown-dark);
+  }
+  .menu-item.active{ border-color: rgba(215,124,47,0.55); box-shadow: 0 0 0 3px rgba(215,124,47,0.12); }
+  .menu-arrow{ opacity: 0.7; }
+  .menu-footer{ margin-top: 18px; display:flex; justify-content:center; }
+  .settings-content{ flex:1; min-width:0; }
+  .profile-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom: 14px;
+    position: sticky;
+    top: 10px;
+    z-index: 20;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(255, 248, 238, 0.92);
+    backdrop-filter: blur(2px);
+  }
+  .profile-title{ margin:0; font-size: 34px; color: var(--brown-dark); }
+  .profile-subtitle{ margin:6px 0 0 0; color: var(--muted); }
+  .panel{
+    background: rgba(255,255,255,0.62); border:1px solid var(--border); border-radius:14px;
+    box-shadow: var(--shadow); margin-bottom: 14px; overflow:hidden;
+  }
+  .inner-panel{ box-shadow: none; background: rgba(255,255,255,0.55); border-style: dashed; }
+  .panel-header{
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(215,124,47,0.08), rgba(255,255,255,0.35));
+  }
+  .panel-title{ margin:0; color: var(--brown-dark); }
+  .panel-body{ padding: 14px; }
+  .muted{ color: var(--muted); }
+  .summary-card{
+    display:flex; justify-content:space-between; align-items:center; padding: 12px;
+    border-radius: 14px; border: 1px dashed rgba(161,75,42,0.35);
+    background: rgba(255,255,255,0.55); margin-bottom: 12px;
+  }
+  .summary-left{ display:flex; gap:12px; align-items:center; }
+  .avatar{
+    width:44px; height:44px; border-radius: 50%;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(215,124,47,0.15); border: 1px solid rgba(215,124,47,0.25); font-size: 20px;
+  }
+  .summary-name{ font-weight: 800; }
+  .summary-sub{ font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .row-between{ display:flex; justify-content:space-between; align-items:center; gap: 10px; margin-bottom: 10px; }
+  .field-row{
+    display:flex; justify-content:space-between; gap: 14px; padding: 10px 0;
+    border-bottom: 1px solid rgba(60,35,20,0.10);
+  }
+  .field-row:last-child{ border-bottom:none; }
+  .field-label{ font-weight: 800; color: var(--brown-dark); }
+  .field-value{ color: var(--ink); text-align:right;word-break:break-word; }
+  .form-row{ margin-bottom: 14px; }
+  .field-label{ display:block; font-weight: 800; color: var(--brown-dark); margin-bottom: 6px; }
+  .input{
+    width:100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border);
+    background: rgba(255,255,255,0.75); outline:none;
+  }
+  .input:disabled{ opacity: 0.75; cursor: not-allowed; }
+  .hint{ font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .mini-check{ display:flex; gap:8px; align-items:center; font-size: 12px; color: var(--muted); user-select:none; }
+  .actions-row{ display:flex; justify-content:flex-end; gap:10px; margin-top: 6px; }
+  .btn{ border-radius: 12px; padding: 9px 14px; font-weight: 800; cursor:pointer;
+    border: 1px solid rgba(60,35,20,0.18); background: rgba(255,255,255,0.65);
+  }
+  .btn-amber{ border: none; background: var(--amber); color:#fff; }
+  .btn-amber:hover{ background: var(--amber-dark); }
+  .btn-outline{ background: rgba(255,255,255,0.65); color: var(--brown-dark); }
+  .error-text{ margin-top:6px; font-size: 12px; color: #9c2f27; }
+  .check-row{
+    display:flex; gap:10px; align-items:center; padding: 12px; border-radius: 14px;
+    border: 1px solid rgba(60,35,20,0.14); background: rgba(255,255,255,0.55);
+    margin-bottom: 10px; font-weight: 700; color: var(--brown-dark);
+  }
+@media (max-width: 860px) {
+  .profile-page {
+    padding: 16px 12px;
+  }
+  
+
+  .profile-layout {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .settings-menu {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .settings-content {
+    width: 100%;
+  }
+
+  .profile-header {
+    position: static;
+    top: auto;
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .profile-title {
+    font-size: 28px;
+  }
+
+  .row-between {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions-row .btn,
+  .row-between .btn {
+    width: 100%;
+  }
+
+  .field-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .field-value {
+    text-align: left;
+    width: 100%;
+    word-break: break-word;
+  }
+
+  .summary-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .menu-item {
+    width: 100%;
+  }
+
+  .input {
+    min-width: 0;
+  }
+}
+.settings-menu,
+.settings-content,
+.panel,
+.summary-card,
+.field-row,
+.actions-row,
+.row-between {
+  min-width: 0;
+}
+</style>

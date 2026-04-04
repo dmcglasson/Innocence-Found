@@ -1,0 +1,58 @@
+<div class="content-section">
+  <button id="backToChaptersBtn" type="button">
+    &larr; Back to Chapters
+  </button>
+
+  <h1 id="chapterTitle" style="margin-top: 16px;">
+    Chapter
+  </h1>
+
+  <div id="chapterBody" style="margin-top: 12px; line-height: 1.7;">
+    <!-- Chapter text will be injected here -->
+  </div>
+
+  <section class="chapter-poll-panel" aria-labelledby="chapterPollTitle">
+    <div class="chapter-poll-header">
+      <p class="chapter-eyebrow">Author question</p>
+      <h3 id="chapterPollTitle">Chapter Question</h3>
+      <p id="chapterPollQuestion">
+        Choose one answer and submit your vote.
+      </p>
+    </div>
+
+    <fieldset id="chapterPollOptions" class="chapter-poll-options"></fieldset>
+
+    <div class="chapter-poll-actions">
+      <button id="chapterPollVoteBtn" type="button">Submit vote</button>
+      <p id="chapterPollStatus" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="chapter-comments-panel" aria-labelledby="chapterCommentsTitle">
+    <div class="chapter-comments-header">
+      <div>
+        <p class="chapter-eyebrow">Chapter comments</p>
+        <h3 id="chapterCommentsTitle">Discussion</h3>
+      </div>
+      <button id="chapterRefreshComments" type="button">Refresh</button>
+    </div>
+
+    <div id="chapterCommentsList" class="chapter-comments-list"></div>
+    <div id="chapterNoComments" class="chapter-empty-state hidden">
+      No comments yet for this chapter.
+    </div>
+    <div id="chapterSubscriberNotice" class="chapter-subscriber-notice hidden">
+      Please log in to post comments.
+    </div>
+
+    <div id="chapterNewCommentArea" class="chapter-comment-compose hidden">
+      <label for="chapterNewCommentText">Add a comment</label>
+      <textarea
+        id="chapterNewCommentText"
+        rows="3"
+        placeholder="Share your thoughts on this chapter..."
+      ></textarea>
+      <button id="chapterSubmitComment" type="button">Post comment</button>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,27 @@
+<h2>Admin Upload Worksheet</h2>
+
+<form id="uploadWorksheetForm" enctype="multipart/form-data">
+
+  <div class="form-group">
+    <label for="worksheetTitle">Title</label>
+    <input type="text" id="worksheetTitle" required />
+  </div>
+
+  <div class="form-group">
+    <label for="worksheetDescription">Description</label>
+    <input type="text" id="worksheetDescription" required />
+  </div>
+
+  <div class="form-group">
+    <label for="worksheetFile">PDF File</label>
+    <input type="file" id="worksheetFile" accept="application/pdf" required />
+  </div>
+
+  <button type="submit" class="btn btn-primary">
+    Upload Worksheet
+  </button>
+
+  <p id="uploadMessage"></p>
+
+</form>
+
