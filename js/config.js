@@ -13,6 +13,9 @@
 
 // Keep your old structure
 const envVars = window.ENV || {};
+const IS_LOCAL_DEV =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
 
 // Supabase Configuration
 export const SUPABASE_CONFIG = {
@@ -26,7 +29,7 @@ export const SUPABASE_CONFIG = {
 export const APP_CONFIG = {
   DEFAULT_PAGE: "home",
   SCREENS_PATH: "screens/",
-  CACHE_ENABLED: true,
+  CACHE_ENABLED: !IS_LOCAL_DEV,
   FREE_CHAPTER_COUNT: 2,
   TOTAL_CHAPTERS: 10,
 };
