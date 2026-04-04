@@ -50,8 +50,18 @@
 
     <form id="signupForm">
       <div class="form-group">
-        <label for="signupName">Name</label>
-        <input type="text" id="signupName" placeholder="Name" required autocomplete="name">
+        <label for="signupFirstName">First Name</label>
+        <input type="text" id="signupFirstName" placeholder="First Name" required autocomplete="given-name">
+      </div>
+
+      <div class="form-group">
+        <label for="signupLastName">Last Name</label>
+        <input type="text" id="signupLastName" placeholder="Last Name" required autocomplete="family-name">
+      </div>
+
+      <div class="form-group">
+        <label for="signupParent">Are you a parent or guardian?</label>
+        <input type="checkbox" id="signupParent" name="signupParent" placeholder="Test">
       </div>
 
       <div class="form-group">

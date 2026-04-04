@@ -11,10 +11,101 @@ import { APP_CONFIG } from '../config.js';
 const screenCache = {};
 // Global screen init callback (set once from main.js)
 let globalOnLoadCallback = null;
+// Optional callback API used by setScreenLoadCallback
+let globalScreenLoadCallback = null;
+
+const KNOWN_SCREENS = new Set([
+  'home',
+  'about',
+  'contact',
+  'login',
+  'subscribe',
+  'profile',
+  'dashboard',
+  'admin-upload',
+  'bookreader',
+  'chapters',
+  'chapter-reader',
+  'worksheets',
+  'worksheet-reader'
+]);
 
 export function setGlobalOnLoadCallback(cb) {
   globalOnLoadCallback = cb;
 }
+
+function normalizePageId(pageId) {
+  return String(pageId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+function isKnownScreen(pageId) {
+  return KNOWN_SCREENS.has(pageId);
+}
+
+function normalizeIndexUrl() {
+  const pathname = window.location.pathname || '';
+  if (!pathname.endsWith('/index.html')) {
+    return;
+  }
+
+  const cleanPath = pathname.slice(0, -'index.html'.length) || '/';
+  const cleanUrl = `${cleanPath}${window.location.search}${window.location.hash}`;
+
+  // Keep SPA state but clean the visible URL.
+  window.history.replaceState(window.history.state, '', cleanUrl);
+}
+
+function applyScreenStyle(pageId) {
+  const body = document.body;
+  if (!body) return;
+
+  const classPrefix = 'screen-';
+  [...body.classList]
+    .filter(cls => cls.startsWith(classPrefix))
+    .forEach(cls => body.classList.remove(cls));
+
+  body.classList.add(`${classPrefix}${pageId}`);
+}
+
+function resetScrollPosition() {
+  const scrollingEl = document.scrollingElement || document.documentElement;
+
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  if (scrollingEl) {
+    scrollingEl.scrollTop = 0;
+    scrollingEl.scrollLeft = 0;
+  }
+
+  document.documentElement.scrollTop = 0;
+  document.documentElement.scrollLeft = 0;
+  document.body.scrollTop = 0;
+  document.body.scrollLeft = 0;
+
+  const pageContainer = document.getElementById('pageContainer');
+  if (pageContainer) {
+    pageContainer.scrollTop = 0;
+    pageContainer.scrollLeft = 0;
+  }
+
+  const mainEl = document.querySelector('main');
+  if (mainEl) {
+    mainEl.scrollTop = 0;
+    mainEl.scrollLeft = 0;
+  }
+}
+
+function resetScrollOnNavigation(pageId = '') {
+  resetScrollPosition();
+
+  requestAnimationFrame(() => {
+    resetScrollPosition();
+  });
+
+  setTimeout(() => {
+    resetScrollPosition();
+  }, 0);
+}
+
 
 /**
  * Sanitize HTML to prevent XSS attacks
@@ -93,7 +184,8 @@ export async function loadScreen(screenName) {
   }
 
   try {
-    const response = await fetch(`${APP_CONFIG.SCREENS_PATH}${screenName}.html`);
+    const url = `${APP_CONFIG.SCREENS_PATH}${screenName}.html`;
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to load screen: ${screenName}`);
     }
@@ -127,11 +219,14 @@ export async function showPage(pageId, onLoadCallback = null) {
     return;
   }
 
-  // Validate pageId
-  if (!pageId || typeof pageId !== 'string') {
-    console.error('Invalid page ID');
+  pageId = normalizePageId(pageId);
+  if (!pageId) {
+    console.error("Invalid page ID");
     return;
   }
+
+  applyScreenStyle(pageId);
+  resetScrollOnNavigation(pageId);
 
   // Show loading state
   pageContainer.textContent = 'Loading...'; // Use textContent instead of innerHTML for safety
@@ -142,12 +237,39 @@ export async function showPage(pageId, onLoadCallback = null) {
     const screenHtml = await loadScreen(pageId);
     pageContainer.innerHTML = screenHtml;
 
+    // Hide current page nav button
+    const worksheetBtn = document.querySelector('[data-page="dashboard"]');
+    const uploadBtn = document.querySelector('[data-page="admin-upload"]');
+
+    if (worksheetBtn) worksheetBtn.style.display = 'inline-block';
+    if (uploadBtn) uploadBtn.style.display = 'inline-block';
+
+    if (pageId === "dashboard" && worksheetBtn) {
+      worksheetBtn.style.display = "none";
+    }
+
+    if (pageId === "admin-upload" && uploadBtn) {
+      uploadBtn.style.display = "none";
+    }
+
     // Call the callback (screen init). Prefer the passed callback, otherwise use global one.
     const cb = onLoadCallback || globalOnLoadCallback;
 
     if (cb && typeof cb === 'function') {
       await cb(pageId);
     }
+
+    // Call global callback for all screen loads (including hash navigation)
+    if (
+      globalScreenLoadCallback &&
+      typeof globalScreenLoadCallback === "function" &&
+      globalScreenLoadCallback !== onLoadCallback
+    ) {
+      await globalScreenLoadCallback(pageId);
+    }
+
+    // Some screens add content after initial paint; enforce top position again.
+    resetScrollOnNavigation(pageId);
   } catch (error) {
     console.error("Error showing page:", error);
     pageContainer.textContent = 'Error loading page.'; // Use textContent for safety
@@ -155,18 +277,30 @@ export async function showPage(pageId, onLoadCallback = null) {
 }
 
 /**
+ * Register a global callback to run after every screen load
+ * @param {Function|null} callback - Callback with signature (pageId) => Promise<void>|void
+ */
+export function setScreenLoadCallback(callback) {
+  globalScreenLoadCallback =
+    typeof callback === "function" ? callback : null;
+}
+
+/**
  * Initialize page from URL hash
  */
 export async function initPageFromHash() {
+  normalizeIndexUrl();
+
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
 
-// remove query string from hash (anything after ?)
-const pageOnly = hash.split('?')[0];
+  // remove query string from hash (anything after ?)
+  const pageOnly = hash.split('?')[0];
 
 // sanitize only the page name
 const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+const initialPage = sanitized || APP_CONFIG.DEFAULT_PAGE;
 
-await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
+await showPage(isKnownScreen(initialPage) ? initialPage : APP_CONFIG.DEFAULT_PAGE);
 }
 
 /**
@@ -181,5 +315,14 @@ window.addEventListener("hashchange", async () => {
   const hash = window.location.hash.substring(1) || APP_CONFIG.DEFAULT_PAGE;
 const pageOnly = hash.split('?')[0];
 const sanitized = pageOnly.replace(/[^a-zA-Z0-9_-]/g, '');
+if (!isKnownScreen(sanitized)) {
+  return;
+}
+
+resetScrollOnNavigation(sanitized || APP_CONFIG.DEFAULT_PAGE);
 await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
 });
+
+if ('scrollRestoration' in window.history) {
+  window.history.scrollRestoration = 'manual';
+}

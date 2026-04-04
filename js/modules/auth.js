@@ -50,7 +50,7 @@ export async function checkAuthState() {
 
     const currentPage = window.location.hash.substring(1) || "home";
     if (currentPage === "login") {
-      window.location.hash = "chapters";   //go to chapter list after login
+      window.location.hash = "bookreader";
     }
   } else {
     updateNavForLoggedOut();
@@ -108,8 +108,7 @@ export async function signUp(email, password, firstName, lastName, parent) {
           last_name: lastName,
           parent: parent,
           subscriber: false, // Default to false, can be updated later
-          admin: false, // Default to false, can be updated later
-          name: firstName + ' ' + lastName,
+          admin: false // Default to false, can be updated later
         },
       },
     });
@@ -169,7 +168,7 @@ export function initAuthStateListener(callback) {
       // Only force dashboard if user is currently on login (or no hash)
       const currentPage = window.location.hash.substring(1) || "home";
       if (currentPage === "login") {
-        window.location.hash = "chapters";
+        window.location.hash = "bookreader";
       }
       // otherwise: do nothing, let the current hash page stay (ex: chapters)
     }

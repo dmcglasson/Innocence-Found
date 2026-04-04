@@ -7,22 +7,27 @@
  * has the needed values, we skip fetching .env entirely.
  */
 
+function isPlaceholderValue(value) {
+  if (typeof value !== "string") return true;
+
+  const normalized = value.trim().toUpperCase();
+  return (
+    normalized.length === 0 ||
+    normalized === "YOUR_SUPABASE_URL" ||
+    normalized === "YOUR_SUPABASE_URL_HERE" ||
+    normalized === "YOUR_SUPABASE_ANON_KEY" ||
+    normalized === "YOUR_SUPABASE_ANON_KEY_HERE"
+  );
+}
+
 function hasSupabaseEnv() {
-  const url = window.ENV?.SUPABASE_URL?.trim();
-  const key = window.ENV?.SUPABASE_ANON_KEY?.trim();
+  const env = window.ENV;
 
-  if (!url || !key) return false;
-
-  if (
-    url === "YOUR_SUPABASE_URL" ||
-    url === "YOUR_SUPABASE_URL_HERE" ||
-    key === "YOUR_SUPABASE_ANON_KEY" ||
-    key === "YOUR_SUPABASE_ANON_KEY_HERE"
-  ) {
-    return false;
-  }
-
-  return true;
+  return (
+    env &&
+    !isPlaceholderValue(env.SUPABASE_URL) &&
+    !isPlaceholderValue(env.SUPABASE_ANON_KEY)
+  );
 }
 
 /**

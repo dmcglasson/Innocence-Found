@@ -115,7 +115,18 @@ The platform solves the challenge of offering:
 
 ---
 
-## Testing *(CSC 191 Placeholder)* 
+## Testing
+
+1. Install dev dependencies:
+   ```bash
+   npm install
+   ```
+2. Run tests:
+   ```bash
+   npm test
+   ```
+
+Current automated tests cover the `bookreader` comment/reply workflow (`tests/bookreader.test.js`).
 
 ---
 
@@ -202,4 +213,3 @@ The platform encourages:
 - **Interactive Learning**
 
 The long-term goal is to provide a space where readers can learn, reflect, and participate in a supportive storytelling experience as well as a safe learning environment.
-
