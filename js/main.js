@@ -16,6 +16,33 @@ import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
 import { fetchWorksheetMetadata, downloadWorksheet } from "./modules/worksheets.js";
 let worksheetsLoadToken = 0;
+const SCREEN_STYLE_ID = "active-screen-style";
+const SCREEN_STYLES = {
+  bookreader: "screens/bookreader.css",
+};
+
+function syncScreenStyles(pageId) {
+  const href = SCREEN_STYLES[pageId];
+  let link = document.getElementById(SCREEN_STYLE_ID);
+
+  if (!href) {
+    if (link) {
+      link.remove();
+    }
+    return;
+  }
+
+  if (!link) {
+    link = document.createElement("link");
+    link.id = SCREEN_STYLE_ID;
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+  }
+
+  if (link.getAttribute("href") !== href) {
+    link.setAttribute("href", href);
+  }
+}
 /**
  * Initialize the application
  */
@@ -175,7 +202,7 @@ async function handleLogin(form) {
           sessionStorage.removeItem('returnTo');
           window.location.hash = returnTo.replace(/^#/, '');
         } else {
-          window.location.hash = 'chapters';
+          window.location.hash = 'bookreader';
         }
       }, 1000);
     } else {
@@ -356,6 +383,8 @@ async function handleWorksheetUpload(form) {
  * @param {string} pageId - ID of the loaded page
  */
 async function initializeScreen(pageId) {
+  syncScreenStyles(pageId);
+
   if (pageId === 'profile') {
     await initializeProfileScreen();
   }

@@ -429,9 +429,62 @@ footer p {
 
 /* Responsive */
 @media (max-width: 768px) {
-    .nav-links {
-        gap: 15px;
-        font-size: 14px;
+    header {
+        padding: 12px 0;
+    }
+
+    header nav.nav {
+        display: grid;
+        grid-template-columns: 72px 1fr;
+        grid-template-areas:
+            "brand title"
+            "right right";
+        align-items: center;
+        row-gap: 8px;
+        column-gap: 10px;
+        padding: 0 12px;
+    }
+
+    header .brand {
+        grid-area: brand;
+        width: auto;
+    }
+
+    header .brand img {
+        width: 56px;
+    }
+
+    header .site-title {
+        grid-area: title;
+        text-align: left;
+        white-space: normal;
+        line-height: 1.1;
+        font-size: clamp(22px, 6.8vw, 30px);
+    }
+
+    .nav-right {
+        grid-area: right;
+        width: 100%;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    header .nav-links {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+    }
+
+    header .nav-links a {
+        font-size: 20px;
+        line-height: 1.2;
+    }
+
+    .user-menu {
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px 10px;
     }
     
     .hero h1 {
@@ -448,14 +501,29 @@ footer p {
 }
 
 @media (max-width: 480px) {
-    nav {
-        flex-direction: column;
-        gap: 15px;
+    header nav.nav {
+        grid-template-columns: 56px 1fr;
     }
-    
-    .nav-links {
-        flex-direction: column;
-        gap: 10px;
+
+    header .brand img {
+        width: 48px;
+    }
+
+    header .site-title {
+        font-size: clamp(20px, 8.2vw, 26px);
+    }
+
+    header .nav-links {
+        gap: 8px 12px;
+    }
+
+    header .nav-links a {
+        font-size: 18px;
+    }
+
+    .user-menu span {
+        width: 100%;
+        text-align: center;
     }
     
     .auth-box {
@@ -1410,4 +1478,140 @@ footer p {
     border-radius: 16px;
   }
   .auth-title{ font-size: 18px; }
+}
+
+/* =========================
+   CHAPTER READER DISCUSSION
+   ========================= */
+
+.chapter-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  color: #8b5a2b;
+}
+
+.chapter-poll-panel,
+.chapter-comments-panel {
+  margin-top: 1.1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #d7c3a6;
+  border-radius: 8px;
+  background: rgba(255, 250, 243, 0.94);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.chapter-poll-header h3,
+.chapter-comments-header h3 {
+  margin: 0.1rem 0 0.3rem;
+  color: #3b2f23;
+}
+
+.chapter-poll-header p {
+  margin: 0;
+  color: #6f5a4a;
+}
+
+.chapter-poll-options {
+  border: 0;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.chapter-poll-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border: 1px solid #d7c3a6;
+  border-radius: 6px;
+  background: #fffdf8;
+  padding: 0.6rem 0.7rem;
+}
+
+.chapter-poll-meta {
+  margin-top: 0.15rem;
+  color: #6f5a4a;
+  font-size: 0.9rem;
+}
+
+.chapter-poll-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.chapter-poll-actions button,
+.chapter-comments-header button,
+.chapter-comment-compose button {
+  background-color: #d1b797;
+  border: none;
+  color: #3a2e27;
+  padding: 0.45rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.chapter-poll-actions button:hover,
+.chapter-comments-header button:hover,
+.chapter-comment-compose button:hover {
+  background-color: #bfa380;
+}
+
+.chapter-comments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.chapter-comments-list {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.chapter-comment-card {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #d7c3a6;
+  border-radius: 6px;
+  background: #fffdf8;
+}
+
+.chapter-comment-meta {
+  color: #6f5a4a;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.chapter-empty-state,
+.chapter-subscriber-notice {
+  margin-top: 0.7rem;
+  padding: 0.8rem;
+  border: 1px dashed #d7c3a6;
+  border-radius: 6px;
+  color: #6f5a4a;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.chapter-comment-compose {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.chapter-comment-compose textarea {
+  border: 1px solid #d7c3a6;
+  border-radius: 6px;
+  background: #fffdf8;
+  color: #3b2f23;
+  padding: 0.65rem;
+  resize: vertical;
+  min-height: 76px;
 }
