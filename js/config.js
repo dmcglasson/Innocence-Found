@@ -13,7 +13,7 @@
 
 // Keep your old structure
 const envVars = window.ENV || {};
-/**
+
 // Supabase Configuration
 export const SUPABASE_CONFIG = {
   //  First try window.ENV values (if provided)
@@ -21,27 +21,8 @@ export const SUPABASE_CONFIG = {
   ANON_KEY: envVars.SUPABASE_ANON_KEY ||
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaXdrYm5xamp5Y213b25iaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjM1NDYsImV4cCI6MjA3ODI5OTU0Nn0.SHCSkMuUl3IY-A76cGXwLRXQNcLF-hOa19Tu8jOSWaU",
 };
- */
 
-const fallbackUrl = "https://khiwkbnqjjycmwonbhqu.supabase.co";
-const fallbackAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaXdrYm5xamp5Y213b25iaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjM1NDYsImV4cCI6MjA3ODI5OTU0Nn0.SHCSkMuUl3IY-A76cGXwLRXQNcLF-hOa19Tu8jOSWaU";
 
-const safeSupabaseUrl =
-  typeof envVars.SUPABASE_URL === "string" &&
-  envVars.SUPABASE_URL.startsWith("http")
-    ? envVars.SUPABASE_URL
-    : fallbackUrl;
-
-const safeAnonKey =
-  typeof envVars.SUPABASE_ANON_KEY === "string" &&
-  envVars.SUPABASE_ANON_KEY.length > 20
-    ? envVars.SUPABASE_ANON_KEY
-    : fallbackAnonKey;
-
-export const SUPABASE_CONFIG = {
-  URL: safeSupabaseUrl,
-  ANON_KEY: safeAnonKey,
-};
 
 
 

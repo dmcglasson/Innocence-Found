@@ -39,6 +39,15 @@ async function init() {
   initUI();
   setGlobalOnLoadCallback(initializeScreen);
 
+  const pageId = window.location.hash.substring(1) || 'home';
+
+  if (pageId === 'home') {
+  const yearEl = document.getElementById('year');
+  if (yearEl) {
+    yearEl.textContent = new Date().getFullYear();
+  }
+}
+
   // Set up navigation handlers before first route render
   setupScreenInitialization();
 
@@ -88,11 +97,27 @@ function setupEventListeners() {
 });
 
   // Click handlers (logout + switch between login/signup)
-  document.addEventListener('click', async (e) => {
-    const target = e.target;
+ document.addEventListener('click', async (e) => {
 
-        const paidPlanBtn = target.closest && target.closest('#select-paid-plan');
+  const target = e.target;
+
+  const freePlanBtn = target.closest && target.closest('#select-free-plan');
+  if (freePlanBtn) {
+    e.preventDefault();
+
+    localStorage.setItem('selectedPlan', JSON.stringify({
+      name: 'Free Plan',
+      price: '$0 / month'
+    }));
+    sessionStorage.setItem('returnTo', '#home');
+    window.location.hash = 'login';
+    return;
+  }
+
+  const paidPlanBtn = target.closest && target.closest('#select-paid-plan');
     if (paidPlanBtn) {
+      sessionStorage.setItem('returnTo', '#payment-confirmation');
+      console.log('PAID returnTo set:', sessionStorage.getItem('returnTo'));
       e.preventDefault();
 
       localStorage.setItem('selectedPlan', JSON.stringify({
@@ -111,13 +136,18 @@ function setupEventListeners() {
     }
 
     const confirmBtn = target.closest && target.closest('#confirmPaymentBtn');
-    if (confirmBtn) {
-      e.preventDefault();
+if (confirmBtn) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation();
 
-      localStorage.setItem('isSubscriber', 'true');
-      window.location.hash = 'payment-success';
-      return;
-    }
+  localStorage.setItem('isSubscriber', 'true');
+  sessionStorage.removeItem('returnTo');
+
+  await showPage('payment-success');
+  window.location.hash = 'payment-success';
+  return;
+}
 
     // Download worksheet button
     const dlBtn = target.closest && target.closest(".downloadWorksheetBtn");
@@ -194,21 +224,26 @@ async function handleLogin(form) {
   try {
     const result = await signIn(email, password);
 
-    if (result.success) {
-      showMessage('loginMessage', result.message, 'success');
-      setTimeout(() => {
-        const returnTo = sessionStorage.getItem('returnTo');
+  if (result.success) {
+  showMessage('loginMessage', result.message, 'success');
 
-        if (returnTo) {
-          sessionStorage.removeItem('returnTo');
-          window.location.hash = returnTo.replace(/^#/, '');
-        } else {
-          window.location.hash = 'chapters';
-        }
-      }, 1000);
-    } else {
-      showMessage('loginMessage', result.message, 'error');
-    }
+const returnTo = sessionStorage.getItem('returnTo');
+const rawPlan = localStorage.getItem('selectedPlan');
+const selectedPlan = rawPlan ? JSON.parse(rawPlan) : null;
+
+if (returnTo) {
+  sessionStorage.removeItem('returnTo');
+  window.location.hash = returnTo.replace(/^#/, '');
+} else if (selectedPlan && selectedPlan.name === 'Paid Plan') {
+  window.location.hash = 'payment-confirmation';
+} else {
+  window.location.hash = 'home';
+}
+
+  return;
+} else {
+  showMessage('loginMessage', result.message, 'error');
+}
   } catch (error) {
     showMessage('loginMessage', error.message || 'Failed to sign in', 'error');
   } finally {
@@ -387,7 +422,16 @@ async function handleWorksheetUpload(form) {
 
 async function initializeScreen(pageId) {
 
-
+ if (pageId === 'home') {
+  const yearEl = document.getElementById('year');
+  if (yearEl) {
+    yearEl.textContent = new Date().getFullYear();
+  }
+}
+  
+if (pageId === 'profile') {
+  await initializeProfileScreen();
+}
 
 // Profile screen
 
