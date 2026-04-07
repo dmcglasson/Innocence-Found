@@ -1,4 +1,15 @@
-const supabase = window.supabase.createClient(window.ENV.SUPABASE_URL, window.ENV.SUPABASE_ANON_KEY);
+const env = window.ENV || {};
+const isPlaceholder = (value) =>
+  typeof value !== "string" ||
+  value.trim().length === 0 ||
+  value === "YOUR_SUPABASE_URL_HERE" ||
+  value === "YOUR_SUPABASE_ANON_KEY_HERE";
+
+if (isPlaceholder(env.SUPABASE_URL) || isPlaceholder(env.SUPABASE_ANON_KEY)) {
+  throw new Error("Supabase runtime env is missing. Configure public values in env.js.");
+}
+
+const supabase = window.supabase.createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
 const form = document.getElementById("registrationForm");
 const errorMessage = document.getElementById("errorMessage");
 const successMessage = document.getElementById("successMessage");

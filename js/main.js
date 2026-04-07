@@ -4,10 +4,9 @@
  * This file initializes the application and sets up all modules.
  * It coordinates between different modules and handles the application lifecycle.
  */
-
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession } from './modules/auth.js';
+import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, getCommentsByChapter, deleteCommentById, updateCommentById } from './modules/auth.js';
 import { initializeProfileScreen } from './modules/profile.js';
 import { initializeChaptersScreen, initializeChapterReaderScreen, handleLockedChapter } from './modules/chapters.js';
 import { initializeWorksheetsScreen, initializeWorksheetReaderScreen, handleLockedWorksheet } from './modules/worksheets.js';
@@ -15,15 +14,39 @@ import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
 import { fetchWorksheetMetadata, downloadWorksheet } from "./modules/worksheets.js";
+import { APP_CONFIG } from './config.js';
+
 let worksheetsLoadToken = 0;
+const SCREEN_STYLE_ID = "active-screen-style";
+const SCREEN_STYLES = {
+  bookreader: "screens/bookreader.css",
+};
+
+function syncScreenStyles(pageId) {
+  const href = SCREEN_STYLES[pageId];
+  let link = document.getElementById(SCREEN_STYLE_ID);
+
+  if (!href) {
+    if (link) {
+      link.remove();
+    }
+    return;
+  }
+
+  if (!link) {
+    link = document.createElement("link");
+    link.id = SCREEN_STYLE_ID;
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+  }
+
+  if (link.getAttribute("href") !== href) {
+    link.setAttribute("href", href);
+  }
+}
 /**
  * Initialize the application
  */
-const APP_CONFIG = window.APP_CONFIG || {
-  FREE_CHAPTER_COUNT: 2,
-  TOTAL_CHAPTERS: 8
-};
-
 const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
 async function init() {
   // Wait a moment for env vars to be available
@@ -84,17 +107,21 @@ async function init() {
 function setupEventListeners() {
   // Login form
   document.addEventListener('submit', async (e) => {
-  if (e.target.id === 'loginForm') {
-    e.preventDefault();
-    await handleLogin(e.target);
-  } else if (e.target.id === 'signupForm') {
-    e.preventDefault();
-    await handleSignup(e.target);
-  } else if (e.target.id === 'uploadWorksheetForm') {
-    e.preventDefault();
-    await handleWorksheetUpload(e.target);
-  }
-});
+
+    if (e.target.id === 'loginForm') {
+      e.preventDefault();
+      await handleLogin(e.target);
+
+    } else if (e.target.id === 'signupForm') {
+      e.preventDefault();
+      await handleSignup(e.target);
+
+    } else if (e.target.id === 'uploadWorksheetForm') {
+      e.preventDefault();
+      await handleWorksheetUpload(e.target);
+    }
+
+  });
 
   // Click handlers (logout + switch between login/signup)
  document.addEventListener('click', async (e) => {
@@ -159,9 +186,68 @@ if (confirmBtn) {
       if (!result.success) {
         alert(result.message);
       }
+
+      return;
+    }
+    const editBtn = e.target.closest && e.target.closest('.edit-response-btn');
+    if (editBtn) {
+      e.preventDefault();
+
+      const commentId = editBtn.getAttribute('data-id');
+
+      const currentRow = document.querySelector(`tr[data-comment-id="${commentId}"]`);
+      const currentText = currentRow ? currentRow.children[1].innerText : '';
+
+      const newMessage = window.prompt('Edit response:', currentText);
+
+      if (!newMessage || newMessage.trim() === '') return;
+
+      const result = await updateCommentById(commentId, newMessage);
+
+      if (!result.success) {
+        alert(result.message || 'Failed to update.');
+        return;
+      }
+
+      // update UI instantly
+      if (currentRow) {
+        currentRow.children[1].innerText = newMessage;
+      }
+
       return;
     }
 
+    const deleteBtn = e.target.closest && e.target.closest('.delete-response-btn');
+    if (deleteBtn) {
+      e.preventDefault();
+
+      const commentId = deleteBtn.getAttribute('data-id');
+      const confirmed = window.confirm('Delete this response?');
+
+      if (!confirmed) return;
+
+      const result = await deleteCommentById(commentId);
+
+      if (!result.success) {
+        alert(result.message || 'Failed to delete response.');
+        return;
+      }
+
+      const row = document.querySelector(`tr[data-comment-id="${commentId}"]`);
+      if (row) {
+        const tbody = row.closest('tbody');
+        row.remove();
+
+        if (tbody && tbody.querySelectorAll('tr').length === 0) {
+          const responsesContainer = document.getElementById('responsesContainer');
+          if (responsesContainer) {
+            responsesContainer.innerHTML = `<div class="admin-empty-state">No responses submitted yet.</div>`;
+          }
+        }
+      }
+
+      return;
+    }
     // Logout button
     if (target.id === 'logoutBtn' || (target.closest && target.closest('#logoutBtn'))) {
       e.preventDefault();
@@ -325,6 +411,7 @@ async function handleSignup(form) {
  * Handle logout
  */
 async function handleLogout() {
+
   try {
     const result = await signOut();
     if (!result.success) {
@@ -421,7 +508,8 @@ async function handleWorksheetUpload(form) {
 
 
 async function initializeScreen(pageId) {
-
+  syncScreenStyles(pageId);
+  
  if (pageId === 'home') {
   const yearEl = document.getElementById('year');
   if (yearEl) {
@@ -490,6 +578,123 @@ if (pageId === 'profile') {
     } catch (error) {
       console.warn("Dashboard elements not found:", error);
     }
+  }
+
+  if (pageId === 'admin-responses') {
+    const isAdmin = await isCurrentUserAdmin();
+
+    if (!isAdmin) {
+      const pageContainer = document.getElementById('pageContainer');
+      if (pageContainer) {
+        pageContainer.innerHTML = `
+        <div class="content-section">
+          <div class="auth-box">
+            <h2>Access Denied</h2>
+            <p>This page is for admins only.</p>
+          </div>
+        </div>
+      `;
+      }
+      return;
+    }
+
+    await waitForElement('#chapterSelect', 1000);
+    await waitForElement('#responsesContainer', 1000);
+
+    const chapterSelect = document.getElementById('chapterSelect');
+    const responsesContainer = document.getElementById('responsesContainer');
+    const messageEl = document.getElementById('adminResponsesMessage');
+
+    if (!chapterSelect || !responsesContainer) return;
+
+    const renderEmptyState = (text) => {
+      responsesContainer.innerHTML = `<div class="admin-empty-state">${text}</div>`;
+    };
+
+    const renderLoadingState = (text = 'Loading responses...') => {
+      responsesContainer.innerHTML = `<div class="admin-loading-state">${text}</div>`;
+    };
+
+    const renderErrorState = (text = 'Error loading responses.') => {
+      responsesContainer.innerHTML = `<div class="admin-error-state">${text}</div>`;
+    };
+
+    const chaptersResult = await getAllChapters();
+
+    if (!chaptersResult.success) {
+      if (messageEl) messageEl.textContent = chaptersResult.message || 'Unable to load chapters.';
+      renderErrorState('Unable to load chapters.');
+      return;
+    }
+
+    chapterSelect.innerHTML = `<option value="">Choose a chapter</option>`;
+
+    chaptersResult.data.forEach((chapter) => {
+      const option = document.createElement('option');
+      option.value = chapter.id;
+      option.textContent = `Chapter ${chapter.id}`;
+      chapterSelect.appendChild(option);
+    });
+
+    renderEmptyState('No chapter selected yet.');
+
+    chapterSelect.addEventListener('change', async () => {
+      const chapterId = chapterSelect.value;
+
+      if (messageEl) messageEl.textContent = '';
+
+      if (!chapterId) {
+        renderEmptyState('No chapter selected yet.');
+        return;
+      }
+
+      renderLoadingState();
+
+      const commentsResult = await getCommentsByChapter(chapterId);
+
+      if (!commentsResult.success) {
+        if (messageEl) {
+          messageEl.textContent = commentsResult.message || 'Unable to load responses.';
+        }
+        renderErrorState('Unable to load responses for this chapter.');
+        return;
+      }
+
+      if (!commentsResult.data.length) {
+        renderEmptyState('No responses submitted yet.');
+        return;
+      }
+
+      responsesContainer.innerHTML = `
+  <table class="responses-table">
+    <thead>
+      <tr>
+        <th>User ID</th>
+        <th>Response</th>
+        <th>Timestamp</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${commentsResult.data.map((comment) => `
+        <tr data-comment-id="${comment.id}">
+          <td>${comment.uid ?? ''}</td>
+          <td>${comment.message ?? ''}</td>
+          <td>${comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ''}</td>
+          <td>
+            <button type="button" class="action-btn edit-response-btn" data-id="${comment.id}">Edit</button>
+            <button type="button" class="action-btn delete-response-btn" data-id="${comment.id}">Delete</button>
+          </td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+`;
+    });
+  }
+
+  if (pageId === 'chapter-reader') {
+    await waitForElement('#chapterTitle', 1000);
 
     try {
       await waitForElement("#worksheetsContainer", 2000);
@@ -592,6 +797,7 @@ if (pageId === 'profile') {
     }
   }
 
+
   if (pageId === 'chapters') {
     await initializeChaptersScreen();
   }
@@ -610,6 +816,9 @@ function navigateToPage(pageId) {
 
   const nextHash = `#${safePage}`;
 
+  // Clear scroll position from history to prevent browser restoration
+  window.history.replaceState(window.history.state, '', window.location.href);
+
   // If hash is unchanged, hashchange will not fire, so render directly.
   if (window.location.hash === nextHash) {
     showPage(safePage);
@@ -617,6 +826,7 @@ function navigateToPage(pageId) {
   }
 
   window.location.hash = safePage;
+  showPage(safePage);
 }
 
 function setupScreenInitialization() {
@@ -630,12 +840,12 @@ function setupScreenInitialization() {
       const pageId = pageLink.getAttribute('data-page');
       const href = pageLink.getAttribute('href') || '';
 
-      // For normal hash anchors (ex: #about), let browser update the URL.
+      // Handle hash links via SPA router to avoid native anchor scroll retention.
       if (href.startsWith('#')) {
-        // If user clicks the current hash, manually re-render because hashchange won't fire.
-        if (window.location.hash === href && pageId) {
-          e.preventDefault();
-          showPage(pageId);
+        e.preventDefault();
+
+        if (pageId) {
+          navigateToPage(pageId);
         }
         return;
       }
@@ -676,3 +886,20 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+
+// ===== Navbar Mobile Toggle =====
+function setupMobileNavToggle() {
+  const navToggle = document.getElementById("navToggle");
+  const navRight = document.getElementById("navRight");
+
+  if (!navToggle || !navRight) return;
+
+  navToggle.addEventListener("click", () => {
+    navRight.classList.toggle("open");
+
+    const isOpen = navRight.classList.contains("open");
+    navToggle.setAttribute("aria-expanded", String(isOpen));
+  });
+}
+
+setupMobileNavToggle();

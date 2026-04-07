@@ -1,13 +1,22 @@
-<div class="content-section">
-  <button id="backToWorksheetsBtn" type="button">
-    &larr; Back to Worksheets
-  </button>
+<section class="worksheet-reader-page">
+  <img
+    class="worksheet-reader-page__bgImg"
+    src="./images/worksheets-bg1.png"
+    alt=""
+    aria-hidden="true"
+  />
 
-  <h1 id="worksheetTitle" style="margin-top: 16px;">
-    Worksheet
-  </h1>
+  <div class="worksheet-reader-page__wrap">
+    <article class="worksheet-reader-page__card">
+      <button id="backToWorksheetsBtn" class="worksheet-reader-page__backBtn" type="button">
+        &larr; Back to Worksheets
+      </button>
 
-  <div id="worksheetBody" style="margin-top: 12px; line-height: 1.7;">
-    <!-- Worksheet PDF will be injected here -->
+      <h1 id="worksheetTitle" class="worksheet-reader-page__title">Worksheet</h1>
+
+      <div id="worksheetBody" class="worksheet-reader-page__body" aria-live="polite">
+        <p>Loading worksheet...</p>
+      </div>
+    </article>
   </div>
-</div>
+</section>
