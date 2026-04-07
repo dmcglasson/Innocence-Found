@@ -1052,6 +1052,363 @@ footer p {
 }
 
 /* =========================
+   WORKSHEETS PAGE
+   ========================= */
+
+.worksheets-page {
+  position: relative;
+  min-height: 100vh;
+  padding: 3.5rem 1.25rem 4.5rem;
+}
+
+.worksheets-page__bgImg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.14;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.worksheets-page__wrap {
+  position: relative;
+  z-index: 2;
+}
+
+.worksheets-page__top {
+  margin: 0 0 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.worksheets-page__banner {
+  display: inline-block;
+  width: auto;
+  max-width: 92vw;
+  padding: 0.85rem 1.25rem;
+  background: #4B2E05;
+  color: #f3e6d3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 600;
+  font-size: clamp(1.25rem, 2.1vw, 2.1rem);
+}
+
+.worksheets-page__quote {
+  display: inline-block;
+  width: auto;
+  max-width: min(760px, 92vw);
+  background: rgba(243, 230, 211, 0.92);
+  border: 1px solid rgba(75, 46, 5, 0.15);
+  padding: 0.75rem 1.15rem;
+  border-radius: 8px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  text-align: center;
+}
+
+.worksheets-page__quote p {
+  margin: 0;
+  color: #4B2E05;
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 600;
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+}
+
+.worksheets-page__stack {
+  margin-top: 1.8rem;
+  display: grid;
+  justify-items: stretch;
+}
+
+.worksheets-page__list {
+  width: min(760px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.worksheet-card {
+  background: rgba(243, 230, 211, 0.9);
+  border: 1px solid rgba(75, 46, 5, 0.14);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(2px);
+}
+
+.worksheet-card--locked {
+  opacity: 0.9;
+}
+
+.worksheet-card__metaRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+}
+
+.worksheet-card__status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.worksheet-card__status--available {
+  background: rgba(46, 125, 50, 0.16);
+  color: #1b5e20;
+  border: 1px solid rgba(46, 125, 50, 0.45);
+}
+
+.worksheet-card__status--locked {
+  background: rgba(185, 122, 32, 0.14);
+  color: #8c4f05;
+  border: 1px solid rgba(140, 79, 5, 0.35);
+}
+
+.worksheet-card__title {
+  margin: 0.5rem 0 0;
+  color: #4B2E05;
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 700;
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+  line-height: 1.2;
+}
+
+.worksheet-card__title--inline {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.worksheet-card__tags {
+  margin-top: 0.45rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.worksheet-card__tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.16rem 0.58rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(75, 46, 5, 0.9);
+  border: 1px solid rgba(75, 46, 5, 0.2);
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.worksheet-card__description {
+  margin: 0.35rem 0 0;
+  color: rgba(75, 46, 5, 0.9);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.worksheet-card__cta {
+  margin-top: 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #d07a2b;
+  background: #d07a2b;
+  color: #ffffff;
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  width: 100%;
+  max-width: 240px;
+}
+
+.worksheet-card__cta:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.worksheet-card__cta:disabled {
+  background: #ece2d1;
+  border-color: #ccb58f;
+  color: #7a6645;
+}
+
+.worksheet-state {
+  background: rgba(243, 230, 211, 0.9);
+  border: 1px solid rgba(75, 46, 5, 0.14);
+  border-radius: 12px;
+  padding: 1.1rem;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.14);
+}
+
+.worksheet-state h3 {
+  margin: 0 0 0.35rem;
+  color: #4B2E05;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.35rem;
+}
+
+.worksheet-state p {
+  margin: 0;
+  color: rgba(75, 46, 5, 0.9);
+}
+
+.worksheet-state--loading {
+  animation: worksheetPulse 1.4s ease-in-out infinite;
+}
+
+.worksheet-state--error {
+  border-color: rgba(176, 34, 34, 0.3);
+}
+
+@keyframes worksheetPulse {
+  0% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.75;
+  }
+}
+
+/* =========================
+   WORKSHEET READER PAGE
+   ========================= */
+
+.worksheet-reader-page {
+  position: relative;
+  min-height: 100vh;
+  padding: 3rem 1.25rem 4.5rem;
+}
+
+.worksheet-reader-page__bgImg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.14;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.worksheet-reader-page__wrap {
+  position: relative;
+  z-index: 2;
+  width: min(1040px, 100%);
+  margin: 0 auto;
+}
+
+.worksheet-reader-page__card {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  background: rgba(243, 230, 211, 0.92);
+  border: 1px solid rgba(75, 46, 5, 0.15);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.14);
+}
+
+.worksheet-reader-page__backBtn {
+  border-radius: 999px;
+  border: 1px solid rgba(75, 46, 5, 0.35);
+  background: rgba(255, 255, 255, 0.7);
+  color: #4B2E05;
+  padding: 0.45rem 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.worksheet-reader-page__title {
+  margin: 0.8rem 0 0;
+  color: #4B2E05;
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 700;
+  font-size: clamp(1.45rem, 3.2vw, 2.2rem);
+}
+
+.worksheet-reader-page__body {
+  margin-top: 0.75rem;
+  line-height: 1.7;
+  color: rgba(75, 46, 5, 0.9);
+}
+
+.worksheet-reader-page__fallbackLink {
+  margin-top: 0.75rem;
+}
+
+.worksheet-reader-page__fallbackLink a {
+  color: #4B2E05;
+}
+
+.worksheet-reader-page__body iframe {
+  width: 100%;
+  min-height: 72vh;
+  border: 1px solid rgba(75, 46, 5, 0.25);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+@media (max-width: 700px) {
+  .worksheets-page {
+    padding: 2.75rem 1rem 3.5rem;
+  }
+
+  .worksheets-page__list {
+    width: min(760px, 100%);
+    gap: 0.75rem;
+  }
+
+  .worksheet-card {
+    padding: 0.9rem;
+  }
+
+  .worksheet-card__metaRow {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .worksheet-card__title--inline {
+    width: 100%;
+  }
+
+  .worksheet-card__cta {
+    max-width: none;
+  }
+
+  .worksheet-reader-page {
+    padding: 2.35rem 0.7rem 3.5rem;
+  }
+
+  .worksheet-reader-page__card {
+    width: 100%;
+    padding: 0.75rem;
+  }
+
+  .worksheet-reader-page__body iframe {
+    min-height: 62vh;
+  }
+}
+
+/* =========================
    ABOUT Page
    ========================= */
 
@@ -1897,4 +2254,223 @@ button.btn-primary {
 
 .admin-table-wrap tr:hover td {
   background: #7a4f1f;
+}
+
+/* ===== HOME VINTAGE PAGE FIX ===== */
+
+.home-vintage * {
+  box-sizing: border-box;
+}
+
+.home-vintage {
+  background: linear-gradient(to bottom, #f6efe4 0%, #e7dbc8 100%);
+  min-height: 100vh;
+  width: 100%;
+}
+
+.home-vintage .wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.home-vintage .stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.home-vintage .hero {
+  padding: 80px 20px 48px;
+  text-align: center;
+}
+
+.home-vintage .card {
+  background: #fffaf1;
+  border-radius: 18px;
+  padding: 40px;
+  max-width: 820px;
+  margin: 0 auto;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.home-vintage .eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #b46b33;
+}
+
+.home-vintage h1 {
+  font-size: 56px;
+  margin: 10px 0 20px;
+  color: #6b3f2d;
+  line-height: 1.15;
+}
+
+.home-vintage .lead {
+  font-size: 18px;
+  margin-bottom: 30px;
+  color: #3b2f26;
+  line-height: 1.8;
+}
+
+.home-vintage .ctaRow {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.home-vintage .btn.primary {
+  background: #6b3f2d;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 10px;
+  text-decoration: none;
+}
+
+.home-vintage .btn.ghost {
+  background: transparent;
+  border: 2px solid #6b3f2d;
+  color: #6b3f2d;
+  padding: 12px 24px;
+  border-radius: 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.home-vintage .features {
+  padding: 24px 20px 80px;
+}
+
+.home-vintage .grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.home-vintage .feature {
+  background: #fffaf1;
+  padding: 24px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 240px;
+}
+
+.home-vintage .tag {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #8f5b34;
+}
+
+.home-vintage .feature h3 {
+  font-size: 32px;
+  line-height: 1.2;
+  color: #2f241c;
+  margin: 0;
+}
+
+.home-vintage .feature p {
+  margin: 0;
+  color: #4b4037;
+  line-height: 1.7;
+}
+
+.home-vintage .feature .btn {
+  margin-top: auto;
+  align-self: center;
+  width: fit-content;
+  padding: 12px 24px;
+}
+
+.home-vintage .section-title,
+.home-vintage .rule {
+  display: none;
+}
+
+.home-vintage footer {
+  background: #4b2e23;
+  color: #f7eadf;
+  padding: 40px 20px 20px;
+}
+
+.home-vintage footer .cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.home-vintage footer a {
+  color: #f0d7c3;
+  text-decoration: none;
+}
+
+.home-vintage footer a:hover {
+  text-decoration: underline;
+}
+
+.home-vintage .brand {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.home-vintage .copyright {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.18);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 1100px) {
+  .home-vintage .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-vintage footer .cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .home-vintage .hero {
+    padding: 56px 16px 32px;
+  }
+
+  .home-vintage .card {
+    padding: 28px 20px;
+  }
+
+  .home-vintage h1 {
+    font-size: 38px;
+  }
+
+  .home-vintage .lead {
+    font-size: 16px;
+  }
+
+  .home-vintage .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-vintage .feature .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .home-vintage footer {
+    padding: 30px 16px 18px;
+  }
+}
+
+.home-vintage footer {
+  display: none !important;
 }

@@ -16,6 +16,10 @@ export const SUPABASE_CONFIG = {
   ANON_KEY: envVars.SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY_HERE",
 };
 
+
+
+
+
 // Application Settings
 export const APP_CONFIG = {
   DEFAULT_PAGE: "home",
