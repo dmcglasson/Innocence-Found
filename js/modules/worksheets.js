@@ -1,18 +1,16 @@
 import { getSupabaseClient } from "./supabase.js";
 import { getCurrentSession, getSubscriberStatus } from "./auth.js";
 import { waitForElement } from "../utils/dom.js";
-import { APP_CONFIG, SUPABASE_CONFIG } from "../config.js";
-
-const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
+import { WORKSHEETS_CONFIG as APP_WORKSHEETS_CONFIG } from "../config.js";
 const WORKSHEETS_TABLE_CANDIDATES = ["worksheets", "Worksheets"];
 const DEFAULT_WORKSHEETS_BUCKET = "Worksheets";
 let activeWorksheetBlobUrl = null;
 
 const WORKSHEETS_CONFIG = {
-  TABLE: "worksheets",
-  BUCKET: "worksheets",
-  SIGNED_URL_EXPIRES_IN: 60 * 5,
-  FUNCTIONS_BASE_URL: `${String(SUPABASE_CONFIG?.URL || "").replace(/\/+$/, "")}/functions/v1`,
+  TABLE: APP_WORKSHEETS_CONFIG?.TABLE || "worksheets",
+  BUCKET: APP_WORKSHEETS_CONFIG?.BUCKET || "worksheets",
+  SIGNED_URL_EXPIRES_IN: APP_WORKSHEETS_CONFIG?.SIGNED_URL_EXPIRES_IN || 60 * 5,
+  FUNCTIONS_BASE_URL: String(APP_WORKSHEETS_CONFIG?.FUNCTIONS_BASE_URL || "").replace(/\/+$/, ""),
 };
 
 /**
@@ -199,6 +197,48 @@ async function getWorksheetPdfUrl(worksheet, options = {}) {
 }
 
 /**
+ * Fetches worksheet PDF bytes through the secured backend edge function.
+ */
+async function getWorksheetPdfUrlFromBackend(worksheetId) {
+  if (!WORKSHEETS_CONFIG.FUNCTIONS_BASE_URL) {
+    throw new Error("Worksheet functions endpoint is not configured.");
+  }
+
+  const endpoint = `${WORKSHEETS_CONFIG.FUNCTIONS_BASE_URL}/download-worksheet?id=${encodeURIComponent(String(worksheetId))}`;
+  const session = await getCurrentSession();
+  const headers = {
+    Accept: "application/pdf",
+  };
+
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  }
+
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = "Failed to retrieve worksheet file";
+    try {
+      const payload = await response.json();
+      if (payload?.error) {
+        message = payload.error;
+      }
+    } catch {
+      // Keep fallback error message.
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  clearActiveWorksheetBlobUrl();
+  activeWorksheetBlobUrl = URL.createObjectURL(blob);
+  return activeWorksheetBlobUrl;
+}
+
+/**
  * Escapes text for safe HTML rendering.
  */
 function escapeHtml(value) {
@@ -263,7 +303,7 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
 
   worksheets.forEach((worksheet, index) => {
     const worksheetOrder = index + 1;
-    const isLocked = !isSubscriber && worksheetOrder > FREE_LIMIT;
+    const isLocked = !isSubscriber;
     const title = escapeHtml(String(worksheet.title || "").trim() || `Worksheet ${worksheetOrder}`);
     const description = escapeHtml(String(worksheet.description || "").trim());
     const statusText = isLocked ? "Locked" : "Available";
@@ -290,7 +330,6 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
           class="worksheet-button worksheet-card__cta"
           data-worksheet-id="${worksheet.id}"
           data-worksheet-order="${worksheetOrder}"
-          ${isLocked ? "disabled aria-disabled=\"true\"" : ""}
         >
           ${ctaLabel}
         </button>
@@ -306,10 +345,9 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
       if (!btn || btn.disabled) return;
 
       const worksheetId = btn.dataset.worksheetId;
-      const worksheetOrder = Number(btn.dataset.worksheetOrder || "1");
       if (!worksheetId) return;
 
-      handleLockedWorksheet(worksheetId, worksheetOrder);
+      handleLockedWorksheet(worksheetId);
     });
 
     worksheetList.dataset.listenerAttached = "true";
@@ -347,12 +385,7 @@ export async function getWorksheetFileUrl(worksheetId, options = {}) {
   }
 
   try {
-    const worksheet = await fetchWorksheetById(supabase, worksheetId);
-    if (!worksheet || !worksheet.file_path) {
-      return { success: false, message: "Worksheet file not found" };
-    }
-
-    const url = await getWorksheetPdfUrl(worksheet, options);
+    const url = await getWorksheetPdfUrlFromBackend(worksheetId, options);
     return { success: true, data: { url } };
   } catch (error) {
     return {
@@ -398,40 +431,38 @@ export async function initializeWorksheetReaderScreen() {
     return;
   }
 
-  const allWorksheets = await fetchWorksheets(supabase);
-  const worksheetIndex = allWorksheets.findIndex((item) => String(item.id) === String(worksheet.id));
-  const worksheetOrder = worksheetIndex >= 0 ? worksheetIndex + 1 : 1;
+  const session = await getCurrentSession();
+  if (!session || !session.user) {
+    sessionStorage.setItem("returnTo", "#worksheets");
+    sessionStorage.setItem("requestedWorksheetId", String(worksheet.id));
+    window.showLogin();
+    return;
+  }
 
-  if (worksheetOrder > FREE_LIMIT) {
-    const session = await getCurrentSession();
-
-    if (!session || !session.user) {
-      sessionStorage.setItem("returnTo", "worksheets");
-      sessionStorage.setItem("requestedWorksheetId", String(worksheet.id));
-      window.showLogin();
-      return;
-    }
-
-    const subInfo = await getSubscriberStatus();
-    if (!subInfo.isSubscriber) {
-      alert("Subscribers only.");
-      window.location.hash = "worksheets";
-      return;
-    }
+  const subInfo = await getSubscriberStatus();
+  if (!subInfo?.isSubscriber) {
+    alert("Subscribers only.");
+    window.location.hash = "worksheets";
+    return;
   }
 
   const titleEl = document.getElementById("worksheetTitle");
   const bodyEl = document.getElementById("worksheetBody");
   const backBtn = document.getElementById("backToWorksheetsBtn");
 
-  const worksheetTitle = String(worksheet.title || "").trim() || `Worksheet ${worksheetOrder}`;
+  const worksheetTitle = String(worksheet.title || "").trim() || "Worksheet";
   if (titleEl) titleEl.textContent = worksheetTitle;
 
   if (bodyEl) {
     bodyEl.textContent = "Loading worksheet...";
 
     try {
-      const pdfUrl = await getWorksheetPdfUrl(worksheet);
+      const fileResult = await getWorksheetFileUrl(worksheet.id);
+      if (!fileResult.success || !fileResult.data?.url) {
+        throw new Error(fileResult.message || "Could not load worksheet file.");
+      }
+
+      const pdfUrl = fileResult.data.url;
       bodyEl.innerHTML = `
         <iframe
           title="${worksheetTitle} PDF"
@@ -443,7 +474,7 @@ export async function initializeWorksheetReaderScreen() {
         </p>
       `;
     } catch (error) {
-      console.error(`Failed to load worksheet ${worksheetTitle} from storage:`, error);
+      console.error(`Failed to load worksheet ${worksheetTitle} from backend:`, error);
       bodyEl.innerHTML = `
         <article class="worksheet-state worksheet-state--error" role="alert">
           <h3>${worksheetTitle}</h3>
@@ -502,33 +533,28 @@ export async function initializeWorksheetsScreen() {
   const requestedWorksheetId = sessionStorage.getItem("requestedWorksheetId");
   if (requestedWorksheetId) {
     sessionStorage.removeItem("requestedWorksheetId");
-
-    const requestedIndex = worksheets.findIndex((item) => String(item.id) === String(requestedWorksheetId));
-    const requestedOrder = requestedIndex >= 0 ? requestedIndex + 1 : 1;
-    await handleLockedWorksheet(requestedWorksheetId, requestedOrder);
+    await handleLockedWorksheet(requestedWorksheetId);
   }
 }
 
 /**
  * Handles worksheet navigation and access control for free and subscriber-only worksheets.
  */
-export async function handleLockedWorksheet(worksheetId, worksheetOrder = 1) {
-  const isFreeWorksheet = worksheetOrder <= FREE_LIMIT;
+export async function handleLockedWorksheet(worksheetId) {
+  if (!worksheetId) return;
 
-  if (!isFreeWorksheet) {
-    const session = await getCurrentSession();
-    if (!session || !session.user) {
-      sessionStorage.setItem("returnTo", "#worksheets");
-      sessionStorage.setItem("requestedWorksheetId", String(worksheetId));
-      window.showLogin();
-      return;
-    }
+  const session = await getCurrentSession();
+  if (!session || !session.user) {
+    sessionStorage.setItem("returnTo", "#worksheets");
+    sessionStorage.setItem("requestedWorksheetId", String(worksheetId));
+    window.showLogin();
+    return;
+  }
 
-    const subInfo = await getSubscriberStatus();
-    if (!subInfo?.isSubscriber) {
-      alert("Subscribers only.");
-      return;
-    }
+  const subInfo = await getSubscriberStatus();
+  if (!subInfo?.isSubscriber) {
+    alert("Subscribers only.");
+    return;
   }
 
   sessionStorage.setItem("activeWorksheetId", String(worksheetId));

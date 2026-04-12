@@ -163,8 +163,9 @@ describe("handleLockedChapter", () => {
     expect(sessionStorage.getItem("activeChapter")).toBeNull();
   });
 
-  test("opens a locked chapter when user is already signed in", async () => {
+  test("opens a locked chapter when user is signed in as subscriber", async () => {
     getCurrentSessionMock.mockResolvedValue({ user: { id: "reader-1" } });
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: true });
 
     await handleLockedChapter(3);
 
@@ -297,8 +298,8 @@ describe("fetchBookReaderEntries", () => {
       chapterId: 21,
       chapterNum: 1,
       bookId: 2,
-      free: false,
-      label: "Book 2 - Chapter 1 (Subscribers)",
+      free: true,
+      label: "Book 2 - Chapter 1",
     });
 
     expect(result.data[0].url).toContain("obj-1.pdf");
