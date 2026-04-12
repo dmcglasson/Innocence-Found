@@ -255,10 +255,6 @@ export async function showPage(pageId, onLoadCallback = null) {
       worksheetBtn.style.display = "none";
     }
 
-    if (pageId === "admin-upload" && uploadBtn) {
-      uploadBtn.style.display = "none";
-    }
-
     // Call the callback (screen init). Prefer the passed callback, otherwise use global one.
     const cb = onLoadCallback || globalOnLoadCallback;
 

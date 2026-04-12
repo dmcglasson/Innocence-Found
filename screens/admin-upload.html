@@ -1,27 +1,77 @@
-<h2>Admin Upload Worksheet</h2>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-menu-card">
+      <h3>Menu</h3>
+      <button type="button" class="admin-menu-btn" data-page="admin-responses">Books & Chapters</button>
+      <button type="button" class="admin-menu-btn">Worksheets</button>
+      <button type="button" class="admin-menu-btn">Blog Posts</button>
+      <button type="button" class="admin-menu-btn">Comments & Contests</button>
+      <button type="button" class="admin-menu-btn">Users & Subscriptions</button>
+      <button type="button" class="admin-menu-btn">Analytics</button>
+      <button type="button" class="admin-menu-btn" data-page="admin-upload">Upload Documents</button>
+    </div>
+  </aside>
 
-<form id="uploadWorksheetForm" enctype="multipart/form-data">
+  <section class="admin-main">
+    <div>
+      <div class="admin-panel__header">
+        <h1>Upload Document</h1>
+        <p>Upload a new chapter or worksheet with its metadata.</p>
+      </div>
 
-  <div class="form-group">
-    <label for="worksheetTitle">Title</label>
-    <input type="text" id="worksheetTitle" required />
-  </div>
+      <form id="uploadWorksheetForm" enctype="multipart/form-data">
 
-  <div class="form-group">
-    <label for="worksheetDescription">Description</label>
-    <input type="text" id="worksheetDescription" required />
-  </div>
+        <div class="admin-controls">
+          <label for="documentType" class="admin-controls__label">Document Type</label>
+          <div class="admin-select-wrap">
+            <select id="documentType" class="admin-select" required>
+              <option value="">Select type</option>
+              <option value="worksheet">Worksheet</option>
+              <option value="chapter">Chapter</option>
+            </select>
+          </div>
+        </div>
 
-  <div class="form-group">
-    <label for="worksheetFile">PDF File</label>
-    <input type="file" id="worksheetFile" accept="application/pdf" required />
-  </div>
+        <div class="admin-controls">
+          <label for="worksheetTitle" class="admin-controls__label">Title</label>
+          <input type="text" id="worksheetTitle" class="admin-select" required />
+        </div>
 
-  <button type="submit" class="btn btn-primary">
-    Upload Worksheet
-  </button>
+        <div class="admin-controls">
+          <label for="worksheetDescription" class="admin-controls__label">Description</label>
+          <input type="text" id="worksheetDescription" class="admin-select" />
+        </div>
 
-  <p id="uploadMessage"></p>
+        <div id="chapterNumberGroup" class="admin-controls" style="display:none">
+          <label for="chapterNumber" class="admin-controls__label">Chapter Number</label>
+          <input type="number" id="chapterNumber" class="admin-select" min="1" />
+        </div>
 
-</form>
+        <div id="accessLevelGroup" class="admin-controls" style="display:none">
+          <label for="accessLevel" class="admin-controls__label">Access Level</label>
+          <div class="admin-select-wrap">
+            <select id="accessLevel" class="admin-select">
+              <option value="public">Free</option>
+              <option value="protected">Subscribers Only</option>
+            </select>
+          </div>
+        </div>
 
+        <div class="admin-controls">
+          <label for="releaseDate" class="admin-controls__label">Release Date</label>
+          <input type="date" id="releaseDate" class="admin-select" />
+        </div>
+
+        <div class="admin-controls">
+          <label for="worksheetFile" class="admin-controls__label">PDF File</label>
+          <input type="file" id="worksheetFile" accept="application/pdf" required />
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top: 16px;">Upload</button>
+
+        <p id="uploadMessage" class="admin-message"></p>
+
+      </form>
+    </div>
+  </section>
+</div>

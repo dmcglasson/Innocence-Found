@@ -427,18 +427,38 @@ async function handleWorksheetUpload(form) {
   const titleInput = form.querySelector('#worksheetTitle');
   const descriptionInput = form.querySelector('#worksheetDescription');
   const fileInput = form.querySelector('#worksheetFile');
+  const documentTypeInput = form.querySelector('#documentType');
+  const chapterNumberInput = form.querySelector('#chapterNumber');
+  const accessLevelInput = form.querySelector('#accessLevel');
+  const releaseDateInput = form.querySelector('#releaseDate');
   const uploadMsg = document.getElementById('uploadMessage');
   const uploadBtn = form.querySelector('button[type="submit"]');
 
-  if (!titleInput || !descriptionInput || !fileInput || !uploadBtn) {
+  if (!titleInput || !fileInput || !uploadBtn || !documentTypeInput) {
     console.error('Upload form elements not found');
     return;
   }
 
   const file = fileInput.files?.[0];
+  const documentType = documentTypeInput.value;
+
+  if (!documentType) {
+    if (uploadMsg) uploadMsg.textContent = 'Please select a document type.';
+    return;
+  }
 
   if (!file) {
     if (uploadMsg) uploadMsg.textContent = 'Please choose a PDF file.';
+    return;
+  }
+
+  if (file.type !== 'application/pdf') {
+    if (uploadMsg) uploadMsg.textContent = 'Only PDF files are allowed.';
+    return;
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    if (uploadMsg) uploadMsg.textContent = 'File too large. Max size is 10MB.';
     return;
   }
 
@@ -448,52 +468,74 @@ async function handleWorksheetUpload(form) {
 
   try {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      throw new Error('Supabase client not initialized');
-    }
+    if (!supabase) throw new Error('Supabase client not initialized');
 
-    const safeFileName = `${Date.now()}-${file.name}`;
+    const safeFileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+    const accessLevel = accessLevelInput?.value || 'public';
+    const is_protected = accessLevel === 'protected' || accessLevel === 'answer-key';
+    const is_answer_key = accessLevel === 'answer-key';
 
-    const { error: storageError } = await supabase.storage
-      .from('Worksheets')
-      .upload(safeFileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    if (documentType === 'chapter') {
+      const chapterNum = parseInt(chapterNumberInput?.value, 10);
+      if (!chapterNum) {
+        if (uploadMsg) uploadMsg.textContent = 'Please enter a chapter number.';
+        return;
+      }
 
-    if (storageError) {
-      throw storageError;
-    }
+      const { error: storageError } = await supabase.storage
+        .from('Chapters')
+        .upload(safeFileName, file, { cacheControl: '3600', upsert: false });
 
-    const { error: dbError } = await supabase
-      .from('worksheets')
-      .insert([
-        {
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase
+        .from('Chapters')
+        .insert([{
+          chapter_num: chapterNum,
+          free: !is_protected,
+          file_path: safeFileName,
+          book_id: 1
+        }]);
+
+
+      if (dbError) {
+        await supabase.storage.from('Chapters').remove([safeFileName]);
+        throw dbError;
+      }
+
+    } else {
+      const { error: storageError } = await supabase.storage
+        .from('Worksheets')
+        .upload(safeFileName, file, { cacheControl: '3600', upsert: false });
+
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase
+        .from('worksheets')
+        .insert([{
           title: titleInput.value.trim(),
-          description: descriptionInput.value.trim(),
-          file_path: safeFileName
-        }
-      ]);
+          description: descriptionInput?.value.trim() || '',
+          file_path: safeFileName,
+          is_protected,
+          is_answer_key,
+          release_date: releaseDateInput?.value || null
+        }]);
 
-    if (dbError) {
-      throw dbError;
+      if (dbError) {
+        await supabase.storage.from('Worksheets').remove([safeFileName]);
+        throw dbError;
+      }
     }
 
-    if (uploadMsg) uploadMsg.textContent = 'Worksheet uploaded successfully.';
+    if (uploadMsg) uploadMsg.textContent = 'Upload successful!';
     form.reset();
 
-    const wsBox = document.getElementById('worksheetsContainer');
-    if (wsBox) {
-      wsBox.dataset.loaded = 'false';
-    }
-
-    await initializeScreen('dashboard');
   } catch (error) {
-    console.error('Worksheet upload error:', error);
+    console.error('Upload error:', error);
     if (uploadMsg) uploadMsg.textContent = error.message || 'Upload failed.';
   } finally {
     uploadBtn.disabled = false;
-    uploadBtn.textContent = 'Upload Worksheet';
+    uploadBtn.textContent = 'Upload';
   }
 }
 
@@ -579,6 +621,37 @@ if (pageId === 'profile') {
       console.warn("Dashboard elements not found:", error);
     }
   }
+
+  if (pageId === 'admin-upload') {
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+      const pageContainer = document.getElementById('pageContainer');
+      if (pageContainer) {
+        pageContainer.innerHTML = `
+          <div class="content-section">
+            <div class="auth-box">
+              <h2>Access Denied</h2>
+              <p>This page is for admins only.</p>
+            </div>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    const documentTypeSelect = document.getElementById('documentType');
+    const chapterNumberGroup = document.getElementById('chapterNumberGroup');
+    const accessLevelGroup = document.getElementById('accessLevelGroup');
+
+    if (documentTypeSelect) {
+      documentTypeSelect.addEventListener('change', () => {
+        const isChapter = documentTypeSelect.value === 'chapter';
+        if (chapterNumberGroup) chapterNumberGroup.style.display = isChapter ? 'block' : 'none';
+        if (accessLevelGroup) accessLevelGroup.style.display = isChapter ? 'block' : 'none';
+      });
+    }
+  }
+
 
   if (pageId === 'admin-responses') {
     const isAdmin = await isCurrentUserAdmin();
