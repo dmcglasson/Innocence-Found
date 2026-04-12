@@ -99,6 +99,7 @@ async function init() {
 
   // Set up event listeners
   setupEventListeners();
+  
 }
 
 /**
@@ -127,6 +128,21 @@ function setupEventListeners() {
  document.addEventListener('click', async (e) => {
 
   const target = e.target;
+  // HOME SUBSCRIPTION BUTTON LOGIC
+const subBtn = target.closest && target.closest('#homeSubscriptionLink');
+if (subBtn) {
+  e.preventDefault();
+
+  const session = await getCurrentSession();
+
+  if (session) {
+    window.location.hash = 'subscribe';
+  } else {
+    sessionStorage.setItem('returnTo', '#subscribe');
+    window.location.hash = 'login';
+  }
+  return;
+}
 
   const freePlanBtn = target.closest && target.closest('#select-free-plan');
   if (freePlanBtn) {
@@ -509,7 +525,20 @@ async function handleWorksheetUpload(form) {
 
 async function initializeScreen(pageId) {
   syncScreenStyles(pageId);
-  
+  // ===== ADMIN NAV VISIBILITY =====
+const adminNavItem = document.getElementById('adminNavItem');
+
+if (adminNavItem) {
+  const isAdmin = await isCurrentUserAdmin();
+
+  if (isAdmin) {
+    adminNavItem.style.display = 'block';
+  } else {
+    adminNavItem.style.display = 'none';
+  }
+}
+
+
  if (pageId === 'home') {
   const yearEl = document.getElementById('year');
   if (yearEl) {
@@ -581,25 +610,16 @@ if (pageId === 'profile') {
   }
 
   if (pageId === 'admin-responses') {
-    const isAdmin = await isCurrentUserAdmin();
+  const isAdmin = await isCurrentUserAdmin();
 
-    if (!isAdmin) {
-      const pageContainer = document.getElementById('pageContainer');
-      if (pageContainer) {
-        pageContainer.innerHTML = `
-        <div class="content-section">
-          <div class="auth-box">
-            <h2>Access Denied</h2>
-            <p>This page is for admins only.</p>
-          </div>
-        </div>
-      `;
-      }
-      return;
-    }
+  if (!isAdmin) {
+  alert("Access denied. Admins only.");
+  window.location.hash = 'home';
+  return;
+}
 
-    await waitForElement('#chapterSelect', 1000);
-    await waitForElement('#responsesContainer', 1000);
+await waitForElement('#chapterSelect', 1000);
+await waitForElement('#responsesContainer', 1000);
 
     const chapterSelect = document.getElementById('chapterSelect');
     const responsesContainer = document.getElementById('responsesContainer');
@@ -690,8 +710,8 @@ if (pageId === 'profile') {
     </tbody>
   </table>
 `;
-    });
-  }
+  });
+}
 
   if (pageId === 'chapter-reader') {
     await waitForElement('#chapterTitle', 1000);
@@ -803,9 +823,10 @@ if (pageId === 'profile') {
   }
 
   if (pageId === 'worksheets') {
-    await initializeWorksheetsScreen();
-  }
+  await initializeWorksheetsScreen();
 }
+
+} // CLOSE initializeScreen HERE
 
 /**
  * Set up screen initialization callback for navigation
@@ -894,11 +915,22 @@ function setupMobileNavToggle() {
 
   if (!navToggle || !navRight) return;
 
+  const closeMobileMenu = () => {
+    navRight.classList.remove("open");
+    navToggle.setAttribute("aria-expanded", "false");
+  };
+
   navToggle.addEventListener("click", () => {
     navRight.classList.toggle("open");
 
     const isOpen = navRight.classList.contains("open");
     navToggle.setAttribute("aria-expanded", String(isOpen));
+  });
+
+  window.addEventListener("scroll", () => {
+    if (window.innerWidth <= 768 && navRight.classList.contains("open")) {
+      closeMobileMenu();
+    }
   });
 }
 
