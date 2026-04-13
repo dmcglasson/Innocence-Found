@@ -1,8 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contact</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      overflow-x: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4e4c9;
+      color: #5a3b2e;
+    }
+
+    .contact-page {
+      position: relative;
+      min-height: 100vh;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .contact-page__bgImg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    .contact-page__wrap {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 1000px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .contact-page__top {
+      text-align: center;
+    }
+
+    .contact-page__banner {
+      background: rgba(250, 242, 230, 0.95);
+      border: 2px solid #d8a96c;
+      padding: 16px;
+      border-radius: 14px;
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .contact-page__quote {
+      background: rgba(255, 248, 237, 0.95);
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #d8a96c;
+      font-style: italic;
+    }
+
+    .contact-page__stack {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .contact-page__card {
+      background: rgba(250, 242, 230, 0.95);
+      border: 2px solid #d8a96c;
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .contact-page__cardTitle {
+      margin-bottom: 8px;
+    }
+
+    .contact-page__subtitle {
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+
+    .contact-page__row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      word-break: break-word;
+    }
+
+    .contact-page__link {
+      color: #5a3b2e;
+      text-decoration: none;
+    }
+
+    .contact-page__link:hover {
+      text-decoration: underline;
+    }
+
+    /* 🔥 MOBILE FIX */
+    @media (max-width: 768px) {
+      .contact-page__stack {
+        grid-template-columns: 1fr;
+      }
+
+      .contact-page {
+        padding: 24px 12px;
+      }
+
+      .contact-page__banner {
+        font-size: 22px;
+      }
+
+      .contact-page__card {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
 <section class="contact-page">
 
   <img
     class="contact-page__bgImg"
-    src="./frontend/images/aboutbg.jpg"
+    src="../frontend/images/aboutbg.jpg"
     alt=""
     aria-hidden="true"
   />
@@ -63,3 +196,6 @@
     </main>
   </div>
 </section>
+
+</body>
+</html>
