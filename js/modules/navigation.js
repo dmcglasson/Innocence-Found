@@ -30,9 +30,9 @@ const KNOWN_SCREENS = new Set([
   'chapter-reader',
   'worksheets',
   'worksheet-reader',
-  'subscribe',
   'payment-confirmation',
-  'payment-success'
+  'payment-success',
+  'payment-cancelled'
 ]);
 
 export function setGlobalOnLoadCallback(cb) {
@@ -183,8 +183,8 @@ export async function loadScreen(screenName) {
     throw new Error('Invalid screen name');
   }
 
-  // Check cache first if enabled
-  if (APP_CONFIG.CACHE_ENABLED && screenCache[screenName]) {
+  // Check cache first if enabled (profile is never cached so UI updates always show)
+  if (APP_CONFIG.CACHE_ENABLED && screenName !== "profile" && screenCache[screenName]) {
     return screenCache[screenName];
   }
 
@@ -200,7 +200,7 @@ export async function loadScreen(screenName) {
     const sanitizedHtml = sanitizeHTML(html);
 
     // Cache the screen if caching is enabled
-    if (APP_CONFIG.CACHE_ENABLED) {
+    if (APP_CONFIG.CACHE_ENABLED && screenName !== "profile") {
       screenCache[screenName] = sanitizedHtml;
     }
 

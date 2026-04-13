@@ -15,6 +15,7 @@ import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
 import { fetchWorksheetMetadata, downloadWorksheet } from "./modules/worksheets.js";
 import { APP_CONFIG } from './config.js';
+import { createStripeCheckoutSession } from './modules/checkout.js';
 
 let worksheetsLoadToken = 0;
 const SCREEN_STYLE_ID = "active-screen-style";
@@ -163,18 +164,28 @@ function setupEventListeners() {
     }
 
     const confirmBtn = target.closest && target.closest('#confirmPaymentBtn');
-if (confirmBtn) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.stopImmediatePropagation();
+    if (confirmBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
 
-  localStorage.setItem('isSubscriber', 'true');
-  sessionStorage.removeItem('returnTo');
+      confirmBtn.disabled = true;
+      const prevText = confirmBtn.textContent;
+      confirmBtn.textContent = "Redirecting to Stripe…";
 
-  await showPage('payment-success');
-  window.location.hash = 'payment-success';
-  return;
-}
+      const result = await createStripeCheckoutSession();
+
+      if (!result.success) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = prevText;
+        alert(result.message || "Could not start checkout. Please try again.");
+        return;
+      }
+
+      sessionStorage.removeItem('returnTo');
+      window.location.href = result.url;
+      return;
+    }
 
     // Download worksheet button
     const dlBtn = target.closest && target.closest(".downloadWorksheetBtn");
@@ -524,10 +535,30 @@ if (pageId === 'profile') {
 // Profile screen
 
   if (pageId === 'payment-success') {
-    const isSubscriber = localStorage.getItem('isSubscriber') === 'true';
-    if (!isSubscriber) {
-      window.location.hash = 'subscribe';
-      return;
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.auth.refreshSession();
+    }
+
+    const statusEl = document.getElementById('paymentSuccessStatus');
+    if (statusEl) {
+      statusEl.textContent = "Confirming your subscription…";
+    }
+
+    let active = false;
+    for (let i = 0; i < 10; i++) {
+      const sub = await getSubscriberStatus();
+      if (sub.isSubscriber) {
+        active = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 800));
+    }
+
+    if (statusEl) {
+      statusEl.textContent = active
+        ? "Your subscription is active. Enjoy full access."
+        : "Payment received. If your access does not update within a few minutes, refresh the page or contact support.";
     }
   }
 

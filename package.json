@@ -6,7 +6,9 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "secrets:push": "npx --yes supabase@latest secrets set --env-file .env.supabase.functions --project-ref khiwkbnqjjycmwonbhqu",
+    "secrets:list": "npx --yes supabase@latest secrets list --project-ref khiwkbnqjjycmwonbhqu",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watchman=false",
     "test:serial": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
     "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch"
   },
