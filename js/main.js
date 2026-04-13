@@ -494,8 +494,12 @@ async function handleWorksheetUpload(form) {
           chapter_num: chapterNum,
           free: !is_protected,
           file_path: safeFileName,
-          book_id: 1
+          book_id: 1,
+          title: titleInput.value.trim(),
+          description: descriptionInput?.value.trim() || '',
+          release_date: releaseDateInput?.value || null
         }]);
+
 
 
       if (dbError) {
