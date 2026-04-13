@@ -104,3 +104,21 @@ export async function getSubscriptionStatus() {
     return null;
   }
 }
+// TEMP TESTS
+
+console.log("Running subscription tests");
+
+// Test 1: valid plan
+try {
+  const result = activateSubscription("premium");
+  console.log("Test 1 (valid plan):", result);
+} catch (err) {
+  console.error("Test 1 failed:", err.message);
+}
+
+// Test 2: invalid plan
+try {
+  activateSubscription(null);
+} catch (err) {
+  console.log("Test 2 (invalid plan) passed:", err.message);
+}

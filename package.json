@@ -1,0 +1,25 @@
+{
+  "name": "innocence-found",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "*A storytelling and educational platform created for author Cynthia Davies.*",
+  "main": "index.js",
+  "scripts": {
+  "test": "jest"
+},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dmcglasson/Innocence-Found.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/dmcglasson/Innocence-Found/issues"
+  },
+  "homepage": "https://github.com/dmcglasson/Innocence-Found#readme",
+  "devDependencies": {
+    "jest": "^30.3.0"
+  }
+}
