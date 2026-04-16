@@ -13,14 +13,19 @@ const screenCache = {};
 let globalOnLoadCallback = null;
 // Optional callback API used by setScreenLoadCallback
 let globalScreenLoadCallback = null;
+let currentRenderedPageId = '';
 
 const KNOWN_SCREENS = new Set([
   'home',
   'about',
   'contact',
   'login',
+  'subscribe',
   'profile',
   'dashboard',
+  'admin-dashboard',
+  'admin-responses',
+  'admin-upload',
   'bookreader',
   'chapters',
   'chapter-reader',
@@ -29,6 +34,8 @@ const KNOWN_SCREENS = new Set([
   'subscribe',
   'subscription-success',
   'subscription-cancel',
+  'payment-confirmation',
+  'payment-success'
 ]);
 
 export function setGlobalOnLoadCallback(cb) {
@@ -67,6 +74,46 @@ function applyScreenStyle(pageId) {
 
   body.classList.add(`${classPrefix}${pageId}`);
 }
+
+function resetScrollPosition() {
+  const scrollingEl = document.scrollingElement || document.documentElement;
+
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  if (scrollingEl) {
+    scrollingEl.scrollTop = 0;
+    scrollingEl.scrollLeft = 0;
+  }
+
+  document.documentElement.scrollTop = 0;
+  document.documentElement.scrollLeft = 0;
+  document.body.scrollTop = 0;
+  document.body.scrollLeft = 0;
+
+  const pageContainer = document.getElementById('pageContainer');
+  if (pageContainer) {
+    pageContainer.scrollTop = 0;
+    pageContainer.scrollLeft = 0;
+  }
+
+  const mainEl = document.querySelector('main');
+  if (mainEl) {
+    mainEl.scrollTop = 0;
+    mainEl.scrollLeft = 0;
+  }
+}
+
+function resetScrollOnNavigation(pageId = '') {
+  resetScrollPosition();
+
+  requestAnimationFrame(() => {
+    resetScrollPosition();
+  });
+
+  setTimeout(() => {
+    resetScrollPosition();
+  }, 0);
+}
+
 
 /**
  * Sanitize HTML to prevent XSS attacks
@@ -152,7 +199,6 @@ export async function loadScreen(screenName) {
     }
     const html = await response.text();
 
-    console.log("📄 loaded HTML length for", screenName, "=", html.length);
     // Sanitize HTML before caching/using
     const sanitizedHtml = sanitizeHTML(html);
 
@@ -187,7 +233,10 @@ export async function showPage(pageId, onLoadCallback = null) {
     return;
   }
 
+  currentRenderedPageId = pageId;
+
   applyScreenStyle(pageId);
+  resetScrollOnNavigation(pageId);
 
   // Show loading state
   pageContainer.textContent = 'Loading...'; // Use textContent instead of innerHTML for safety
@@ -209,10 +258,6 @@ export async function showPage(pageId, onLoadCallback = null) {
       worksheetBtn.style.display = "none";
     }
 
-    if (pageId === "admin-upload" && uploadBtn) {
-      uploadBtn.style.display = "none";
-    }
-
     // Call the callback (screen init). Prefer the passed callback, otherwise use global one.
     const cb = onLoadCallback || globalOnLoadCallback;
 
@@ -228,6 +273,9 @@ export async function showPage(pageId, onLoadCallback = null) {
     ) {
       await globalScreenLoadCallback(pageId);
     }
+
+    // Some screens add content after initial paint; enforce top position again.
+    resetScrollOnNavigation(pageId);
   } catch (error) {
     console.error("Error showing page:", error);
     pageContainer.textContent = 'Error loading page.'; // Use textContent for safety
@@ -277,5 +325,14 @@ if (!isKnownScreen(sanitized)) {
   return;
 }
 
+if (sanitized === currentRenderedPageId) {
+  return;
+}
+
+resetScrollOnNavigation(sanitized || APP_CONFIG.DEFAULT_PAGE);
 await showPage(sanitized || APP_CONFIG.DEFAULT_PAGE);
 });
+
+if ('scrollRestoration' in window.history) {
+  window.history.scrollRestoration = 'manual';
+}

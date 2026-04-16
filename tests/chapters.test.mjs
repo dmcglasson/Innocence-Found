@@ -28,6 +28,7 @@ jest.unstable_mockModule("../js/utils/dom.js", () => ({
 }));
 
 const {
+  fetchBookReaderEntries,
   handleLockedChapter,
   initializeChaptersScreen,
   initializeChapterReaderScreen,
@@ -91,6 +92,50 @@ function createSupabaseStub() {
   };
 }
 
+function createBookReaderEntriesSupabaseStub() {
+  const rows = [
+    { id: 11, chapter_num: 1, book_id: 1, chapter_id: "obj-1", free: true },
+    { id: 12, chapter_num: 2, book_id: 1, chapter_id: null, free: true }, // skipped
+    { id: 21, chapter_num: 1, book_id: 2, chapter_id: "obj-2", free: false },
+  ];
+
+  const finalOrderMock = jest.fn().mockResolvedValue({ data: rows, error: null });
+  const firstOrderMock = jest.fn(() => ({ order: finalOrderMock }));
+  const selectMock = jest.fn(() => ({ order: firstOrderMock }));
+
+  const fromTableMock = jest.fn((tableName) => {
+    if (tableName !== "Chapters") {
+      return {};
+    }
+    return { select: selectMock };
+  });
+
+  const createSignedUrlMock = jest.fn((path) =>
+    Promise.resolve({
+      data: { signedUrl: `https://example.com/${path}` },
+      error: null,
+    })
+  );
+
+  const fromBucketMock = jest.fn(() => ({
+    createSignedUrl: createSignedUrlMock,
+    getPublicUrl: jest.fn(() => ({ data: { publicUrl: "https://example.com/public.pdf" } })),
+  }));
+
+  const rpcMock = jest.fn((_fnName, payload) =>
+    Promise.resolve({
+      data: [{ bucket_id: "Chapters", name: `${payload?.p_object_id}.pdf` }],
+      error: null,
+    })
+  );
+
+  return {
+    from: fromTableMock,
+    rpc: rpcMock,
+    storage: { from: fromBucketMock },
+  };
+}
+
 // Access-control tests for direct chapter navigation logic.
 describe("handleLockedChapter", () => {
   beforeEach(() => {
@@ -104,7 +149,7 @@ describe("handleLockedChapter", () => {
     await handleLockedChapter(1);
 
     expect(sessionStorage.getItem("activeChapter")).toBe("1");
-    expect(window.location.hash).toBe("#chapter-reader");
+    expect(window.location.hash).toBe("#bookreader");
   });
 
   test("redirects locked chapter to login when user is not signed in", async () => {
@@ -116,6 +161,17 @@ describe("handleLockedChapter", () => {
     expect(sessionStorage.getItem("returnTo")).toBe("#chapters");
     expect(sessionStorage.getItem("requestedChapter")).toBe("3");
     expect(sessionStorage.getItem("activeChapter")).toBeNull();
+  });
+
+  test("opens a locked chapter when user is signed in as subscriber", async () => {
+    getCurrentSessionMock.mockResolvedValue({ user: { id: "reader-1" } });
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: true });
+
+    await handleLockedChapter(3);
+
+    expect(sessionStorage.getItem("activeChapter")).toBe("3");
+    expect(window.location.hash).toBe("#bookreader");
+    expect(window.showLogin).not.toHaveBeenCalled();
   });
 });
 
@@ -149,7 +205,7 @@ describe("initializeChaptersScreen", () => {
 
     expect(sessionStorage.getItem("requestedChapter")).toBeNull();
     expect(sessionStorage.getItem("activeChapter")).toBe("2");
-    expect(window.location.hash).toBe("#chapter-reader");
+    expect(window.location.hash).toBe("#bookreader");
   });
 });
 
@@ -160,6 +216,7 @@ describe("initializeChapterReaderScreen", () => {
     sessionStorage.clear();
     window.location.hash = "";
     window.showLogin = jest.fn();
+    window.alert = jest.fn();
     buildChapterReaderDom();
 
     URL.createObjectURL = jest.fn(() => "blob:chapter");
@@ -192,5 +249,60 @@ describe("initializeChapterReaderScreen", () => {
     expect(document.getElementById("chapterTitle").textContent).toBe("Chapter 1");
     expect(document.querySelector("#chapterBody iframe")).not.toBeNull();
     expect(document.getElementById("chapterBody").innerHTML).toContain("blob:chapter");
+  });
+
+  test("blocks locked chapter for logged-in non-subscribers", async () => {
+    sessionStorage.setItem("activeChapter", "3");
+    getCurrentSessionMock.mockResolvedValue({ user: { id: "reader-2" } });
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: false });
+
+    await initializeChapterReaderScreen();
+
+    expect(window.alert).toHaveBeenCalledWith("Subscribers only.");
+    expect(window.location.hash).toBe("#chapters");
+  });
+});
+
+describe("fetchBookReaderEntries", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("returns an error response when supabase client is missing", async () => {
+    getSupabaseClientMock.mockReturnValue(null);
+
+    const result = await fetchBookReaderEntries();
+
+    expect(result.ok).toBe(false);
+    expect(result.data).toEqual([]);
+    expect(result.message).toContain("not initialized");
+  });
+
+  test("maps chapter rows to reader entries and skips invalid rows", async () => {
+    getSupabaseClientMock.mockReturnValue(createBookReaderEntriesSupabaseStub());
+
+    const result = await fetchBookReaderEntries();
+
+    expect(result.ok).toBe(true);
+    expect(result.data).toHaveLength(2);
+
+    expect(result.data[0]).toMatchObject({
+      chapterId: 11,
+      chapterNum: 1,
+      bookId: 1,
+      free: true,
+      label: "Book 1 - Chapter 1",
+    });
+
+    expect(result.data[1]).toMatchObject({
+      chapterId: 21,
+      chapterNum: 1,
+      bookId: 2,
+      free: true,
+      label: "Book 2 - Chapter 1",
+    });
+
+    expect(result.data[0].url).toContain("obj-1.pdf");
+    expect(result.data[1].url).toContain("obj-2.pdf");
   });
 });

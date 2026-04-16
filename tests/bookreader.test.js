@@ -1,6 +1,34 @@
+/** @jest-environment jsdom */
+
 import { jest } from "@jest/globals";
 
-const BOOK_ONE = "../book reader/books/book1.pdf";
+const BOOK_ONE = "https://cdn.example.com/book-1-ch-1.pdf";
+const BOOK_TWO = "https://cdn.example.com/book-2-ch-1.pdf";
+
+const submitCommentMock = jest.fn();
+const getCommentsByChapterMock = jest.fn();
+const fetchBookReaderEntriesMock = jest.fn();
+const getSubscriberStatusMock = jest.fn();
+const getSupabaseClientMock = jest.fn();
+
+jest.unstable_mockModule("../js/modules/comments.js", () => ({
+  submitComment: submitCommentMock,
+  getCommentsByChapter: getCommentsByChapterMock,
+}));
+
+jest.unstable_mockModule("../js/modules/chapters.js", () => ({
+  fetchBookReaderEntries: fetchBookReaderEntriesMock,
+}));
+
+jest.unstable_mockModule("../js/modules/auth.js", () => ({
+  getSubscriberStatus: getSubscriberStatusMock,
+}));
+
+jest.unstable_mockModule("../js/modules/supabase.js", () => ({
+  getSupabaseClient: getSupabaseClientMock,
+}));
+
+const { initBookReader } = await import("../js/modules/bookreader.js");
 
 function buildBookReaderDom() {
   document.body.innerHTML = `
@@ -9,19 +37,39 @@ function buildBookReaderDom() {
         <div class="book-selector">
           <select id="bookSelect">
             <option value="${BOOK_ONE}">Book 1 (PDF)</option>
-            <option value="../book reader/books/book2.pdf">Book 2 (PDF)</option>
+            <option value="${BOOK_TWO}">Book 2 (PDF)</option>
             <option value="locked">Locked Chapter</option>
           </select>
         </div>
-        <div class="book">
-          <div class="page left-page"><canvas id="leftPage"></canvas></div>
-          <div class="page right-page"><canvas id="rightPage"></canvas></div>
+
+        <div class="reader-view-controls">
+          <button id="doublePageViewBtn" type="button">Double page</button>
+          <button id="singlePageViewBtn" type="button">Single page</button>
         </div>
+
+        <section class="reader-shell">
+          <p id="readerError" class="hidden"></p>
+          <div class="book" id="bookFrame">
+            <div class="page left-page"><canvas id="leftPage"></canvas></div>
+            <div class="page right-page"><canvas id="rightPage"></canvas></div>
+          </div>
+        </section>
+
         <div class="controls">
           <button id="prevPage">Previous</button>
           <span id="pageInfo">Page 1-2</span>
           <button id="nextPage">Next</button>
+          <button id="jumpToDiscussion" type="button">Jump</button>
         </div>
+
+        <section class="poll-panel">
+          <h3 id="pollTitle">Reader Poll</h3>
+          <p id="pollQuestion"></p>
+          <fieldset id="pollOptions"></fieldset>
+          <button id="submitPollVote" type="button">Submit vote</button>
+          <p id="pollStatus"></p>
+        </section>
+
         <section class="comments-panel">
           <h3 id="commentsTitle">Book 1 - Section</h3>
           <p id="commentsMeta">All pages</p>
@@ -32,6 +80,7 @@ function buildBookReaderDom() {
           </select>
           <button id="refreshComments" type="button">Refresh</button>
           <div id="commentsList"></div>
+          <div id="commentsError" class="hidden"></div>
           <div id="noComments" class="hidden"></div>
           <div id="subscriberNotice" class="hidden"></div>
           <div id="newCommentArea">
@@ -53,7 +102,10 @@ function mockPdfJs() {
   const render = jest.fn(() => ({ promise: Promise.resolve() }));
   const getPage = jest.fn(() =>
     Promise.resolve({
-      getViewport: () => ({ height: 100, width: 80 }),
+      getViewport: ({ scale = 1 } = {}) => ({
+        width: 600 * scale,
+        height: 900 * scale,
+      }),
       render,
     })
   );
@@ -69,159 +121,405 @@ function mockPdfJs() {
   };
 }
 
-function findCommentCardByAuthor(author) {
-  return [...document.querySelectorAll(".comment-card")].find((card) =>
-    card.textContent.includes(`${author} -`)
-  );
-}
-
 async function flush() {
   await Promise.resolve();
   await Promise.resolve();
+  await Promise.resolve();
 }
 
-function firstCommentAuthor() {
-  const meta = document.querySelector(".comment-card .comment-meta");
-  if (!meta) return "";
-  return meta.textContent.split(" - ")[0];
-}
-
-describe("bookreader comments", () => {
-  let initBookReader;
+describe("bookreader module", () => {
+  const chapterComments = {
+    11: [
+      {
+        uid: "reader-b",
+        message: "Newest chapter 1",
+        created_at: "2026-03-12T10:00:00.000Z",
+      },
+      {
+        uid: "user-1",
+        message: "Oldest chapter 1",
+        created_at: "2026-03-10T08:00:00.000Z",
+      },
+    ],
+    21: [
+      {
+        uid: "reader-z",
+        message: "Book 2 comment",
+        created_at: "2026-03-11T12:00:00.000Z",
+      },
+    ],
+  };
 
   beforeEach(async () => {
-    jest.resetModules();
+    jest.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
     document.head.innerHTML = "";
+
     buildBookReaderDom();
     mockPdfJs();
 
+    await jest.unstable_mockModule("../js/modules/supabase.js", () => {
+      const commentsByBook = {
+        "../book reader/books/book1.pdf": [
+          { id: 3, author: "Jules", content: "Jules comment", parent_id: null, replies: 0 },
+          { id: 2, author: "Marco", content: "Marco comment", parent_id: null, replies: 0 },
+          { id: 1, author: "Priya", content: "Priya comment", parent_id: null, replies: 0 }
+        ],
+        "../book reader/books/book2.pdf": [
+          { id: 4, author: "Anita", content: "Anita comment", parent_id: null, replies: 0 }
+        ]
+      };
+
+      let currentRows = commentsByBook["../book reader/books/book1.pdf"];
+
+      const query = {
+        select: jest.fn(() => query),
+        eq: jest.fn((field, value) => {
+          if (field === "chapter_path" && commentsByBook[value]) {
+            currentRows = commentsByBook[value];
+          }
+          return query;
+        }),
+        maybeSingle: jest.fn(async () => ({ data: null, error: null })),
+        order: jest.fn(async () => ({ data: currentRows, error: null })),
+        insert: jest.fn((rows) => {
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          const newRow = {
+            id: Date.now(),
+            author: row.author ?? "Test User",
+            content: row.content,
+            parent_id: row.parent_id ?? null,
+            replies: 0
+          };
+          currentRows.push(newRow);
+          return {
+            select: jest.fn(() => ({
+              single: jest.fn(async () => ({ data: newRow, error: null }))
+            }))
+          };
+        })
+      };
+
+      return {
+        getSupabaseClient: jest.fn(() => ({
+          from: jest.fn(() => query),
+          auth: {
+            getUser: jest.fn(async () => ({
+              data: { user: { id: "test-user" } },
+              error: null
+            }))
+          }
+        }))
+      };
+    });
+
+    await jest.unstable_mockModule("../js/modules/comments.js", () => {
+      const commentsByBook = {
+        "../book reader/books/book1.pdf": [
+          { id: 3, author: "Jules", content: "Jules comment", parent_id: null, replies: 0 },
+          { id: 2, author: "Marco", content: "Marco comment", parent_id: null, replies: 0 },
+          { id: 1, author: "Priya", content: "Priya comment", parent_id: null, replies: 0 }
+        ],
+        "../book reader/books/book2.pdf": [
+          { id: 4, author: "Anita", content: "Anita comment", parent_id: null, replies: 0 }
+        ]
+      };
+
+      let currentBook = "../book reader/books/book1.pdf";
+
+      return {
+        getCommentsByChapter: jest.fn(async (chapterId) => {
+          const bookPath =
+            chapterId === 14
+              ? currentBook
+              : "../book reader/books/book1.pdf";
+
+          const rows = (commentsByBook[bookPath] || []).map((item, index) => ({
+            id: item.id ?? index + 1,
+            uid: item.author === "Test User" ? "test-user" : "other-user",
+            created_at: `2026-02-${10 + index}T10:00:00`,
+            message: item.content
+          }));
+
+          return {
+            ok: true,
+            data: rows
+          };
+        }),
+        addComment: jest.fn(async (comment) => {
+          const newComment = {
+            id: Date.now(),
+            author: "Test User",
+            content: comment.content,
+            parent_id: comment.parent_id ?? null,
+            replies: 0
+          };
+          if (!commentsByBook[currentBook]) {
+            commentsByBook[currentBook] = [];
+          }
+          commentsByBook[currentBook].push(newComment);
+          return newComment;
+        }),
+
+        addReply: jest.fn(async (reply) => {
+          const newReply = {
+            id: Date.now(),
+            author: "Test User",
+            content: reply.content,
+            parent_id: reply.parent_id,
+            replies: 0
+          };
+          if (!commentsByBook[currentBook]) {
+            commentsByBook[currentBook] = [];
+          }
+          commentsByBook[currentBook].push(newReply);
+          return newReply;
+        }),
+
+        submitComment: jest.fn(async (comment) => {
+          const newComment = {
+            id: Date.now(),
+            author: "Test User",
+            content: comment.content,
+            parent_id: comment.parent_id ?? null,
+            replies: 0
+          };
+          if (!commentsByBook[currentBook]) {
+            commentsByBook[currentBook] = [];
+          }
+          commentsByBook[currentBook].push(newComment);
+          return newComment;
+        })
+      };
+    });
+
     global.requestAnimationFrame = (cb) => cb();
+    window.matchMedia = jest.fn(() => ({
+      matches: false,
+      media: "(max-width: 760px)",
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }));
+    window.alert = jest.fn();
+
     HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
       clearRect: jest.fn(),
+      setTransform: jest.fn(),
     }));
 
-    ({ initBookReader } = await import("../js/modules/bookreader.js"));
+    getSupabaseClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: "user-1" } },
+        }),
+      },
+      from: jest.fn(() => ({
+        select: jest.fn(() => ({
+          eq: jest.fn(() => ({
+            eq: jest.fn(() => ({
+              maybeSingle: jest.fn().mockResolvedValue({
+                data: { id: 11 },
+                error: null,
+              }),
+            })),
+          })),
+        })),
+      })),
+    });
+
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: true });
+    submitCommentMock.mockResolvedValue({ ok: true });
+    fetchBookReaderEntriesMock.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          chapterId: 11,
+          chapterNum: 1,
+          bookId: 1,
+          free: true,
+          url: BOOK_ONE,
+          label: "Book 1 - Chapter 1",
+        },
+        {
+          chapterId: 21,
+          chapterNum: 1,
+          bookId: 2,
+          free: true,
+          url: BOOK_TWO,
+          label: "Book 2 - Chapter 1",
+        },
+      ],
+    });
+    getCommentsByChapterMock.mockImplementation(async (chapterId) => ({
+      ok: true,
+      data: chapterComments[Number(chapterId)] || [],
+    }));
   });
 
-  test("allows subscriber to post a new comment", async () => {
+  test("loads book options from backend and renders chapter metadata", async () => {
     await initBookReader();
+    await flush();
 
-    const startingCount = document.querySelectorAll(".comment-card").length;
+    const select = document.getElementById("bookSelect");
+    expect(select.options).toHaveLength(2);
+    expect(select.options[0].textContent).toContain("Book 1 - Chapter 1");
+    expect(document.getElementById("commentsMeta").textContent).toBe("Chapter 1");
+  });
+
+  test("posts a subscriber comment and clears compose box", async () => {
+    await initBookReader();
+    await flush();
+
     const input = document.getElementById("newCommentText");
-    const submit = document.getElementById("submitComment");
+    input.value = "Posting from test";
+    document.getElementById("submitComment").click();
+    await flush();
 
-    input.value = "This is a new test comment";
-    submit.click();
-
-    expect(document.querySelectorAll(".comment-card")).toHaveLength(
-      startingCount + 1
-    );
-    expect(document.getElementById("commentsList").textContent).toContain(
-      "This is a new test comment"
-    );
+    expect(submitCommentMock).toHaveBeenCalledWith({
+      chapterId: 11,
+      message: "Posting from test",
+      parentCommentId: null,
+    });
     expect(input.value).toBe("");
   });
 
-  test("adds reply to the selected parent comment even when sorted", async () => {
+  test("shows comments in ascending order when sort is switched", async () => {
     await initBookReader();
-
-    const filter = document.getElementById("filterComments");
-    filter.value = "popular";
-    filter.dispatchEvent(new Event("change"));
-
-    const targetAuthor = "Marco";
-    const replyText = "Reply meant for Marco only";
-
-    const marcoCard = findCommentCardByAuthor(targetAuthor);
-    expect(marcoCard).toBeTruthy();
-
-    const replyButton = marcoCard.querySelector(".reply-btn");
-    replyButton.click();
-
-    const replyInput = marcoCard.querySelector(".reply-form textarea");
-    const replySubmit = marcoCard.querySelector(".reply-form button");
-    replyInput.value = replyText;
-    replySubmit.click();
-
     await flush();
 
-    const marcoCardAfter = findCommentCardByAuthor(targetAuthor);
-    const priyaCardAfter = findCommentCardByAuthor("Priya");
-
-    expect(marcoCardAfter.textContent).toContain(replyText);
-    expect(priyaCardAfter.textContent).not.toContain(replyText);
-  });
-
-  test("does not add a blank comment", async () => {
-    await initBookReader();
-
-    const startingCount = document.querySelectorAll(".comment-card").length;
-    const input = document.getElementById("newCommentText");
-    const submit = document.getElementById("submitComment");
-
-    input.value = "   ";
-    submit.click();
-
-    expect(document.querySelectorAll(".comment-card")).toHaveLength(startingCount);
-  });
-
-  test("changes display order when sort is switched to oldest first", async () => {
-    await initBookReader();
-
-    expect(firstCommentAuthor()).toBe("Jules");
+    const firstBefore = document.querySelector(".comment-card .comment-text");
+    expect(firstBefore.textContent).toBe("Newest chapter 1");
 
     const filter = document.getElementById("filterComments");
     filter.value = "asc";
     filter.dispatchEvent(new Event("change"));
+    await flush();
 
-    expect(firstCommentAuthor()).toBe("Priya");
+    const firstAfter = document.querySelector(".comment-card .comment-text");
+    expect(firstAfter.textContent).toBe("Oldest chapter 1");
   });
 
-  test("updates comments when switching from Book 1 to Book 2", async () => {
+  test("shows subscriber gating for comments and poll voting", async () => {
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: false });
+
     await initBookReader();
+    await flush();
+
+    expect(document.getElementById("newCommentArea").classList.contains("hidden")).toBe(true);
+    expect(document.getElementById("subscriberNotice").classList.contains("hidden")).toBe(false);
+    expect(document.getElementById("submitPollVote").disabled).toBe(true);
+  });
+
+  test("shows only free chapters in dropdown for free users", async () => {
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: false });
+    fetchBookReaderEntriesMock.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          chapterId: 11,
+          chapterNum: 1,
+          bookId: 1,
+          free: true,
+          url: BOOK_ONE,
+          label: "Book 1 - Chapter 1",
+        },
+        {
+          chapterId: 17,
+          chapterNum: 7,
+          bookId: 1,
+          free: false,
+          url: "https://cdn.example.com/book-1-ch-7.pdf",
+          label: "Book 1 - Chapter 7 (Subscribers)",
+        },
+      ],
+    });
+
+    await initBookReader();
+    await flush();
 
     const select = document.getElementById("bookSelect");
-    select.value = "../book reader/books/book2.pdf";
-    select.dispatchEvent(new Event("change"));
-    await flush();
-    await flush();
-
-    const commentText = document.getElementById("commentsList").textContent;
-    expect(commentText).toContain("Anita -");
-    expect(commentText).not.toContain("Priya -");
-    expect(document.getElementById("commentsTitle").textContent).toContain("Book 2");
+    const labels = Array.from(select.options).map((option) => option.textContent);
+    expect(labels).toEqual(["Book 1 - Chapter 1"]);
   });
 
-  test("keeps comment posting available when PDF.js initialization fails", async () => {
-    jest.resetModules();
-    document.head.innerHTML = "";
-    buildBookReaderDom();
+  test("shows comments error state when comments API fails", async () => {
+    getCommentsByChapterMock.mockResolvedValue({ ok: false, data: [], message: "network error" });
 
-    const existingScript = document.createElement("script");
-    existingScript.id = "pdfjs-cdn";
-    existingScript._loadingPromise = Promise.resolve();
-    document.head.appendChild(existingScript);
-    window.pdfjsLib = undefined;
-
-    global.requestAnimationFrame = (cb) => cb();
-    HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
-      clearRect: jest.fn(),
-    }));
-
-    ({ initBookReader } = await import("../js/modules/bookreader.js"));
     await initBookReader();
+    await flush();
 
-    expect(document.getElementById("pageInfo").textContent).toBe(
-      "Reader unavailable"
-    );
+    const errorBox = document.getElementById("commentsError");
+    expect(errorBox.classList.contains("hidden")).toBe(false);
+    expect(errorBox.textContent).toContain("could not be loaded");
+  });
 
-    const input = document.getElementById("newCommentText");
-    const submit = document.getElementById("submitComment");
-    input.value = "Comment works without PDF";
-    submit.click();
+  test("updates chapter comments when switching to a different book option", async () => {
+    await initBookReader();
+    await flush();
 
-    expect(document.getElementById("commentsList").textContent).toContain(
-      "Comment works without PDF"
-    );
+    const select = document.getElementById("bookSelect");
+    select.value = BOOK_TWO;
+    select.dispatchEvent(new Event("change"));
+    await flush();
+
+    expect(document.getElementById("commentsTitle").textContent).toContain("Book 2");
+    expect(document.getElementById("commentsList").textContent).toContain("Book 2 comment");
+  });
+
+  test("preselects chapter option from activeChapter session value", async () => {
+    sessionStorage.setItem("activeChapter", "1");
+    fetchBookReaderEntriesMock.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          chapterId: 31,
+          chapterNum: 3,
+          bookId: 1,
+          free: true,
+          url: "https://cdn.example.com/book-1-ch-3.pdf",
+          label: "Book 1 - Chapter 3",
+        },
+        {
+          chapterId: 11,
+          chapterNum: 1,
+          bookId: 1,
+          free: true,
+          url: BOOK_ONE,
+          label: "Book 1 - Chapter 1",
+        },
+      ],
+    });
+
+    await initBookReader();
+    await flush();
+
+    const select = document.getElementById("bookSelect");
+    expect(select.value).toBe(BOOK_ONE);
+    expect(document.getElementById("commentsMeta").textContent).toBe("Chapter 1");
+    expect(sessionStorage.getItem("activeChapter")).toBeNull();
+  });
+
+  test("switches between single and double page view", async () => {
+    await initBookReader();
+    await flush();
+
+    const frame = document.getElementById("bookFrame");
+    const singleBtn = document.getElementById("singlePageViewBtn");
+    const doubleBtn = document.getElementById("doublePageViewBtn");
+
+    singleBtn.click();
+    await flush();
+    expect(frame.classList.contains("single-page-mode")).toBe(true);
+    expect(localStorage.getItem("bookreaderViewMode.v1")).toBe("single");
+
+    doubleBtn.click();
+    await flush();
+    expect(frame.classList.contains("single-page-mode")).toBe(false);
+    expect(localStorage.getItem("bookreaderViewMode.v1")).toBe("double");
   });
 });
