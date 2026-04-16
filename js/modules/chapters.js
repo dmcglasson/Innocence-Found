@@ -464,6 +464,13 @@ export async function fetchBookReaderEntries() {
     return { ok: false, data: [], message: "Supabase client not initialized." };
   }
 
+  const session = await getCurrentSession();
+  let canAccessLockedChapters = false;
+  if (session?.user) {
+    const subInfo = await getSubscriberStatus();
+    canAccessLockedChapters = !!subInfo?.isSubscriber;
+  }
+
   const { data: rows, error } = await supabase
     .from(CHAPTERS_TABLE)
     .select("id,chapter_num,book_id,chapter_id,free")
@@ -478,6 +485,13 @@ export async function fetchBookReaderEntries() {
   for (const row of rows || []) {
     if (!row?.chapter_id) continue;
 
+    const chapterNum = Number(row.chapter_num) || 1;
+    const isFreeChapter = chapterNum <= FREE_LIMIT;
+
+    if (!isFreeChapter && !canAccessLockedChapters) {
+      continue;
+    }
+
     try {
       const objectRef = await fetchStorageObjectById(supabase, row.chapter_id);
       if (!objectRef) continue;
@@ -490,14 +504,13 @@ export async function fetchBookReaderEntries() {
       if (!url) continue;
 
       const bookId = Number(row.book_id) || 1;
-      const chapterNum = Number(row.chapter_num) || 1;
       entries.push({
         chapterId: row.id ?? null,
         chapterNum,
         bookId,
-        free: !!row.free,
+        free: isFreeChapter,
         url,
-        label: `Book ${bookId} - Chapter ${chapterNum}${row.free ? "" : " (Subscribers)"}`,
+        label: `Book ${bookId} - Chapter ${chapterNum}${isFreeChapter ? "" : " (Subscribers)"}`,
       });
     } catch (entryError) {
       console.warn("Skipping chapter entry due to URL resolution error:", entryError);
@@ -678,6 +691,12 @@ export async function handleLockedChapter(chapterNumber) {
       sessionStorage.setItem("returnTo", "#chapters");
       sessionStorage.setItem("requestedChapter", String(chapterNumber));
       window.showLogin();
+      return;
+    }
+
+    const subInfo = await getSubscriberStatus();
+    if (!subInfo?.isSubscriber) {
+      alert("Subscribers only.");
       return;
     }
   }

@@ -270,7 +270,7 @@ export async function isCurrentUserAdmin() {
     .from('profiles')
     .select('role')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (error || !data) return false;
 
@@ -326,16 +326,56 @@ export async function getSubscriberStatus() {
     const { data, error } = await supabase.auth.getUser();
     if (error) return { isSubscriber: false };
 
-    const meta = data?.user?.user_metadata || {};
-    const val = meta.subscriber;
+    const user = data?.user;
+    const userId = user?.id;
+
+    const appMeta = user?.app_metadata || {};
+    const userMeta = user?.user_metadata || {};
+    const roleMeta = String(
+      userMeta.role || appMeta.role || ""
+    ).trim().toLowerCase();
+
+    let role = roleMeta;
+    let hasActiveSubscription = false;
+
+    if (userId) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!profileError && profile?.role) {
+        role = String(profile.role).trim().toLowerCase();
+      }
+
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from("subscriptions")
+        .select("status")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!subscriptionError && !!subscription) {
+        hasActiveSubscription = true;
+      }
+    }
+
+    const rawSubscriberValue =
+      userMeta.subscriber ??
+      userMeta.is_subscriber ??
+      appMeta.is_subscriber ??
+      userMeta.subscription;
 
     const isSubscriber =
-      val === true ||
-      val === 1 ||
-      (typeof val === "string" &&
-        ["true", "1", "subscriber", "active", "paid"].includes(val.trim().toLowerCase()));
+      hasActiveSubscription ||
+      ["admin", "parent", "subscriber"].includes(role) ||
+      rawSubscriberValue === true ||
+      rawSubscriberValue === 1 ||
+      (typeof rawSubscriberValue === "string" &&
+        ["true", "1", "subscriber", "active", "paid"].includes(rawSubscriberValue.trim().toLowerCase()));
 
-    return { isSubscriber };
+    return { isSubscriber, role, hasActiveSubscription };
   } catch (e) {
     console.error("getSubscriberStatus() error:", e);
     return { isSubscriber: false };
@@ -365,9 +405,11 @@ export async function updateCommentById(commentId, newMessage) {
     return { success: false, message: 'Supabase client not initialized' };
   }
 
+  const cleanMessage = String(newMessage || '').trim();
+
   const { error } = await supabase
     .from('Comments')
-    .update({ message: newMessage })
+    .update({ message: cleanMessage })
     .eq('id', commentId);
 
   if (error) {
@@ -375,4 +417,39 @@ export async function updateCommentById(commentId, newMessage) {
   }
 
   return { success: true, message: 'Response updated successfully.' };
+}
+
+export async function getAllUsers() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, data: [], message: "No client" };
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('user_id, role');
+
+  if (error) {
+    return { success: false, data: [], message: error.message };
+  }
+
+  return { success: true, data };
+}
+
+export async function deleteUserById(userId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client not initialized' };
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  return { success: true, message: 'User deleted successfully.' };
 }
