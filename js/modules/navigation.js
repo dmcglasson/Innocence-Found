@@ -23,6 +23,7 @@ const KNOWN_SCREENS = new Set([
   'subscribe',
   'profile',
   'dashboard',
+  'admin-dashboard',
   'admin-responses',
   'admin-upload',
   'bookreader',
@@ -30,6 +31,9 @@ const KNOWN_SCREENS = new Set([
   'chapter-reader',
   'worksheets',
   'worksheet-reader',
+  'subscribe',
+  'subscription-success',
+  'subscription-cancel',
   'payment-confirmation',
   'payment-success',
   'payment-cancelled'
@@ -253,10 +257,6 @@ export async function showPage(pageId, onLoadCallback = null) {
 
     if (pageId === "dashboard" && worksheetBtn) {
       worksheetBtn.style.display = "none";
-    }
-
-    if (pageId === "admin-upload" && uploadBtn) {
-      uploadBtn.style.display = "none";
     }
 
     // Call the callback (screen init). Prefer the passed callback, otherwise use global one.
