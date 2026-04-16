@@ -270,7 +270,7 @@ export async function isCurrentUserAdmin() {
     .from('profiles')
     .select('role')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (error || !data) return false;
 
@@ -405,9 +405,11 @@ export async function updateCommentById(commentId, newMessage) {
     return { success: false, message: 'Supabase client not initialized' };
   }
 
+  const cleanMessage = String(newMessage || '').trim();
+
   const { error } = await supabase
     .from('Comments')
-    .update({ message: newMessage })
+    .update({ message: cleanMessage })
     .eq('id', commentId);
 
   if (error) {
@@ -415,4 +417,39 @@ export async function updateCommentById(commentId, newMessage) {
   }
 
   return { success: true, message: 'Response updated successfully.' };
+}
+
+export async function getAllUsers() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, data: [], message: "No client" };
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('user_id, role');
+
+  if (error) {
+    return { success: false, data: [], message: error.message };
+  }
+
+  return { success: true, data };
+}
+
+export async function deleteUserById(userId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client not initialized' };
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  return { success: true, message: 'User deleted successfully.' };
 }

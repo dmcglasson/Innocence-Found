@@ -1,14 +1,15 @@
 <div class="admin-layout">
+
   <aside class="admin-sidebar">
-    <div class="admin-menu-card">
-      <h3>Menu</h3>
-      <button type="button" class="admin-menu-btn">Books & Chapters</button>
-      <button type="button" class="admin-menu-btn">Worksheets</button>
-      <button type="button" class="admin-menu-btn">Blog Posts</button>
-      <button type="button" class="admin-menu-btn">Comments & Contests</button>
-      <button type="button" class="admin-menu-btn">Users & Subscriptions</button>
-      <button type="button" class="admin-menu-btn">Analytics</button>
-    </div>
+   <div class="admin-menu-card">
+  <h3>Menu</h3>
+
+  <button class="admin-menu-btn" data-page="chapters">Books & Chapters</button>
+  <button class="admin-menu-btn" data-page="worksheets">Worksheets</button>
+  <button class="admin-menu-btn" data-page="admin-dashboard">Admin Dashboard</button>
+  <button class="admin-menu-btn" data-page="subscribe">Users & Subscriptions</button>
+  <button class="admin-menu-btn" data-page="admin-dashboard">Analytics</button>
+</div>
   </aside>
 
   <section class="admin-main">
@@ -18,12 +19,17 @@
         <p>Select a chapter to view submitted responses.</p>
       </div>
 
-
-
       <div class="admin-controls">
         <label for="chapterSelect" class="admin-controls__label">Chapter</label>
-        <div class="admin-select-wrap">
-          <select id="chapterSelect" class="admin-select">
+
+        <div class="admin-select-wrap custom-dropdown" id="chapterDropdown">
+          <button type="button" class="admin-select custom-dropdown__trigger" id="chapterDropdownTrigger">
+            Choose a chapter
+          </button>
+
+          <div class="custom-dropdown__menu" id="chapterDropdownMenu"></div>
+
+          <select id="chapterSelect" class="admin-select custom-dropdown__native" aria-hidden="true" tabindex="-1">
             <option value="">Choose a chapter</option>
           </select>
         </div>
@@ -36,6 +42,8 @@
           No chapter selected yet.
         </div>
       </div>
+
     </div>
   </section>
+
 </div>

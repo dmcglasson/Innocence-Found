@@ -23,6 +23,7 @@ const KNOWN_SCREENS = new Set([
   'subscribe',
   'profile',
   'dashboard',
+  'admin-dashboard',
   'admin-responses',
   'admin-upload',
   'bookreader',
