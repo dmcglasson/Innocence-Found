@@ -168,7 +168,6 @@ if (confirmBtn) {
   e.stopPropagation();
   e.stopImmediatePropagation();
 
-  localStorage.setItem('isSubscriber', 'true');
   sessionStorage.removeItem('returnTo');
 
   await showPage('payment-success');
@@ -313,18 +312,14 @@ async function handleLogin(form) {
   if (result.success) {
   showMessage('loginMessage', result.message, 'success');
 
-const returnTo = sessionStorage.getItem('returnTo');
-const rawPlan = localStorage.getItem('selectedPlan');
-const selectedPlan = rawPlan ? JSON.parse(rawPlan) : null;
+  const returnTo = sessionStorage.getItem('returnTo');
 
-if (returnTo) {
-  sessionStorage.removeItem('returnTo');
-  window.location.hash = returnTo.replace(/^#/, '');
-} else if (selectedPlan && selectedPlan.name === 'Paid Plan') {
-  window.location.hash = 'payment-confirmation';
-} else {
-  window.location.hash = 'home';
-}
+  if (returnTo) {
+    sessionStorage.removeItem('returnTo');
+    window.location.hash = returnTo.replace(/^#/, '');
+  } else {
+    window.location.hash = 'home';
+  }
 
   return;
 } else {
@@ -512,20 +507,22 @@ async function initializeScreen(pageId) {
   
  if (pageId === 'home') {
   const yearEl = document.getElementById('year');
-  if (yearEl) {
-    yearEl.textContent = new Date().getFullYear();
+    if (yearEl) {
+      yearEl.textContent = new Date().getFullYear();
+    }
   }
-}
   
-if (pageId === 'profile') {
-  await initializeProfileScreen();
-}
+  if (pageId === 'profile') {
+    await initializeProfileScreen();
+  }
 
 // Profile screen
 
   if (pageId === 'payment-success') {
-    const isSubscriber = localStorage.getItem('isSubscriber') === 'true';
-    if (!isSubscriber) {
+    const session = await getCurrentSession();
+    const subInfo = session?.user ? await getSubscriberStatus() : { isSubscriber: false };
+
+    if (!subInfo?.isSubscriber) {
       window.location.hash = 'subscribe';
       return;
     }
