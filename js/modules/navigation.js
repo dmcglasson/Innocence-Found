@@ -32,6 +32,8 @@ const KNOWN_SCREENS = new Set([
   'worksheets',
   'worksheet-reader',
   'subscribe',
+  'subscription-success',
+  'subscription-cancel',
   'payment-confirmation',
   'payment-success'
 ]);
