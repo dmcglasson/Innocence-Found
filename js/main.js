@@ -21,6 +21,7 @@ import {
   initializeSubscriptionCancelScreen,
 } from "./modules/subscription.js";
 import { APP_CONFIG } from './config.js';
+import { createStripeCheckoutSession } from './modules/checkout.js';
 import { getResponsesByChapter, renderResponsesTable } from './adminResponses.helpers.js';
 
 let worksheetsLoadToken = 0;
@@ -199,10 +200,21 @@ if (subBtn) {
       e.stopPropagation();
       e.stopImmediatePropagation();
 
-  sessionStorage.removeItem('returnTo');
+      confirmBtn.disabled = true;
+      const prevText = confirmBtn.textContent;
+      confirmBtn.textContent = "Redirecting to Stripe…";
 
-      await showPage('payment-success');
-      window.location.hash = 'payment-success';
+      const result = await createStripeCheckoutSession();
+
+      if (!result.success) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = prevText;
+        alert(result.message || "Could not start checkout. Please try again.");
+        return;
+      }
+
+      sessionStorage.removeItem('returnTo');
+      window.location.href = result.url;
       return;
     }
 
@@ -691,12 +703,30 @@ if (adminNavItem) {
   // Profile screen
 
   if (pageId === 'payment-success') {
-    const session = await getCurrentSession();
-    const subInfo = session?.user ? await getSubscriberStatus() : { isSubscriber: false };
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.auth.refreshSession();
+    }
 
-    if (!subInfo?.isSubscriber) {
-      window.location.hash = 'subscribe';
-      return;
+    const statusEl = document.getElementById('paymentSuccessStatus');
+    if (statusEl) {
+      statusEl.textContent = "Confirming your subscription…";
+    }
+
+    let active = false;
+    for (let i = 0; i < 10; i++) {
+      const sub = await getSubscriberStatus();
+      if (sub.isSubscriber) {
+        active = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 800));
+    }
+
+    if (statusEl) {
+      statusEl.textContent = active
+        ? "Your subscription is active. Enjoy full access."
+        : "Payment received. If your access does not update within a few minutes, refresh the page or contact support.";
     }
   }
 

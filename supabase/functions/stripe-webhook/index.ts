@@ -1,211 +1,237 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Stripe from "https://esm.sh/stripe@14.25.0?target=deno";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 
-const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
-const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-const supabaseUrl = Deno.env.get("SUPABASE_URL");
-const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const corsHeaders: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "stripe-signature, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-Deno.serve(async (req) => {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
-    });
+function mapStripeStatus(status: Stripe.Subscription.Status): string {
+  if (status === "active" || status === "trialing") return "active";
+  if (status === "past_due") return "past_due";
+  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired") {
+    return "canceled";
   }
-
-  if (!stripeSecret || !webhookSecret || !supabaseUrl || !supabaseServiceRoleKey) {
-    return new Response(JSON.stringify({ error: "Server configuration error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const signature = req.headers.get("stripe-signature");
-  if (!signature) {
-    return new Response(JSON.stringify({ error: "Missing stripe-signature" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const body = await req.text();
-  const stripe = new Stripe(stripeSecret);
-
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Invalid signature";
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-  const { error: claimError } = await supabaseAdmin.from("stripe_processed_events").insert({ id: event.id });
-
-  if (claimError) {
-    const code = (claimError as { code?: string }).code;
-    if (code === "23505") {
-      return new Response(JSON.stringify({ received: true, duplicate: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify({ error: claimError.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  try {
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      if (session.mode === "subscription") {
-        await activateSubscription(stripe, supabaseAdmin, session);
-      }
-    } else if (event.type === "customer.subscription.deleted") {
-      const sub = event.data.object as Stripe.Subscription;
-      await deactivateSubscription(supabaseAdmin, sub.id);
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Processing failed";
-    await supabaseAdmin.from("stripe_processed_events").delete().eq("id", event.id);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  return new Response(JSON.stringify({ received: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-});
-
-async function setSubscriberMetadata(
-  supabaseAdmin: ReturnType<typeof createClient>,
-  userId: string,
-  planId: string,
-  periodStartIso: string,
-  active: boolean,
-) {
-  const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
-  if (getUserError || !userData?.user) {
-    throw new Error(getUserError?.message ?? "User not found for subscription");
-  }
-
-  const prevMeta = userData.user.user_metadata ?? {};
-  await supabaseAdmin.auth.admin.updateUserById(userId, {
-    user_metadata: {
-      ...prevMeta,
-      subscriber: active,
-      subscription: active ? "active" : "inactive",
-      subscription_plan: active ? planId : null,
-      subscription_started_at: active ? periodStartIso : null,
-    },
-  });
+  return "incomplete";
 }
 
-async function activateSubscription(
-  stripe: Stripe,
-  supabaseAdmin: ReturnType<typeof createClient>,
-  session: Stripe.Checkout.Session,
+function subscriberFromStatus(dbStatus: string): boolean {
+  return dbStatus === "active" || dbStatus === "trialing";
+}
+
+async function upsertSubscription(
+  supabaseAdmin: SupabaseClient,
+  params: {
+    userId: string;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string;
+    status: string;
+    planType: string;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+  },
 ) {
-  const userId = session.metadata?.supabase_user_id;
-  const planId = session.metadata?.plan_id;
-  if (!userId || !planId) {
-    throw new Error("Missing supabase_user_id or plan_id on checkout session metadata");
+  const { error: upsertError } = await supabaseAdmin.from("subscriptions").upsert(
+    {
+      user_id: params.userId,
+      stripe_customer_id: params.stripeCustomerId,
+      stripe_subscription_id: params.stripeSubscriptionId,
+      status: params.status,
+      plan_type: params.planType,
+      current_period_start: params.currentPeriodStart,
+      current_period_end: params.currentPeriodEnd,
+    },
+    { onConflict: "user_id" },
+  );
+
+  if (upsertError) {
+    throw upsertError;
   }
 
-  const stripeSubId =
-    typeof session.subscription === "string"
-      ? session.subscription
-      : session.subscription?.id;
+  const metaSubscriber = subscriberFromStatus(params.status);
+  const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(params.userId, {
+    user_metadata: {
+      subscriber: metaSubscriber,
+      subscription_status: params.status,
+    },
+  });
 
-  if (!stripeSubId) {
-    throw new Error("Checkout session missing subscription id");
+  if (authError) {
+    console.error("updateUserById:", authError);
+  }
+}
+
+async function applyStripeSubscription(
+  supabaseAdmin: SupabaseClient,
+  subscription: Stripe.Subscription,
+  explicitUserId?: string | null,
+) {
+  let userId =
+    explicitUserId ||
+    subscription.metadata?.supabase_user_id ||
+    null;
+
+  if (!userId) {
+    const { data: row } = await supabaseAdmin
+      .from("subscriptions")
+      .select("user_id")
+      .eq("stripe_subscription_id", subscription.id)
+      .maybeSingle();
+    userId = row?.user_id ?? null;
   }
 
-  const { data: existing } = await supabaseAdmin
-    .from("subscriptions")
-    .select("id, user_id, plan_id, status, current_period_start")
-    .eq("stripe_subscription_id", stripeSubId)
-    .maybeSingle();
-
-  if (existing?.status === "active") {
-    const started =
-      existing.current_period_start ??
-      new Date().toISOString();
-    await setSubscriberMetadata(supabaseAdmin, existing.user_id, existing.plan_id, started, true);
+  if (!userId) {
+    console.warn("stripe-webhook: no user for subscription", subscription.id);
     return;
   }
 
-  const subscription = await stripe.subscriptions.retrieve(stripeSubId);
-  const customerId =
-    typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+  const customerId = typeof subscription.customer === "string"
+    ? subscription.customer
+    : subscription.customer?.id ?? null;
 
-  await supabaseAdmin
-    .from("subscriptions")
-    .update({ status: "canceled", updated_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .eq("status", "active");
-
-  const periodStart = subscription.current_period_start
+  const dbStatus = mapStripeStatus(subscription.status);
+  const start = subscription.current_period_start
     ? new Date(subscription.current_period_start * 1000).toISOString()
-    : new Date().toISOString();
+    : null;
+  const end = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toISOString()
+    : null;
 
-  const { error: insertError } = await supabaseAdmin.from("subscriptions").insert({
-    user_id: userId,
-    plan_id: planId,
-    status: "active",
-    stripe_customer_id: customerId ?? null,
-    stripe_subscription_id: stripeSubId,
-    stripe_checkout_session_id: session.id,
-    current_period_start: periodStart,
-    updated_at: new Date().toISOString(),
+  await upsertSubscription(supabaseAdmin, {
+    userId,
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: subscription.id,
+    status: dbStatus,
+    planType: "paid",
+    currentPeriodStart: start,
+    currentPeriodEnd: end,
   });
+}
 
-  if (insertError) {
-    const code = (insertError as { code?: string }).code;
-    if (code === "23505") {
-      const { data: row } = await supabaseAdmin
-        .from("subscriptions")
-        .select("user_id, plan_id, current_period_start")
-        .eq("stripe_subscription_id", stripeSubId)
-        .maybeSingle();
-      if (row?.user_id) {
-        const started = row.current_period_start ?? periodStart;
-        await setSubscriberMetadata(supabaseAdmin, row.user_id, row.plan_id, started, true);
-      }
-      return;
-    }
-    throw insertError;
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
-  await setSubscriberMetadata(supabaseAdmin, userId, planId, periodStart, true);
-}
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-async function deactivateSubscription(
-  supabaseAdmin: ReturnType<typeof createClient>,
-  stripeSubscriptionId: string,
-) {
-  const { data: row } = await supabaseAdmin
-    .from("subscriptions")
-    .select("user_id, plan_id, current_period_start")
-    .eq("stripe_subscription_id", stripeSubscriptionId)
+  const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
+  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!stripeSecret || !webhookSecret || !supabaseUrl || !serviceKey) {
+    console.error("Missing STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, or Supabase secrets");
+    return new Response(JSON.stringify({ error: "Webhook not configured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const stripe = new Stripe(stripeSecret, { apiVersion: "2024-06-20" });
+
+  const body = await req.text();
+  const sig = req.headers.get("stripe-signature");
+
+  if (!sig) {
+    return new Response(JSON.stringify({ error: "Missing stripe-signature" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+  } catch (err) {
+    console.error("Webhook signature verification failed:", err);
+    return new Response(JSON.stringify({ error: "Invalid signature" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+
+  const { data: existing, error: selErr } = await supabaseAdmin
+    .from("stripe_webhook_events")
+    .select("id")
+    .eq("id", event.id)
     .maybeSingle();
 
-  if (!row?.user_id) return;
+  if (selErr) {
+    console.error("stripe_webhook_events select:", selErr);
+    return new Response(JSON.stringify({ error: "Database error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-  await supabaseAdmin
-    .from("subscriptions")
-    .update({ status: "canceled", updated_at: new Date().toISOString() })
-    .eq("stripe_subscription_id", stripeSubscriptionId);
+  if (existing?.id) {
+    return new Response(JSON.stringify({ received: true, duplicate: true }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-  const started = row.current_period_start ?? new Date().toISOString();
-  await setSubscriberMetadata(supabaseAdmin, row.user_id, row.plan_id, started, false);
-}
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode !== "subscription") break;
+
+        const userId = session.client_reference_id || session.metadata?.supabase_user_id;
+        if (!userId) {
+          throw new Error("checkout.session.completed missing user reference");
+        }
+
+        const subRef = session.subscription;
+        const subId = typeof subRef === "string" ? subRef : subRef?.id;
+        if (!subId) {
+          throw new Error("checkout.session.completed missing subscription id");
+        }
+
+        const subscription = await stripe.subscriptions.retrieve(subId);
+        await applyStripeSubscription(supabaseAdmin, subscription, userId);
+        break;
+      }
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await applyStripeSubscription(supabaseAdmin, subscription);
+        break;
+      }
+      default:
+        break;
+    }
+
+    const { error: insErr } = await supabaseAdmin.from("stripe_webhook_events").insert({ id: event.id });
+    if (insErr) {
+      if (insErr.code === "23505") {
+        return new Response(JSON.stringify({ received: true, duplicate: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw insErr;
+    }
+
+    return new Response(JSON.stringify({ received: true }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Handler error";
+    console.error("stripe-webhook processing:", e);
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

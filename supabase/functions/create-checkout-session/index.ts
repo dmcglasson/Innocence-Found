@@ -1,25 +1,40 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Stripe from "https://esm.sh/stripe@14.25.0?target=deno";
+import { createClient } from "@supabase/supabase-js";
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const VALID_PLAN_IDS = ["monthly", "annual"] as const;
-type PlanId = (typeof VALID_PLAN_IDS)[number];
+const LOCAL_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
-function planIdFromBody(body: unknown): PlanId | null {
-  if (!body || typeof body !== "object") return null;
-  const id = (body as { plan_id?: unknown }).plan_id;
-  if (typeof id !== "string") return null;
-  return VALID_PLAN_IDS.includes(id as PlanId) ? (id as PlanId) : null;
-}
+/**
+ * Resolves the public site base URL for Stripe success/cancel redirects.
+ * 1) Validated localhost `client_origin` from the browser (local dev; overrides SITE_URL).
+ * 2) SITE_URL secret (production).
+ * 3) Origin header (localhost or https).
+ */
+function getSiteUrl(req: Request, body: { client_origin?: string }): string {
+  const co = body.client_origin?.replace(/\/$/, "") ?? "";
+  if (co && LOCAL_ORIGIN_RE.test(co)) {
+    return co;
+  }
 
-function getStripePriceId(planId: PlanId): string | undefined {
-  if (planId === "monthly") return Deno.env.get("STRIPE_PRICE_MONTHLY") ?? undefined;
-  return Deno.env.get("STRIPE_PRICE_ANNUAL") ?? undefined;
+  const envUrl = Deno.env.get("SITE_URL")?.replace(/\/$/, "");
+  if (envUrl) return envUrl;
+
+  const origin = req.headers.get("Origin")?.replace(/\/$/, "") ?? "";
+  if (origin && LOCAL_ORIGIN_RE.test(origin)) {
+    return origin;
+  }
+  if (origin && /^https:\/\//.test(origin)) {
+    return origin;
+  }
+
+  throw new Error(
+    "SITE_URL is not configured. Add it in Supabase Edge Function secrets, or open the app from http://localhost or http://127.0.0.1.",
+  );
 }
 
 Deno.serve(async (req) => {
@@ -43,54 +58,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
-    const siteUrl = Deno.env.get("SITE_URL");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const priceId = Deno.env.get("STRIPE_PRICE_ID_PAID");
 
-    if (!supabaseUrl || !supabaseAnonKey || !stripeSecret || !siteUrl) {
-      return new Response(JSON.stringify({ error: "Server configuration error" }), {
+    if (!stripeSecretKey || !priceId) {
+      console.error("Missing STRIPE_SECRET_KEY or STRIPE_PRICE_ID_PAID");
+      return new Response(JSON.stringify({ error: "Subscription checkout is not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = await req.json();
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const planId = planIdFromBody(parsed);
-    if (!planId) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid plan_id",
-          details: "plan_id must be one of: monthly, annual",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const priceId = getStripePriceId(planId);
-    if (!priceId) {
-      return new Response(
-        JSON.stringify({
-          error: "Plan not available",
-          details: `Missing Stripe price for plan "${planId}". Set STRIPE_PRICE_MONTHLY or STRIPE_PRICE_ANNUAL.`,
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
     }
 
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
@@ -109,49 +87,50 @@ Deno.serve(async (req) => {
       });
     }
 
-    const baseUrl = siteUrl.replace(/\/+$/, "");
-    const successUrl = `${baseUrl}/index.html?session_id={CHECKOUT_SESSION_ID}#subscription-success`;
-    const cancelUrl = `${baseUrl}/index.html#subscription-cancel`;
+    let body: { plan?: string; client_origin?: string } = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
 
-    const stripe = new Stripe(stripeSecret);
+    if (body.plan !== "paid") {
+      return new Response(JSON.stringify({ error: "Invalid plan" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const siteUrl = getSiteUrl(req, body);
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-06-20" });
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
+      success_url: `${siteUrl}/index.html#payment-success`,
+      cancel_url: `${siteUrl}/index.html#payment-cancelled`,
       client_reference_id: user.id,
-      metadata: {
-        supabase_user_id: user.id,
-        plan_id: planId,
-      },
+      metadata: { supabase_user_id: user.id },
       subscription_data: {
-        metadata: {
-          supabase_user_id: user.id,
-          plan_id: planId,
-        },
+        metadata: { supabase_user_id: user.id },
       },
+      customer_email: user.email ?? undefined,
     });
 
     if (!session.url) {
-      return new Response(JSON.stringify({ error: "Checkout session missing redirect URL" }), {
+      return new Response(JSON.stringify({ error: "Could not create checkout session" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(
-      JSON.stringify({
-        url: session.url,
-        session_id: session.id,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown server error";
+    return new Response(JSON.stringify({ url: session.url }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    console.error("create-checkout-session:", e);
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

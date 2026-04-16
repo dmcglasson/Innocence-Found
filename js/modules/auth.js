@@ -314,17 +314,15 @@ export async function getCommentsByChapter(chapterId) {
   return { success: true, data };
 }
 /**
- * Read subscriber status from Supabase Auth user_metadata
- * NOTE: Right now your user_metadata has NO subscriber key.
- * This function safely returns false unless a known key exists.
+ * Subscriber status: prefers `subscriptions.status === 'active'`, then user_metadata.subscriber.
  */
 export async function getSubscriberStatus() {
   try {
     const supabase = getSupabaseClient();
     if (!supabase) return { isSubscriber: false };
 
-    const { data, error } = await supabase.auth.getUser();
-    if (error) return { isSubscriber: false };
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return { isSubscriber: false };
 
     const user = data?.user;
     const userId = user?.id;
