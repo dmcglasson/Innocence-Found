@@ -1,0 +1,53 @@
+# Supabase local development configuration
+
+project_id = "innocence-found"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[functions.download-worksheet]
+enabled = true
+verify_jwt = true
+import_map = "./functions/download-worksheet/deno.json"
+entrypoint = "./functions/download-worksheet/index.ts"
+
+[functions.upload-document]
+enabled = true
+verify_jwt = true
+import_map = "./functions/upload-document/deno.json"
+entrypoint = "./functions/upload-document/index.ts"
+
+[functions.create-checkout-session]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-checkout-session/deno.json"
+entrypoint = "./functions/create-checkout-session/index.ts"
+
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/stripe-webhook/deno.json"
+entrypoint = "./functions/stripe-webhook/index.ts"

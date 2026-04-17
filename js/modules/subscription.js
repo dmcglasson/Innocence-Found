@@ -1,124 +1,125 @@
 /**
- * Subscription Module
- * 
- * Handles subscription activation and retrieval of subscription status.
- * Uses Supabase with RLS policies enforcing user-level access.
+ * Stripe subscription checkout (Supabase Edge Functions).
+ * Secrets stay on the server; the browser only receives a redirect URL.
  */
 
 import { getSupabaseClient } from "./supabase.js";
+import { SUPABASE_CONFIG } from "../config.js";
 
-const supabase = getSupabaseClient();
+function functionsBaseUrl() {
+  const base = String(SUPABASE_CONFIG.URL || "").replace(/\/+$/, "");
+  return `${base}/functions/v1`;
+}
 
 /**
- * Activate subscription for the authenticated user
- * @param {string} plan - subscription plan/tier identifier
- * @returns {Promise<Object>} result object
+ * @param {"monthly"|"annual"} planId
+ * @returns {Promise<{ success: boolean, message?: string }>}
  */
-export async function activateSubscription(plan) {
-  try {
-    if (!supabase) throw new Error("Supabase client not initialized");
+export async function startSubscriptionCheckout(planId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: "Supabase client not initialized" };
+  }
 
-    // Get authenticated user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData?.session;
 
-    if (authError || !user) {
-      return { status: 401, message: "User not authenticated" };
-    }
+  if (!session) {
+    sessionStorage.setItem("returnTo", "#subscribe");
+    window.location.hash = "login";
+    return { success: false, message: "Please sign in to subscribe." };
+  }
 
-    // Validate subscription plan
-    const validPlans = ["basic", "premium"];
-    if (!validPlans.includes(plan)) {
-      return { status: 400, message: "Invalid subscription plan" };
-    }
+  const res = await fetch(`${functionsBaseUrl()}/create-checkout-session`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: SUPABASE_CONFIG.ANON_KEY,
+    },
+    body: JSON.stringify({ plan_id: planId }),
+  });
 
-    // Check if user already has an active subscription
-    const { data: existingSubscription, error: checkError } = await supabase
-      .from("subscriptions")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .maybeSingle();
+  const json = await res.json().catch(() => ({}));
 
-    if (checkError) throw checkError;
-
-    if (existingSubscription) {
-      return {
-        status: 409,
-        message: "User already has an active subscription",
-      };
-    }
-
-    // Insert new subscription
-    const { data, error } = await supabase
-      .from("subscriptions")
-      .insert({
-        user_id: user.id,
-        status: "active",
-        started_at: new Date(),
-        end_date: null,
-      })
-      .single();
-
-    if (error) throw error;
-
+  if (!res.ok) {
     return {
-      status: 200,
-      message: "Subscription activated successfully",
-      data,
+      success: false,
+      message: json.error || json.details || `Checkout failed (${res.status})`,
     };
-  } catch (error) {
-    console.error("Error activating subscription:", error);
-    return {
-      status: 500,
-      message: error.message || "Failed to activate subscription",
-    };
+  }
+
+  if (json.url) {
+    window.location.href = json.url;
+    return { success: true };
+  }
+
+  return { success: false, message: "No checkout URL returned." };
+}
+
+export async function initializeSubscribeScreen() {
+  const { getCurrentSession } = await import("./auth.js");
+  const session = await getCurrentSession();
+  const hint = document.getElementById("subscribeAuthHint");
+  if (hint) {
+    hint.hidden = Boolean(session);
   }
 }
 
 /**
- * Get subscription status for the authenticated user
- * @returns {Promise<Object|null>}
+ * After Stripe redirects back, poll until the webhook activates the row (or timeout).
  */
-export async function getSubscriptionStatus() {
-  try {
-    if (!supabase) throw new Error("Supabase client not initialized");
+export async function initializeSubscriptionSuccessScreen() {
+  const supabase = getSupabaseClient();
+  const statusEl = document.getElementById("subscriptionVerifyStatus");
+  if (!supabase) {
+    if (statusEl) statusEl.textContent = "Unable to verify subscription (app not configured).";
+    return;
+  }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session?.user) {
+    if (statusEl) statusEl.textContent = "Sign in to see your subscription status.";
+    return;
+  }
 
-    if (authError || !user) {
-      return null;
-    }
+  const userId = sessionData.session.user.id;
 
-    const { data, error } = await supabase
+  if (statusEl) statusEl.textContent = "Confirming your subscription…";
+
+  const maxAttempts = 8;
+  for (let i = 0; i < maxAttempts; i++) {
+    await supabase.auth.refreshSession();
+
+    const { data: sub, error } = await supabase
       .from("subscriptions")
-      .select("*")
-      .eq("user_id", user.id)
+      .select("plan_id, current_period_start, status")
+      .eq("user_id", userId)
       .eq("status", "active")
       .maybeSingle();
 
-    if (error) throw error;
+    if (!error && sub) {
+      const started = sub.current_period_start
+        ? new Date(sub.current_period_start).toLocaleDateString()
+        : "";
+      if (statusEl) {
+        statusEl.textContent = `You are subscribed (${sub.plan_id}${started ? `, started ${started}` : ""}).`;
+      }
+      return;
+    }
 
-    return data;
-  } catch (error) {
-    console.error("Error fetching subscription status:", error);
-    return null;
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+
+  if (statusEl) {
+    statusEl.textContent =
+      "Payment may still be processing. Refresh this page or check your profile in a minute.";
   }
 }
-// TEMP TESTS
 
-console.log("Running subscription tests");
-
-// Test 1: valid plan
-try {
-  const result = activateSubscription("premium");
-  console.log("Test 1 (valid plan):", result);
-} catch (err) {
-  console.error("Test 1 failed:", err.message);
-}
-
-// Test 2: invalid plan
-try {
-  activateSubscription(null);
-} catch (err) {
-  console.log("Test 2 (invalid plan) passed:", err.message);
+export async function initializeSubscriptionCancelScreen() {
+  const el = document.getElementById("subscriptionCancelHint");
+  if (el) {
+    el.textContent = "No charge was made. You can choose a plan again whenever you like.";
+  }
 }

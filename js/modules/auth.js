@@ -12,7 +12,6 @@
 import { getSupabaseClient } from './supabase.js';
 import { showPage } from './navigation.js';
 import { updateNavForLoggedIn, updateNavForLoggedOut } from './ui.js';
-import { hashPassword } from '../utils/password-encryption.js';   // <-- ADDED
 
 let authStateListeners = [];
 
@@ -26,13 +25,9 @@ export async function getCurrentSession() {
 
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error("Error getting session:", error);
-      return null;
-    }
+    if (error) return null;
     return session;
-  } catch (error) {
-    console.error("Error checking auth state:", error);
+  } catch {
     return null;
   }
 }
@@ -44,10 +39,18 @@ export async function checkAuthState() {
   const session = await getCurrentSession();
   if (session) {
     updateNavForLoggedIn(session.user);
-    // Only redirect to dashboard if on login page
+
+    // If user was trying to go back somewhere (ex: #chapters), go there
+    const returnTo = sessionStorage.getItem("returnTo");
+    if (returnTo) {
+      sessionStorage.removeItem("returnTo");
+      window.location.hash = returnTo; // ex: "#chapters"
+      return;
+    }
+
     const currentPage = window.location.hash.substring(1) || "home";
     if (currentPage === "login") {
-      showPage("dashboard");
+      window.location.hash = "home";
     }
   } else {
     updateNavForLoggedOut();
@@ -56,9 +59,6 @@ export async function checkAuthState() {
 
 /**
  * Sign in a user
- * @param {string} email - User email
- * @param {string} password - User password
- * @returns {Promise<Object>} Result object with success status and message
  */
 export async function signIn(email, password) {
   const supabase = getSupabaseClient();
@@ -77,8 +77,8 @@ export async function signIn(email, password) {
     }
 
     return { success: true, data, message: "Login successful!" };
-  } catch (error) {
-    return { success: false, message: error.message || "Failed to sign in" };
+  } catch {
+    return { success: false, message: "Failed to sign in" };
   }
 }
 
@@ -86,25 +86,29 @@ export async function signIn(email, password) {
  * Sign up a new user
  * @param {string} email - User email
  * @param {string} password - User password
- * @param {string} name - User name
+ * @param {string} firstName - User first name
+ * @param {string} lastName - User last name
+ * @param {boolean} parent - Indicates if the user is a parent
  * @returns {Promise<Object>} Result object with success status and message
  */
-export async function signUp(email, password, name) {
+export async function signUp(email, password, firstName, lastName, parent) {
   const supabase = getSupabaseClient();
   if (!supabase) {
     return { success: false, message: "Supabase client not initialized" };
   }
 
   try {
-    // 🔐 Hash the password BEFORE sending to Supabase
-    const hashedPassword = await hashPassword(password);
-
     const { data, error } = await supabase.auth.signUp({
       email,
-      password: hashedPassword,
+      password,
       options: {
         data: {
-          name: name,
+          name: [firstName, lastName].filter(Boolean).join(' '),
+          first_name: firstName,
+          last_name: lastName,
+          parent: parent,
+          subscriber: false, // Default to false, can be updated later
+          admin: false // Default to false, can be updated later
         },
       },
     });
@@ -118,14 +122,13 @@ export async function signUp(email, password, name) {
       data,
       message: "Account created successfully! Please check your email to verify your account.",
     };
-  } catch (error) {
-    return { success: false, message: error.message || "Failed to create account" };
+  } catch {
+    return { success: false, message: "Failed to create account" };
   }
 }
 
 /**
  * Sign out the current user
- * @returns {Promise<Object>} Result object with success status and message
  */
 export async function signOut() {
   const supabase = getSupabaseClient();
@@ -139,14 +142,13 @@ export async function signOut() {
       return { success: false, message: error.message };
     }
     return { success: true, message: "Signed out successfully" };
-  } catch (error) {
-    return { success: false, message: error.message || "Failed to sign out" };
+  } catch {
+    return { success: false, message: "Failed to sign out" };
   }
 }
 
 /**
  * Initialize auth state listener
- * @param {Function} callback - Callback function for auth state changes
  */
 export function initAuthStateListener(callback) {
   const supabase = getSupabaseClient();
@@ -155,15 +157,297 @@ export function initAuthStateListener(callback) {
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_IN") {
       updateNavForLoggedIn(session.user);
-      showPage("dashboard");
-    } else if (event === "SIGNED_OUT") {
+
+      const returnTo = sessionStorage.getItem("returnTo");
+      if (returnTo) {
+        sessionStorage.removeItem("returnTo");
+        window.location.hash = returnTo; // ex: "#chapters"
+        return;
+      }
+
+      // Only force dashboard if user is currently on login (or no hash)
+      const currentPage = window.location.hash.substring(1) || "home";
+      if (currentPage === "login") {
+        window.location.hash = "home";
+      }
+      // otherwise: do nothing, let the current hash page stay (ex: chapters)
+    }
+
+    if (event === "SIGNED_OUT") {
       updateNavForLoggedOut();
       showPage("home");
     }
 
-    // Call custom callback if provided
-    if (callback && typeof callback === 'function') {
+    if (callback) {
       callback(event, session);
     }
   });
+}
+
+/* ===============================
+   Secure Password Update Helpers
+================================ */
+function needsReauth(error) {
+  const msg = String(error?.message || "").toLowerCase();
+
+  return (
+    msg.includes("recent") ||
+    msg.includes("reauth") ||
+    msg.includes("re-auth") ||
+    (msg.includes("login") && msg.includes("required"))
+  );
+}
+
+function friendlyAuthError(error) {
+  const msg = String(error?.message || "").toLowerCase();
+
+  if (msg.includes("invalid")) {
+    return "Current password is incorrect.";
+  }
+
+  if (msg.includes("password")) {
+    return "New password does not meet the password requirements.";
+  }
+
+  if (msg.includes("expired")) {
+    return "Your session expired. Please re-authenticate.";
+  }
+
+  return "Unable to update your password.";
+}
+
+/**
+ * Secure password update with re-authentication
+ */
+export async function updatePasswordSecurely({ currentPassword, newPassword }) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: "Supabase client not initialized" };
+  }
+
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData?.user?.email) {
+    return { success: false, message: "You must be signed in to change your password." };
+  }
+
+  const email = userData.user.email;
+
+  const firstTry = await supabase.auth.updateUser({ password: newPassword });
+  if (!firstTry.error) {
+    return { success: true, message: "Password updated successfully." };
+  }
+
+  if (!needsReauth(firstTry.error)) {
+    return { success: false, message: friendlyAuthError(firstTry.error) };
+  }
+
+  const reauth = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  });
+
+  if (reauth.error) {
+    return { success: false, message: friendlyAuthError(reauth.error) };
+  }
+
+  const secondTry = await supabase.auth.updateUser({ password: newPassword });
+  if (secondTry.error) {
+    return { success: false, message: friendlyAuthError(secondTry.error) };
+  }
+
+  return { success: true, message: "Password updated successfully." };
+}
+
+export async function isCurrentUserAdmin() {
+  const supabase = getSupabaseClient();
+  if (!supabase) return false;
+
+  const session = await getCurrentSession();
+  const userId = session?.user?.id;
+  if (!userId) return false;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data) return false;
+
+  return data.role === 'admin';
+}
+
+export async function getAllChapters() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, data: [], message: 'Supabase client not initialized' };
+  }
+
+  const { data, error } = await supabase
+    .from('Chapters')
+    .select('*')
+    .order('id', { ascending: true });
+
+  if (error) {
+    return { success: false, data: [], message: error.message };
+  }
+
+  return { success: true, data };
+}
+
+export async function getCommentsByChapter(chapterId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, data: [], message: 'Supabase client not initialized' };
+  }
+
+  const { data, error } = await supabase
+    .from('Comments')
+    .select('id, message, created_at, uid, chapter_id')
+    .eq('chapter_id', chapterId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { success: false, data: [], message: error.message };
+  }
+
+  return { success: true, data };
+}
+/**
+ * Subscriber status: prefers `subscriptions.status === 'active'`, then user_metadata.subscriber.
+ */
+export async function getSubscriberStatus() {
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) return { isSubscriber: false };
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return { isSubscriber: false };
+
+    const user = data?.user;
+    const userId = user?.id;
+
+    const appMeta = user?.app_metadata || {};
+    const userMeta = user?.user_metadata || {};
+    const roleMeta = String(
+      userMeta.role || appMeta.role || ""
+    ).trim().toLowerCase();
+
+    let role = roleMeta;
+    let hasActiveSubscription = false;
+
+    if (userId) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!profileError && profile?.role) {
+        role = String(profile.role).trim().toLowerCase();
+      }
+
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from("subscriptions")
+        .select("status")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!subscriptionError && !!subscription) {
+        hasActiveSubscription = true;
+      }
+    }
+
+    const rawSubscriberValue =
+      userMeta.subscriber ??
+      userMeta.is_subscriber ??
+      appMeta.is_subscriber ??
+      userMeta.subscription;
+
+    const isSubscriber =
+      hasActiveSubscription ||
+      ["admin", "parent", "subscriber"].includes(role) ||
+      rawSubscriberValue === true ||
+      rawSubscriberValue === 1 ||
+      (typeof rawSubscriberValue === "string" &&
+        ["true", "1", "subscriber", "active", "paid"].includes(rawSubscriberValue.trim().toLowerCase()));
+
+    return { isSubscriber, role, hasActiveSubscription };
+  } catch (e) {
+    console.error("getSubscriberStatus() error:", e);
+    return { isSubscriber: false };
+  }
+}
+export async function deleteCommentById(commentId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client not initialized' };
+  }
+
+  const { error } = await supabase
+    .from('Comments')
+    .delete()
+    .eq('id', commentId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  return { success: true, message: 'Response deleted successfully.' };
+}
+
+export async function updateCommentById(commentId, newMessage) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client not initialized' };
+  }
+
+  const cleanMessage = String(newMessage || '').trim();
+
+  const { error } = await supabase
+    .from('Comments')
+    .update({ message: cleanMessage })
+    .eq('id', commentId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  return { success: true, message: 'Response updated successfully.' };
+}
+
+export async function getAllUsers() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, data: [], message: "No client" };
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('user_id, role');
+
+  if (error) {
+    return { success: false, data: [], message: error.message };
+  }
+
+  return { success: true, data };
+}
+
+export async function deleteUserById(userId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client not initialized' };
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  return { success: true, message: 'User deleted successfully.' };
 }
