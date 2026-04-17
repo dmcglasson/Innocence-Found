@@ -400,8 +400,11 @@ async function loadBookOptionsFromBackend() {
   );
   const response = await fetchBookReaderEntries();
   if (!response?.ok || !Array.isArray(response.data) || response.data.length === 0) {
+    setChapterLoadNotice("Chapter list could not be loaded. Using fallback chapters where available.");
     return;
   }
+
+  setChapterLoadNotice("");
 
   const visibleEntries = response.data.filter((entry) => {
     if (!entry?.url) return false;
@@ -1173,6 +1176,18 @@ submitComment?.addEventListener("click", async () => {
 
 export async function initBookReader() {
   if (!cacheDom()) return;
+  // Reset module-level state so each initialization is deterministic.
+  pdfDoc = null;
+  currentPage = 1;
+  currentUserId = null;
+  currentBookId = 1;
+  currentChapterRowId = null;
+  currentChapterNum = 1;
+  currentPollData = null;
+  pollLoadState = "idle";
+  pollLoadMessage = "";
+  chapterMetaByUrl.clear();
+
   syncReaderLayoutMode();
 
   await refreshAuthState();

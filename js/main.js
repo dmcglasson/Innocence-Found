@@ -778,23 +778,24 @@ if (adminNavItem) {
       console.warn("Dashboard elements not found:", error);
     }
   }
-  if (pageId === 'admin-dashboard') {
+  const renderAdminAccessDenied = () => {
     const pageContainer = document.getElementById('pageContainer');
+    if (!pageContainer) return;
+
+    pageContainer.innerHTML = `
+      <div class="content-section">
+        <div class="auth-box">
+          <h2>Access Denied</h2>
+          <p>This page is for admins only.</p>
+        </div>
+      </div>
+    `;
+  };
 
   if (pageId === 'admin-upload') {
     const isAdmin = await isCurrentUserAdmin();
     if (!isAdmin) {
-      const pageContainer = document.getElementById('pageContainer');
-      if (pageContainer) {
-        pageContainer.innerHTML = `
-          <div class="content-section">
-            <div class="auth-box">
-              <h2>Access Denied</h2>
-              <p>This page is for admins only.</p>
-            </div>
-          </div>
-        `;
-      }
+      renderAdminAccessDenied();
       return;
     }
 
@@ -811,21 +812,10 @@ if (adminNavItem) {
     }
   }
 
-
-  if (pageId === 'admin-responses') {
+  if (pageId === 'admin-dashboard') {
     const isAdmin = await isCurrentUserAdmin();
-
     if (!isAdmin) {
-      if (pageContainer) {
-        pageContainer.innerHTML = `
-        <div class="content-section">
-          <div class="auth-box">
-            <h2>Access Denied</h2>
-            <p>This page is for admins only.</p>
-          </div>
-        </div>
-      `;
-      }
+      renderAdminAccessDenied();
       return;
     }
 
@@ -838,11 +828,9 @@ if (adminNavItem) {
     }
 
     adminLayout.style.display = 'grid';
-
     usersTable.innerHTML = `<tr><td colspan="3">Loading users...</td></tr>`;
 
     const result = await getAllUsers();
-
     if (!result.success) {
       usersTable.innerHTML = `<tr><td colspan="3">Failed to load users.</td></tr>`;
       return;
@@ -870,16 +858,14 @@ if (adminNavItem) {
   }
 
   if (pageId === 'admin-responses') {
-  const isAdmin = await isCurrentUserAdmin();
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+      renderAdminAccessDenied();
+      return;
+    }
 
-  if (!isAdmin) {
-  alert("Access denied. Admins only.");
-  window.location.hash = 'home';
-  return;
-}
-
-await waitForElement('#chapterSelect', 1000);
-await waitForElement('#responsesContainer', 1000);
+    await waitForElement('#chapterSelect', 1000);
+    await waitForElement('#responsesContainer', 1000);
 
     const chapterSelect = document.getElementById('chapterSelect');
     const responsesContainer = document.getElementById('responsesContainer');
@@ -909,6 +895,9 @@ await waitForElement('#responsesContainer', 1000);
       renderErrorState('Unable to load chapters.');
       return;
     }
+
+    chapterSelect.innerHTML = '<option value="">Choose a chapter</option>';
+    if (chapterDropdownMenu) chapterDropdownMenu.innerHTML = '';
 
     chaptersResult.data.forEach((chapter) => {
       const option = document.createElement('option');
@@ -966,33 +955,7 @@ await waitForElement('#responsesContainer', 1000);
 
     renderEmptyState('No chapter selected yet.');
 
-      responsesContainer.innerHTML = `
-  <table class="responses-table">
-    <thead>
-      <tr>
-        <th>User ID</th>
-        <th>Response</th>
-        <th>Timestamp</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${commentsResult.data.map((comment) => `
-        <tr data-comment-id="${comment.id}">
-          <td>${comment.uid ?? ''}</td>
-          <td>${comment.message ?? ''}</td>
-          <td>${comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ''}</td>
-          <td>
-            <button type="button" class="action-btn edit-response-btn" data-id="${comment.id}">Edit</button>
-            <button type="button" class="action-btn delete-response-btn" data-id="${comment.id}">Delete</button>
-          </td>
-        </tr>
-      `).join('')}
-    </tbody>
-  </table>
-`;
-  });
-}
+  }
 
   if (pageId === 'chapter-reader') {
     await waitForElement('#chapterTitle', 1000);
@@ -1120,7 +1083,7 @@ await waitForElement('#responsesContainer', 1000);
   }
 }
 
-} // CLOSE initializeScreen HERE
+ // CLOSE initializeScreen HERE
 
 /**
  * Set up screen initialization callback for navigation

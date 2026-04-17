@@ -2,27 +2,30 @@
  * @jest-environment jsdom
  */
 
-// ✅ mock the entire auth module (avoids import errors)
-jest.mock('../js/modules/auth.js', () => ({
-  checkAuthState: jest.fn(),
-  getCurrentSession: jest.fn()
-}));
-
-const auth = require('../js/modules/auth.js');
-
-// mock global functions used in auth.js
-global.updateNavForLoggedIn = jest.fn();
-global.updateNavForLoggedOut = jest.fn();
-global.showPage = jest.fn();
+import * as auth from '../js/modules/auth.js';
 
 describe('Auth Module', () => {
-
-  test('checkAuthState exists', () => {
-    expect(auth.checkAuthState).toBeDefined();
+  test('getCurrentSession returns null when Supabase client is unavailable', async () => {
+    const session = await auth.getCurrentSession();
+    expect(session).toBeNull();
   });
 
-  test('getCurrentSession exists', () => {
-    expect(auth.getCurrentSession).toBeDefined();
+  test('signIn fails gracefully when Supabase client is unavailable', async () => {
+    const result = await auth.signIn('test@example.com', 'password123');
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Supabase client not initialized');
   });
 
+  test('signOut fails gracefully when Supabase client is unavailable', async () => {
+    const result = await auth.signOut();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Supabase client not initialized');
+  });
+
+  test('isCurrentUserAdmin returns false when Supabase client is unavailable', async () => {
+    const isAdmin = await auth.isCurrentUserAdmin();
+    expect(isAdmin).toBe(false);
+  });
 });

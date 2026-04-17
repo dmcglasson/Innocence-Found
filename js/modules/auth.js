@@ -324,7 +324,7 @@ export async function getSubscriberStatus() {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData?.user) return { isSubscriber: false };
 
-    const user = data?.user;
+    const user = userData?.user;
     const userId = user?.id;
 
     const appMeta = user?.app_metadata || {};

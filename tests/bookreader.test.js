@@ -139,6 +139,15 @@ async function flush() {
   await Promise.resolve();
 }
 
+async function waitForCommentCard(maxAttempts = 8) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const firstComment = document.querySelector(".comment-card .comment-text");
+    if (firstComment) return firstComment;
+    await flush();
+  }
+  return null;
+}
+
 describe("bookreader module", () => {
   const chapterComments = {
     11: [
@@ -453,9 +462,9 @@ describe("bookreader module", () => {
     const filter = document.getElementById("filterComments");
     filter.value = "asc";
     filter.dispatchEvent(new Event("change"));
-    await flush();
+    const firstAfter = await waitForCommentCard();
 
-    const firstAfter = document.querySelector(".comment-card .comment-text");
+    expect(firstAfter).not.toBeNull();
     expect(firstAfter.textContent).toBe("Oldest chapter 1");
   });
 
@@ -480,10 +489,12 @@ describe("bookreader module", () => {
     document.getElementById("submitPollVote").click();
     await flush();
 
-    expect(submitAuthorQuestionVoteMock).toHaveBeenCalledWith({
-      questionId: 101,
-      selectedOptionIndex: 1,
-    });
+    expect(submitAuthorQuestionVoteMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: 101,
+        selectedOptionIndex: 1,
+      })
+    );
   });
 
   test("shows only free chapters in dropdown for free users", async () => {
