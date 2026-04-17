@@ -22,6 +22,7 @@ let currentChapterNum = 1;
 const chapterMetaByUrl = new Map();
 let isSinglePageMode = false;
 let preferredViewMode = loadPreferredViewMode();
+let cachedComments = null;
 
 async function refreshAuthState() {
   const supabase = getSupabaseClient();
@@ -906,74 +907,261 @@ async function handlePollSubmit() {
   renderPoll();
 }
 
-async function renderComments() {
+async function renderComments(forceRefresh = true) {
   if (!commentsList || !noComments) return;
 
   setCommentHeader();
   noComments.classList.add("hidden");
   commentsError?.classList.add("hidden");
-  renderCommentSkeleton();
 
-  const chapterId = getCurrentChapterId();
-  if (!chapterId) {
+  if (forceRefresh) {
+    renderCommentSkeleton();
+    const chapterId = getCurrentChapterId();
+    if (!chapterId) {
+      commentsList.classList.remove("is-loading");
+      commentsList.innerHTML = "";
+      if (commentsError) {
+        commentsError.textContent = "Comments are unavailable because this chapter could not be identified.";
+        commentsError.classList.remove("hidden");
+      }
+      return;
+    }
+    const result = await getCommentsByChapter(chapterId);
     commentsList.classList.remove("is-loading");
-    commentsList.innerHTML = "";
-    noComments.classList.add("hidden");
-    if (commentsError) {
-      commentsError.textContent = "Comments are unavailable because this chapter could not be identified.";
-      commentsError.classList.remove("hidden");
+    if (!result.ok) {
+      commentsList.innerHTML = "";
+      if (commentsError) {
+        commentsError.textContent = "Comments could not be loaded. Tap refresh to try again.";
+        commentsError.classList.remove("hidden");
+      }
+      return;
     }
-    return;
+    cachedComments = result.data ?? [];
   }
 
-  const result = await getCommentsByChapter(chapterId);
-  commentsList.classList.remove("is-loading");
-
-  if (!result.ok) {
-    commentsList.innerHTML = "";
-    if (commentsError) {
-      commentsError.textContent = "Comments could not be loaded. Tap refresh to try again.";
-      commentsError.classList.remove("hidden");
-    }
-    return;
-  }
-
-  if (!result.data?.length) {
+  if (!cachedComments?.length) {
     commentsList.innerHTML = "";
     noComments.classList.remove("hidden");
     return;
   }
+
   noComments.classList.add("hidden");
   commentsList.innerHTML = "";
 
   const selected = filterComments?.value || "desc";
-  const rows = [...result.data];
+  const roots = buildTree(cachedComments);
 
-  // Sort by created_at
-  rows.sort((a, b) => {
+  roots.sort((a, b) => {
+    if (selected === "popular") {
+      return (b.children?.length || 0) - (a.children?.length || 0);
+    }
     const ta = new Date(a.created_at).getTime();
     const tb = new Date(b.created_at).getTime();
     return selected === "asc" ? ta - tb : tb - ta;
   });
 
-  rows.forEach((row) => {
-    const card = document.createElement("article");
-    card.className = "comment-card";
-
-    const meta = document.createElement("div");
-    meta.className = "comment-meta";
-    const who = formatCommentAuthor(row);
-    const when = formatCommentTimestamp(row.created_at);
-    meta.textContent = `${who} | ${when}`;
-    card.appendChild(meta);
-
-    const body = document.createElement("p");
-    body.className = "comment-text";
-    body.textContent = row.message; // ✅ XSS-safe
-    card.appendChild(body);
-
-    commentsList.appendChild(card);
+  roots.forEach((node) => {
+    commentsList.appendChild(buildCommentCard(node, 0));
   });
+}
+
+function buildTree(comments) {
+  const map = {};
+  const roots = [];
+  comments.forEach((c) => { map[c.id] = { ...c, children: [] }; });
+  comments.forEach((c) => {
+    if (c.comment_id && map[c.comment_id]) {
+      map[c.comment_id].children.push(map[c.id]);
+    } else {
+      roots.push(map[c.id]);
+    }
+  });
+  Object.values(map).forEach((node) => {
+    node.children.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  });
+  return roots;
+}
+
+const MAX_DEPTH = 3;
+
+function buildCommentCard(node, depth) {
+  const card = document.createElement("article");
+  card.className = "comment-card";
+  if (depth > 0) card.dataset.depth = depth;
+
+  const meta = document.createElement("div");
+  meta.className = "comment-meta";
+  meta.textContent = `${formatCommentAuthor(node)} | ${formatCommentTimestamp(node.created_at)}`;
+  card.appendChild(meta);
+
+  const body = document.createElement("p");
+  body.className = "comment-text";
+  body.textContent = node.message;
+  card.appendChild(body);
+
+  const actions = document.createElement("div");
+  actions.className = "comment-actions";
+
+  if (subscriber) {
+    const replyBtn = document.createElement("button");
+    replyBtn.className = "reply-btn";
+    replyBtn.textContent = node.children?.length ? `↩ Reply (${node.children.length})` : "↩ Reply";
+    replyBtn.addEventListener("click", () => {
+      const existing = card.querySelector(":scope > .reply-form");
+      if (existing) { existing.remove(); return; }
+      const form = buildReplyForm(node.id);
+      card.appendChild(form);
+      form.querySelector("textarea").focus();
+    });
+    actions.appendChild(replyBtn);
+  } else if (node.children?.length > 0) {
+    const countLabel = document.createElement("span");
+    countLabel.className = "reply-count-label";
+    countLabel.textContent = `${node.children.length} ${node.children.length === 1 ? "reply" : "replies"}`;
+    actions.appendChild(countLabel);
+  }
+
+  card.appendChild(actions);
+
+  if (node.children?.length > 0) {
+    const repliesEl = document.createElement("div");
+    repliesEl.className = "replies";
+    const nextDepth = depth + 1;
+
+    if (depth >= MAX_DEPTH) {
+      const continueBtn = document.createElement("button");
+      continueBtn.className = "continue-thread-btn";
+      continueBtn.textContent = "↪ Continue this thread";
+      continueBtn.addEventListener("click", () => {
+        continueBtn.remove();
+        const threadContainer = document.createElement("div");
+        threadContainer.className = "continued-thread";
+        node.children.forEach((child) => {
+          threadContainer.appendChild(buildCommentCard(child, 0));
+        });
+        repliesEl.appendChild(threadContainer);
+      });
+      repliesEl.appendChild(continueBtn);
+    } else {
+      const SHOW_INITIAL = 5;
+      const visible = node.children.slice(0, SHOW_INITIAL);
+      const hidden = node.children.slice(SHOW_INITIAL);
+
+      visible.forEach((child) => {
+        repliesEl.appendChild(buildCommentCard(child, nextDepth));
+      });
+
+      if (hidden.length > 0) {
+        const showMoreBtn = document.createElement("button");
+        showMoreBtn.className = "show-more-replies-btn";
+        showMoreBtn.textContent = `Show ${hidden.length} more ${hidden.length === 1 ? "reply" : "replies"}`;
+        showMoreBtn.addEventListener("click", () => {
+          hidden.forEach((child) => {
+            repliesEl.insertBefore(buildCommentCard(child, nextDepth), showMoreBtn);
+          });
+          showMoreBtn.remove();
+        });
+        repliesEl.appendChild(showMoreBtn);
+      }
+    }
+
+    card.appendChild(repliesEl);
+  }
+  
+  return card;
+}
+function buildReplyForm(parentId) {
+  const form = document.createElement("div");
+  form.className = "reply-form";
+
+  const ta = document.createElement("textarea");
+  ta.placeholder = "Write a reply…";
+  ta.rows = 2;
+
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "button";
+  submitBtn.textContent = "Post reply";
+
+  submitBtn.addEventListener("click", async () => {
+    const text = ta.value.trim();
+    if (!text) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Posting…";
+    const chapterId = getCurrentChapterId();
+    const res = await submitCommentToDB({ chapterId, message: text, parentCommentId: parentId });
+    if (!res.ok) {
+      alert(res.message || "Failed to post reply.");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Post reply";
+      return;
+    }
+    await renderComments(true);
+  });
+
+  form.appendChild(ta);
+  form.appendChild(submitBtn);
+  return form;
+}
+
+function buildRepliesSection(commentId, replies) {
+  const pageIdx = replyPageState.get(commentId) || 0;
+  const totalPages = Math.ceil(replies.length / REPLIES_PER_PAGE);
+  const pageReplies = replies.slice(pageIdx * REPLIES_PER_PAGE, (pageIdx + 1) * REPLIES_PER_PAGE);
+
+  const container = document.createElement("div");
+  container.className = "replies";
+
+  pageReplies.forEach((reply) => {
+    const r = document.createElement("div");
+    r.className = "reply";
+
+    const rMeta = document.createElement("div");
+    rMeta.className = "comment-meta";
+    rMeta.textContent = `${formatCommentAuthor(reply)} | ${formatCommentTimestamp(reply.created_at)}`;
+
+    const rBody = document.createElement("p");
+    rBody.className = "comment-text";
+    rBody.textContent = reply.message;
+
+    r.appendChild(rMeta);
+    r.appendChild(rBody);
+    container.appendChild(r);
+  });
+
+  if (totalPages > 1) {
+    const pagination = document.createElement("div");
+    pagination.className = "reply-pagination";
+
+    if (pageIdx > 0) {
+      const prev = document.createElement("button");
+      prev.className = "reply-page-btn";
+      prev.textContent = "← Prev";
+      prev.addEventListener("click", () => {
+        replyPageState.set(commentId, pageIdx - 1);
+        renderComments(false);
+      });
+      pagination.appendChild(prev);
+    }
+
+    const pageLabel = document.createElement("span");
+    pageLabel.textContent = `${pageIdx + 1} / ${totalPages}`;
+    pagination.appendChild(pageLabel);
+
+    if (pageIdx < totalPages - 1) {
+      const next = document.createElement("button");
+      next.className = "reply-page-btn";
+      next.textContent = "Next →";
+      next.addEventListener("click", () => {
+        replyPageState.set(commentId, pageIdx + 1);
+        renderComments(false);
+      });
+      pagination.appendChild(next);
+    }
+
+    container.appendChild(pagination);
+  }
+
+  return container;
 }
 
 function updateCommentUIAccess() {
