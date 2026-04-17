@@ -40,7 +40,11 @@ function toDisplayName(user) {
 function toSubscriberLabel(user) {
   const metadata = user?.user_metadata || {};
   const raw = metadata.subscriber;
-  const isSubscriber = raw === true || String(raw).toLowerCase() === "true";
+  const subStatus = metadata.subscription;
+  const isSubscriber =
+    raw === true ||
+    String(raw).toLowerCase() === "true" ||
+    subStatus === "active";
   return isSubscriber ? "Subscriber" : "Free";
 }
 

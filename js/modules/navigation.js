@@ -23,13 +23,20 @@ const KNOWN_SCREENS = new Set([
   'subscribe',
   'profile',
   'dashboard',
+  'admin-dashboard',
   'admin-responses',
   'admin-upload',
   'bookreader',
   'chapters',
   'chapter-reader',
   'worksheets',
-  'worksheet-reader'
+  'worksheet-reader',
+  'subscribe',
+  'subscription-success',
+  'subscription-cancel',
+  'payment-confirmation',
+  'payment-success',
+  'payment-cancelled'
 ]);
 
 export function setGlobalOnLoadCallback(cb) {
@@ -180,8 +187,8 @@ export async function loadScreen(screenName) {
     throw new Error('Invalid screen name');
   }
 
-  // Check cache first if enabled
-  if (APP_CONFIG.CACHE_ENABLED && screenCache[screenName]) {
+  // Check cache first if enabled (profile is never cached so UI updates always show)
+  if (APP_CONFIG.CACHE_ENABLED && screenName !== "profile" && screenCache[screenName]) {
     return screenCache[screenName];
   }
 
@@ -197,7 +204,7 @@ export async function loadScreen(screenName) {
     const sanitizedHtml = sanitizeHTML(html);
 
     // Cache the screen if caching is enabled
-    if (APP_CONFIG.CACHE_ENABLED) {
+    if (APP_CONFIG.CACHE_ENABLED && screenName !== "profile") {
       screenCache[screenName] = sanitizedHtml;
     }
 
@@ -250,10 +257,6 @@ export async function showPage(pageId, onLoadCallback = null) {
 
     if (pageId === "dashboard" && worksheetBtn) {
       worksheetBtn.style.display = "none";
-    }
-
-    if (pageId === "admin-upload" && uploadBtn) {
-      uploadBtn.style.display = "none";
     }
 
     // Call the callback (screen init). Prefer the passed callback, otherwise use global one.

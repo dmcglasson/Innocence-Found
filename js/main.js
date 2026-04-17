@@ -6,7 +6,7 @@
  */
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, getCommentsByChapter, deleteCommentById, updateCommentById } from './modules/auth.js';
+import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, deleteCommentById, updateCommentById, getAllUsers, deleteUserById } from './modules/auth.js';
 import { initializeProfileScreen } from './modules/profile.js';
 import { initializeChaptersScreen, initializeChapterReaderScreen, handleLockedChapter } from './modules/chapters.js';
 import { initializeWorksheetsScreen, initializeWorksheetReaderScreen, handleLockedWorksheet } from './modules/worksheets.js';
@@ -14,7 +14,15 @@ import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
 import { fetchWorksheetMetadata, downloadWorksheet } from "./modules/worksheets.js";
+import {
+  startSubscriptionCheckout,
+  initializeSubscribeScreen,
+  initializeSubscriptionSuccessScreen,
+  initializeSubscriptionCancelScreen,
+} from "./modules/subscription.js";
 import { APP_CONFIG } from './config.js';
+import { createStripeCheckoutSession } from './modules/checkout.js';
+import { getResponsesByChapter, renderResponsesTable } from './adminResponses.helpers.js';
 
 let worksheetsLoadToken = 0;
 const SCREEN_STYLE_ID = "active-screen-style";
@@ -62,6 +70,15 @@ async function init() {
   initUI();
   setGlobalOnLoadCallback(initializeScreen);
 
+  const pageId = window.location.hash.substring(1) || 'home';
+
+  if (pageId === 'home') {
+    const yearEl = document.getElementById('year');
+    if (yearEl) {
+      yearEl.textContent = new Date().getFullYear();
+    }
+  }
+
   // Set up navigation handlers before first route render
   setupScreenInitialization();
 
@@ -90,6 +107,15 @@ async function init() {
 
   // Set up event listeners
   setupEventListeners();
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.admin-menu-btn');
+    if (!btn) return;
+
+    const page = btn.getAttribute('data-page');
+    if (!page) return;
+
+    window.location.hash = page;
+  });
 }
 
 /**
@@ -116,7 +142,81 @@ function setupEventListeners() {
 
   // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
-    const target = e.target;
+
+  const target = e.target;
+  // HOME SUBSCRIPTION BUTTON LOGIC
+const subBtn = target.closest && target.closest('#homeSubscriptionLink');
+if (subBtn) {
+  e.preventDefault();
+
+  const session = await getCurrentSession();
+
+  if (session) {
+    window.location.hash = 'subscribe';
+  } else {
+    sessionStorage.setItem('returnTo', '#subscribe');
+    window.location.hash = 'login';
+  }
+  return;
+}
+
+    const freePlanBtn = target.closest && target.closest('#select-free-plan');
+    if (freePlanBtn) {
+      e.preventDefault();
+
+      localStorage.setItem('selectedPlan', JSON.stringify({
+        name: 'Free Plan',
+        price: '$0 / month'
+      }));
+      sessionStorage.setItem('returnTo', '#home');
+      window.location.hash = 'login';
+      return;
+    }
+
+    const paidPlanBtn = target.closest && target.closest('#select-paid-plan');
+    if (paidPlanBtn) {
+      sessionStorage.setItem('returnTo', '#payment-confirmation');
+      console.log('PAID returnTo set:', sessionStorage.getItem('returnTo'));
+      e.preventDefault();
+
+      localStorage.setItem('selectedPlan', JSON.stringify({
+        name: 'Paid Plan',
+        price: '$4.99 / month'
+      }));
+
+      const session = await getCurrentSession();
+      if (session) {
+        window.location.hash = 'payment-confirmation';
+      } else {
+        sessionStorage.setItem('returnTo', '#payment-confirmation');
+        window.location.hash = 'login';
+      }
+      return;
+    }
+
+    const confirmBtn = target.closest && target.closest('#confirmPaymentBtn');
+    if (confirmBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      confirmBtn.disabled = true;
+      const prevText = confirmBtn.textContent;
+      confirmBtn.textContent = "Redirecting to Stripe…";
+
+      const result = await createStripeCheckoutSession();
+
+      if (!result.success) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = prevText;
+        alert(result.message || "Could not start checkout. Please try again.");
+        return;
+      }
+
+      sessionStorage.removeItem('returnTo');
+      window.location.href = result.url;
+      return;
+    }
 
     // Download worksheet button
     const dlBtn = target.closest && target.closest(".downloadWorksheetBtn");
@@ -190,6 +290,88 @@ function setupEventListeners() {
 
       return;
     }
+    const viewUserBtn = e.target.closest('.view-user-btn');
+
+    if (viewUserBtn) {
+      e.preventDefault();
+
+      const userId = viewUserBtn.getAttribute('data-id');
+      const role = viewUserBtn.closest('tr').children[1].innerText;
+
+      const existingModal = document.getElementById('userDetailsModal');
+      if (existingModal) existingModal.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'userDetailsModal';
+      modal.className = 'user-details-modal-overlay';
+      modal.innerHTML = `
+    <div class="user-details-modal">
+      <h3>User Details</h3>
+      <p><strong>User ID:</strong> ${userId}</p>
+      <p><strong>Role:</strong> ${role}</p>
+      <button type="button" id="closeUserDetailsModal" class="action-btn">Close</button>
+    </div>
+  `;
+
+      document.body.appendChild(modal);
+
+      document.getElementById('closeUserDetailsModal').addEventListener('click', () => {
+        modal.remove();
+      });
+
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+          modal.remove();
+        }
+      });
+
+      return;
+    }
+    const deleteUserBtn = e.target.closest('.delete-user-btn');
+    if (deleteUserBtn) {
+      e.preventDefault();
+
+      const userId = deleteUserBtn.getAttribute('data-id');
+
+      const role = deleteUserBtn.closest('tr').children[1].innerText;
+
+      if (role === 'admin') {
+        alert('You cannot delete an admin account.');
+        return;
+      }
+      const confirmed = window.confirm('Delete this user?');
+
+      if (!confirmed) return;
+
+      const result = await deleteUserById(userId);
+
+      if (!result.success) {
+        alert(result.message || 'Failed to delete user.');
+        return;
+      }
+
+      const row = deleteUserBtn.closest('tr');
+      if (row) {
+        row.remove();
+      }
+
+      return;
+    }
+
+    const subscribeBtn = target.closest && target.closest(".subscribePlanBtn");
+    if (subscribeBtn) {
+      e.preventDefault();
+      const planId = subscribeBtn.getAttribute("data-plan-id");
+      const msgEl = document.getElementById("subscribeMessage");
+      if (msgEl) msgEl.textContent = "";
+      if (!planId) return;
+      const result = await startSubscriptionCheckout(planId);
+      if (!result.success && result.message && msgEl) {
+        msgEl.textContent = result.message;
+      }
+      return;
+    }
+
     // Logout button
     if (target.id === 'logoutBtn' || (target.closest && target.closest('#logoutBtn'))) {
       e.preventDefault();
@@ -254,16 +436,17 @@ async function handleLogin(form) {
 
     if (result.success) {
       showMessage('loginMessage', result.message, 'success');
-      setTimeout(() => {
-        const returnTo = sessionStorage.getItem('returnTo');
 
-        if (returnTo) {
-          sessionStorage.removeItem('returnTo');
-          window.location.hash = returnTo.replace(/^#/, '');
-        } else {
-          window.location.hash = 'home';
-        }
-      }, 1000);
+  const returnTo = sessionStorage.getItem('returnTo');
+
+  if (returnTo) {
+    sessionStorage.removeItem('returnTo');
+    window.location.hash = returnTo.replace(/^#/, '');
+  } else {
+    window.location.hash = 'home';
+  }
+
+      return;
     } else {
       showMessage('loginMessage', result.message, 'error');
     }
@@ -364,18 +547,38 @@ async function handleWorksheetUpload(form) {
   const titleInput = form.querySelector('#worksheetTitle');
   const descriptionInput = form.querySelector('#worksheetDescription');
   const fileInput = form.querySelector('#worksheetFile');
+  const documentTypeInput = form.querySelector('#documentType');
+  const chapterNumberInput = form.querySelector('#chapterNumber');
+  const accessLevelInput = form.querySelector('#accessLevel');
+  const releaseDateInput = form.querySelector('#releaseDate');
   const uploadMsg = document.getElementById('uploadMessage');
   const uploadBtn = form.querySelector('button[type="submit"]');
 
-  if (!titleInput || !descriptionInput || !fileInput || !uploadBtn) {
+  if (!titleInput || !fileInput || !uploadBtn || !documentTypeInput) {
     console.error('Upload form elements not found');
     return;
   }
 
   const file = fileInput.files?.[0];
+  const documentType = documentTypeInput.value;
+
+  if (!documentType) {
+    if (uploadMsg) uploadMsg.textContent = 'Please select a document type.';
+    return;
+  }
 
   if (!file) {
     if (uploadMsg) uploadMsg.textContent = 'Please choose a PDF file.';
+    return;
+  }
+
+  if (file.type !== 'application/pdf') {
+    if (uploadMsg) uploadMsg.textContent = 'Only PDF files are allowed.';
+    return;
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    if (uploadMsg) uploadMsg.textContent = 'File too large. Max size is 10MB.';
     return;
   }
 
@@ -385,52 +588,78 @@ async function handleWorksheetUpload(form) {
 
   try {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      throw new Error('Supabase client not initialized');
-    }
+    if (!supabase) throw new Error('Supabase client not initialized');
 
-    const safeFileName = `${Date.now()}-${file.name}`;
+    const safeFileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+    const accessLevel = accessLevelInput?.value || 'public';
+    const is_protected = accessLevel === 'protected' || accessLevel === 'answer-key';
+    const is_answer_key = accessLevel === 'answer-key';
 
-    const { error: storageError } = await supabase.storage
-      .from('Worksheets')
-      .upload(safeFileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    if (documentType === 'chapter') {
+      const chapterNum = parseInt(chapterNumberInput?.value, 10);
+      if (!chapterNum) {
+        if (uploadMsg) uploadMsg.textContent = 'Please enter a chapter number.';
+        return;
+      }
 
-    if (storageError) {
-      throw storageError;
-    }
+      const { error: storageError } = await supabase.storage
+        .from('Chapters')
+        .upload(safeFileName, file, { cacheControl: '3600', upsert: false });
 
-    const { error: dbError } = await supabase
-      .from('worksheets')
-      .insert([
-        {
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase
+        .from('Chapters')
+        .insert([{
+          chapter_num: chapterNum,
+          free: !is_protected,
+          file_path: safeFileName,
+          book_id: 1,
           title: titleInput.value.trim(),
-          description: descriptionInput.value.trim(),
-          file_path: safeFileName
-        }
-      ]);
+          description: descriptionInput?.value.trim() || '',
+          release_date: releaseDateInput?.value || null
+        }]);
 
-    if (dbError) {
-      throw dbError;
+
+
+      if (dbError) {
+        await supabase.storage.from('Chapters').remove([safeFileName]);
+        throw dbError;
+      }
+
+    } else {
+      const { error: storageError } = await supabase.storage
+        .from('Worksheets')
+        .upload(safeFileName, file, { cacheControl: '3600', upsert: false });
+
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase
+        .from('worksheets')
+        .insert([{
+          title: titleInput.value.trim(),
+          description: descriptionInput?.value.trim() || '',
+          file_path: safeFileName,
+          is_protected,
+          is_answer_key,
+          release_date: releaseDateInput?.value || null
+        }]);
+
+      if (dbError) {
+        await supabase.storage.from('Worksheets').remove([safeFileName]);
+        throw dbError;
+      }
     }
 
-    if (uploadMsg) uploadMsg.textContent = 'Worksheet uploaded successfully.';
+    if (uploadMsg) uploadMsg.textContent = 'Upload successful!';
     form.reset();
 
-    const wsBox = document.getElementById('worksheetsContainer');
-    if (wsBox) {
-      wsBox.dataset.loaded = 'false';
-    }
-
-    await initializeScreen('dashboard');
   } catch (error) {
-    console.error('Worksheet upload error:', error);
+    console.error('Upload error:', error);
     if (uploadMsg) uploadMsg.textContent = error.message || 'Upload failed.';
   } finally {
     uploadBtn.disabled = false;
-    uploadBtn.textContent = 'Upload Worksheet';
+    uploadBtn.textContent = 'Upload';
   }
 }
 
@@ -442,11 +671,87 @@ async function handleWorksheetUpload(form) {
  * Initialize screen-specific logic after screen loads
  * @param {string} pageId - ID of the loaded page
  */
+
+
 async function initializeScreen(pageId) {
   syncScreenStyles(pageId);
+  // ===== ADMIN NAV VISIBILITY =====
+const adminNavItem = document.getElementById('adminNavItem');
 
+if (adminNavItem) {
+  const isAdmin = await isCurrentUserAdmin();
+
+  if (isAdmin) {
+    adminNavItem.style.display = 'block';
+  } else {
+    adminNavItem.style.display = 'none';
+  }
+}
+
+
+ if (pageId === 'home') {
+  const yearEl = document.getElementById('year');
+    if (yearEl) {
+      yearEl.textContent = new Date().getFullYear();
+    }
+  }
+  
   if (pageId === 'profile') {
     await initializeProfileScreen();
+  }
+
+  // Profile screen
+
+  if (pageId === 'payment-success') {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.auth.refreshSession();
+    }
+
+    const statusEl = document.getElementById('paymentSuccessStatus');
+    if (statusEl) {
+      statusEl.textContent = "Confirming your subscription…";
+    }
+
+    let active = false;
+    for (let i = 0; i < 10; i++) {
+      const sub = await getSubscriberStatus();
+      if (sub.isSubscriber) {
+        active = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 800));
+    }
+
+    if (statusEl) {
+      statusEl.textContent = active
+        ? "Your subscription is active. Enjoy full access."
+        : "Payment received. If your access does not update within a few minutes, refresh the page or contact support.";
+    }
+  }
+
+  if (pageId === 'payment-confirmation') {
+    try {
+      const session = await getCurrentSession();
+      if (!session) {
+        sessionStorage.setItem('returnTo', '#payment-confirmation');
+        window.location.hash = 'login';
+        return;
+      }
+
+      const rawPlan = localStorage.getItem('selectedPlan');
+      const planData = rawPlan ? JSON.parse(rawPlan) : null;
+
+      const nameEl = document.getElementById('planName');
+      const priceEl = document.getElementById('planPrice');
+
+      if (planData) {
+        if (nameEl) nameEl.textContent = planData.name || 'Paid Plan';
+        if (priceEl) priceEl.textContent = planData.price || '$4.99 / month';
+      }
+    } catch (error) {
+      console.warn('Could not load selected plan:', error);
+    }
   }
 
   // Bookreader screen (supports direct hash and DOM detection)
@@ -473,12 +778,44 @@ async function initializeScreen(pageId) {
       console.warn("Dashboard elements not found:", error);
     }
   }
+  if (pageId === 'admin-dashboard') {
+    const pageContainer = document.getElementById('pageContainer');
+
+  if (pageId === 'admin-upload') {
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+      const pageContainer = document.getElementById('pageContainer');
+      if (pageContainer) {
+        pageContainer.innerHTML = `
+          <div class="content-section">
+            <div class="auth-box">
+              <h2>Access Denied</h2>
+              <p>This page is for admins only.</p>
+            </div>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    const documentTypeSelect = document.getElementById('documentType');
+    const chapterNumberGroup = document.getElementById('chapterNumberGroup');
+    const accessLevelGroup = document.getElementById('accessLevelGroup');
+
+    if (documentTypeSelect) {
+      documentTypeSelect.addEventListener('change', () => {
+        const isChapter = documentTypeSelect.value === 'chapter';
+        if (chapterNumberGroup) chapterNumberGroup.style.display = isChapter ? 'block' : 'none';
+        if (accessLevelGroup) accessLevelGroup.style.display = isChapter ? 'block' : 'none';
+      });
+    }
+  }
+
 
   if (pageId === 'admin-responses') {
     const isAdmin = await isCurrentUserAdmin();
 
     if (!isAdmin) {
-      const pageContainer = document.getElementById('pageContainer');
       if (pageContainer) {
         pageContainer.innerHTML = `
         <div class="content-section">
@@ -492,13 +829,65 @@ async function initializeScreen(pageId) {
       return;
     }
 
-    await waitForElement('#chapterSelect', 1000);
-    await waitForElement('#responsesContainer', 1000);
+    const adminLayout = document.getElementById('adminDashboardLayout');
+    const usersTable = document.getElementById('usersTable');
+
+    if (!adminLayout || !usersTable) {
+      console.warn('Admin dashboard elements not found');
+      return;
+    }
+
+    adminLayout.style.display = 'grid';
+
+    usersTable.innerHTML = `<tr><td colspan="3">Loading users...</td></tr>`;
+
+    const result = await getAllUsers();
+
+    if (!result.success) {
+      usersTable.innerHTML = `<tr><td colspan="3">Failed to load users.</td></tr>`;
+      return;
+    }
+
+    if (!result.data.length) {
+      usersTable.innerHTML = `<tr><td colspan="3">No users found.</td></tr>`;
+      return;
+    }
+
+    usersTable.innerHTML = result.data
+      .map(
+        (user) => `
+      <tr>
+        <td>${user.user_id}</td>
+        <td>${user.role ?? ''}</td>
+        <td>
+          <button class="action-btn view-user-btn" data-id="${user.user_id}">View</button>
+          <button class="action-btn delete-user-btn" data-id="${user.user_id}">Delete</button>
+        </td>
+      </tr>
+    `
+      )
+      .join('');
+  }
+
+  if (pageId === 'admin-responses') {
+  const isAdmin = await isCurrentUserAdmin();
+
+  if (!isAdmin) {
+  alert("Access denied. Admins only.");
+  window.location.hash = 'home';
+  return;
+}
+
+await waitForElement('#chapterSelect', 1000);
+await waitForElement('#responsesContainer', 1000);
 
     const chapterSelect = document.getElementById('chapterSelect');
     const responsesContainer = document.getElementById('responsesContainer');
     const messageEl = document.getElementById('adminResponsesMessage');
 
+    const chapterDropdown = document.getElementById('chapterDropdown');
+    const chapterDropdownTrigger = document.getElementById('chapterDropdownTrigger');
+    const chapterDropdownMenu = document.getElementById('chapterDropdownMenu');
     if (!chapterSelect || !responsesContainer) return;
 
     const renderEmptyState = (text) => {
@@ -521,43 +910,61 @@ async function initializeScreen(pageId) {
       return;
     }
 
-    chapterSelect.innerHTML = `<option value="">Choose a chapter</option>`;
-
     chaptersResult.data.forEach((chapter) => {
       const option = document.createElement('option');
       option.value = chapter.id;
       option.textContent = `Chapter ${chapter.id}`;
       chapterSelect.appendChild(option);
+
+      const customOption = document.createElement('button');
+      customOption.type = 'button';
+      customOption.className = 'custom-dropdown__option';
+      customOption.setAttribute('data-value', chapter.id);
+      customOption.textContent = `Chapter ${chapter.id}`;
+      chapterDropdownMenu.appendChild(customOption);
     });
 
-    renderEmptyState('No chapter selected yet.');
+    if (chapterDropdownTrigger && chapterDropdown && chapterDropdownMenu) {
+      chapterDropdownTrigger.addEventListener('click', () => {
+        chapterDropdown.classList.toggle('active');
+      });
 
-    chapterSelect.addEventListener('change', async () => {
-      const chapterId = chapterSelect.value;
+      chapterDropdownMenu.addEventListener('click', async (e) => {
+        const option = e.target.closest('.custom-dropdown__option');
+        if (!option) return;
 
-      if (messageEl) messageEl.textContent = '';
+        const value = option.getAttribute('data-value') || '';
+        const text = option.textContent;
 
-      if (!chapterId) {
-        renderEmptyState('No chapter selected yet.');
-        return;
-      }
+        chapterSelect.value = value;
+        chapterDropdownTrigger.textContent = text;
+        chapterDropdown.classList.remove('active');
 
-      renderLoadingState();
+        if (!value) return;
 
-      const commentsResult = await getCommentsByChapter(chapterId);
+        renderLoadingState('Loading responses...');
 
-      if (!commentsResult.success) {
-        if (messageEl) {
-          messageEl.textContent = commentsResult.message || 'Unable to load responses.';
+        const result = await getResponsesByChapter(value);
+
+        if (!result.success) {
+          renderErrorState('Failed to load responses.');
+          return;
         }
-        renderErrorState('Unable to load responses for this chapter.');
-        return;
-      }
 
-      if (!commentsResult.data.length) {
-        renderEmptyState('No responses submitted yet.');
-        return;
-      }
+        renderResponsesTable(result.data, responsesContainer);
+
+        if (messageEl) messageEl.textContent = '';
+
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!chapterDropdown.contains(e.target)) {
+          chapterDropdown.classList.remove('active');
+        }
+      });
+    }
+
+    renderEmptyState('No chapter selected yet.');
 
       responsesContainer.innerHTML = `
   <table class="responses-table">
@@ -584,8 +991,8 @@ async function initializeScreen(pageId) {
     </tbody>
   </table>
 `;
-    });
-  }
+  });
+}
 
   if (pageId === 'chapter-reader') {
     await waitForElement('#chapterTitle', 1000);
@@ -699,7 +1106,21 @@ async function initializeScreen(pageId) {
   if (pageId === 'worksheets') {
     await initializeWorksheetsScreen();
   }
+
+  if (pageId === "subscribe") {
+    await initializeSubscribeScreen();
+  }
+
+  if (pageId === "subscription-success") {
+    await initializeSubscriptionSuccessScreen();
+  }
+
+  if (pageId === "subscription-cancel") {
+    await initializeSubscriptionCancelScreen();
+  }
 }
+
+} // CLOSE initializeScreen HERE
 
 /**
  * Set up screen initialization callback for navigation
@@ -788,11 +1209,22 @@ function setupMobileNavToggle() {
 
   if (!navToggle || !navRight) return;
 
+  const closeMobileMenu = () => {
+    navRight.classList.remove("open");
+    navToggle.setAttribute("aria-expanded", "false");
+  };
+
   navToggle.addEventListener("click", () => {
     navRight.classList.toggle("open");
 
     const isOpen = navRight.classList.contains("open");
     navToggle.setAttribute("aria-expanded", String(isOpen));
+  });
+
+  window.addEventListener("scroll", () => {
+    if (window.innerWidth <= 768 && navRight.classList.contains("open")) {
+      closeMobileMenu();
+    }
   });
 }
 

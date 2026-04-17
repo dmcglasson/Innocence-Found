@@ -394,40 +394,32 @@ async function loadBookOptionsFromBackend() {
   if (!bookSelect) return;
 
   const currentSelection = bookSelect.value || currentUrl;
-  let response;
-  try {
-    response = await fetchBookReaderEntries();
-  } catch (error) {
-    console.warn("Book reader entries failed to load:", error);
-    response = { ok: false, data: [], message: error?.message || "" };
-  }
-
-  if (!response?.ok) {
-    setChapterLoadNotice(
-      bookSelect.options.length
-        ? "Chapter list could not be loaded. Showing fallback chapters instead."
-        : "Chapter list could not be loaded."
-    );
+  const requestedChapterNum = Number.parseInt(
+    sessionStorage.getItem("activeChapter") || "",
+    10
+  );
+  const response = await fetchBookReaderEntries();
+  if (!response?.ok || !Array.isArray(response.data) || response.data.length === 0) {
     return;
   }
 
-  if (!Array.isArray(response.data) || response.data.length === 0) {
-    setChapterLoadNotice(
-      bookSelect.options.length
-        ? "No backend chapters were returned. Showing fallback chapters instead."
-        : "No chapters are available right now."
-    );
+  const visibleEntries = response.data.filter((entry) => {
+    if (!entry?.url) return false;
+    const isFreeEntry =
+      entry.free === true ||
+      entry.free === 1 ||
+      String(entry.free).toLowerCase() === "true";
+    return subscriber || isFreeEntry;
+  });
+
+  if (!visibleEntries.length) {
     return;
   }
-
-  setChapterLoadNotice("");
 
   chapterMetaByUrl.clear();
   bookSelect.innerHTML = "";
 
-  response.data.forEach((entry) => {
-    if (!entry?.url) return;
-
+  visibleEntries.forEach((entry) => {
     const option = document.createElement("option");
     option.value = entry.url;
     option.textContent = entry.label || `Book ${entry.bookId || 1} - Chapter ${entry.chapterNum || 1}`;
@@ -441,10 +433,24 @@ async function loadBookOptionsFromBackend() {
   }
 
   const firstValue = bookSelect.options[0].value;
-  const nextValue = chapterMetaByUrl.has(currentSelection) ? currentSelection : firstValue;
+  const requestedEntry = Number.isInteger(requestedChapterNum) && requestedChapterNum > 0
+    ? visibleEntries.find((entry) => Number(entry?.chapterNum) === requestedChapterNum)
+    : null;
+
+  let nextValue = firstValue;
+  if (requestedEntry?.url && chapterMetaByUrl.has(requestedEntry.url)) {
+    nextValue = requestedEntry.url;
+  } else if (chapterMetaByUrl.has(currentSelection)) {
+    nextValue = currentSelection;
+  }
+
   bookSelect.value = nextValue;
   currentUrl = nextValue;
   syncCurrentSelectionMeta();
+
+  if (requestedEntry?.url) {
+    sessionStorage.removeItem("activeChapter");
+  }
 }
 
 function loadDocument(url) {

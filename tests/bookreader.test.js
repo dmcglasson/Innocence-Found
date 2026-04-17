@@ -486,6 +486,38 @@ describe("bookreader module", () => {
     });
   });
 
+  test("shows only free chapters in dropdown for free users", async () => {
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: false });
+    fetchBookReaderEntriesMock.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          chapterId: 11,
+          chapterNum: 1,
+          bookId: 1,
+          free: true,
+          url: BOOK_ONE,
+          label: "Book 1 - Chapter 1",
+        },
+        {
+          chapterId: 17,
+          chapterNum: 7,
+          bookId: 1,
+          free: false,
+          url: "https://cdn.example.com/book-1-ch-7.pdf",
+          label: "Book 1 - Chapter 7 (Subscribers)",
+        },
+      ],
+    });
+
+    await initBookReader();
+    await flush();
+
+    const select = document.getElementById("bookSelect");
+    const labels = Array.from(select.options).map((option) => option.textContent);
+    expect(labels).toEqual(["Book 1 - Chapter 1"]);
+  });
+
   test("shows comments error state when comments API fails", async () => {
     getCommentsByChapterMock.mockResolvedValue({ ok: false, data: [], message: "network error" });
 
@@ -535,6 +567,39 @@ describe("bookreader module", () => {
     expect(document.getElementById("commentsList").textContent).toContain("Book 2 comment");
   });
 
+  test("preselects chapter option from activeChapter session value", async () => {
+    sessionStorage.setItem("activeChapter", "1");
+    fetchBookReaderEntriesMock.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          chapterId: 31,
+          chapterNum: 3,
+          bookId: 1,
+          free: true,
+          url: "https://cdn.example.com/book-1-ch-3.pdf",
+          label: "Book 1 - Chapter 3",
+        },
+        {
+          chapterId: 11,
+          chapterNum: 1,
+          bookId: 1,
+          free: true,
+          url: BOOK_ONE,
+          label: "Book 1 - Chapter 1",
+        },
+      ],
+    });
+
+    await initBookReader();
+    await flush();
+
+    const select = document.getElementById("bookSelect");
+    expect(select.value).toBe(BOOK_ONE);
+    expect(document.getElementById("commentsMeta").textContent).toBe("Chapter 1");
+    expect(sessionStorage.getItem("activeChapter")).toBeNull();
+  });
+  
   test("shows a fallback message when a chapter has no author question", async () => {
     await initBookReader();
     await flush();
