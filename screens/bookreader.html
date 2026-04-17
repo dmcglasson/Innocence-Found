@@ -3,12 +3,7 @@
     <div class="book-selector">
       <label for="bookSelect">Choose a book:</label>
       <select id="bookSelect">
-        <!-- for testing purposes the only options are book1 and book2,
-         once the backend is established the book selector should
-         fetch book and chapter options from the back end -->
-        <option value="../book reader/books/book1.pdf">Book 1 (PDF)</option>
-        <option value="../book reader/books/book2.pdf">Book 2 (PDF)</option>
-        <option value="locked">Locked Chapter</option>
+        <option value="" selected disabled>Loading available chapters...</option>
       </select>
     </div>
 
@@ -17,6 +12,8 @@
       <button id="doublePageViewBtn" type="button" class="reader-view-btn">Double page</button>
       <button id="singlePageViewBtn" type="button" class="reader-view-btn">Single page</button>
     </div>
+
+    <p id="chapterLoadNotice" class="reader-error hidden" role="status"></p>
 
     <section class="reader-shell" aria-label="Book reader">
       <p id="readerError" class="reader-error hidden" role="alert"></p>
