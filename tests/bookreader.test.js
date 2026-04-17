@@ -10,6 +10,8 @@ const getCommentsByChapterMock = jest.fn();
 const fetchBookReaderEntriesMock = jest.fn();
 const getSubscriberStatusMock = jest.fn();
 const getSupabaseClientMock = jest.fn();
+const getAuthorQuestionByChapterMock = jest.fn();
+const submitAuthorQuestionVoteMock = jest.fn();
 
 jest.unstable_mockModule("../js/modules/comments.js", () => ({
   submitComment: submitCommentMock,
@@ -26,6 +28,11 @@ jest.unstable_mockModule("../js/modules/auth.js", () => ({
 
 jest.unstable_mockModule("../js/modules/supabase.js", () => ({
   getSupabaseClient: getSupabaseClientMock,
+}));
+
+jest.unstable_mockModule("../js/modules/author_question.js", () => ({
+  getAuthorQuestionByChapter: getAuthorQuestionByChapterMock,
+  submitAuthorQuestionVote: submitAuthorQuestionVoteMock,
 }));
 
 const { initBookReader } = await import("../js/modules/bookreader.js");
@@ -46,6 +53,8 @@ function buildBookReaderDom() {
           <button id="doublePageViewBtn" type="button">Double page</button>
           <button id="singlePageViewBtn" type="button">Single page</button>
         </div>
+
+        <p id="chapterLoadNotice" class="hidden"></p>
 
         <section class="reader-shell">
           <p id="readerError" class="hidden"></p>
@@ -99,7 +108,10 @@ function mockPdfJs() {
   existingScript._loadingPromise = Promise.resolve();
   document.head.appendChild(existingScript);
 
-  const render = jest.fn(() => ({ promise: Promise.resolve() }));
+  const render = jest.fn(() => ({
+    promise: Promise.resolve(),
+    cancel: jest.fn(),
+  }));
   const getPage = jest.fn(() =>
     Promise.resolve({
       getViewport: ({ scale = 1 } = {}) => ({
@@ -155,6 +167,11 @@ describe("bookreader module", () => {
     localStorage.clear();
     sessionStorage.clear();
     document.head.innerHTML = "";
+    window.requestAnimationFrame = (callback) => {
+      callback();
+      return 1;
+    };
+    window.cancelAnimationFrame = () => {};
 
     buildBookReaderDom();
     mockPdfJs();
@@ -334,6 +351,44 @@ describe("bookreader module", () => {
 
     getSubscriberStatusMock.mockResolvedValue({ isSubscriber: true });
     submitCommentMock.mockResolvedValue({ ok: true });
+    getAuthorQuestionByChapterMock.mockImplementation(async (chapterId) => {
+      if (Number(chapterId) === 11) {
+        return {
+          ok: true,
+          data: {
+            id: 101,
+            chapterId: 11,
+            title: "Author Question",
+            question: "What is motivating the lead character most in this chapter?",
+            options: [
+              "Protecting family at any cost",
+              "Seeking justice through the legal system",
+              "Escaping a painful past",
+            ],
+            selectedOption: null,
+            voteCounts: [0, 0, 0],
+          },
+        };
+      }
+
+      return { ok: true, data: null };
+    });
+    submitAuthorQuestionVoteMock.mockImplementation(async ({ questionId, selectedOptionIndex }) => ({
+      ok: true,
+      data: {
+        id: Number(questionId),
+        chapterId: 11,
+        title: "Author Question",
+        question: "What is motivating the lead character most in this chapter?",
+        options: [
+          "Protecting family at any cost",
+          "Seeking justice through the legal system",
+          "Escaping a painful past",
+        ],
+        selectedOption: selectedOptionIndex,
+        voteCounts: [selectedOptionIndex === 0 ? 1 : 0, selectedOptionIndex === 1 ? 1 : 0, selectedOptionIndex === 2 ? 1 : 0],
+      },
+    }));
     fetchBookReaderEntriesMock.mockResolvedValue({
       ok: true,
       data: [
@@ -412,7 +467,23 @@ describe("bookreader module", () => {
 
     expect(document.getElementById("newCommentArea").classList.contains("hidden")).toBe(true);
     expect(document.getElementById("subscriberNotice").classList.contains("hidden")).toBe(false);
-    expect(document.getElementById("submitPollVote").disabled).toBe(true);
+    expect(document.getElementById("submitPollVote").disabled).toBe(false);
+    expect(document.querySelector('input[name="bookPollOption"]')?.disabled).toBe(false);
+  });
+
+  test("submits an author question vote through the data module", async () => {
+    await initBookReader();
+    await flush();
+
+    const option = document.querySelector('input[name="bookPollOption"][value="1"]');
+    option.click();
+    document.getElementById("submitPollVote").click();
+    await flush();
+
+    expect(submitAuthorQuestionVoteMock).toHaveBeenCalledWith({
+      questionId: 101,
+      selectedOptionIndex: 1,
+    });
   });
 
   test("shows only free chapters in dropdown for free users", async () => {
@@ -456,6 +527,31 @@ describe("bookreader module", () => {
     const errorBox = document.getElementById("commentsError");
     expect(errorBox.classList.contains("hidden")).toBe(false);
     expect(errorBox.textContent).toContain("could not be loaded");
+  });
+
+  test("shows a fallback notice when chapter metadata fails to load", async () => {
+    fetchBookReaderEntriesMock.mockResolvedValue({ ok: false, data: [], message: "network error" });
+
+    await initBookReader();
+    await flush();
+
+    const notice = document.getElementById("chapterLoadNotice");
+    expect(notice.classList.contains("hidden")).toBe(false);
+    expect(notice.textContent).toContain("Chapter list could not be loaded");
+    expect(notice.textContent).toContain("fallback chapters");
+  });
+
+  test("shows comments unavailable when the chapter cannot be identified", async () => {
+    getSupabaseClientMock.mockReturnValue(null);
+    fetchBookReaderEntriesMock.mockResolvedValue({ ok: false, data: [], message: "network error" });
+
+    await initBookReader();
+    await flush();
+
+    const errorBox = document.getElementById("commentsError");
+    expect(errorBox.classList.contains("hidden")).toBe(false);
+    expect(errorBox.textContent).toContain("chapter could not be identified");
+    expect(document.getElementById("noComments").classList.contains("hidden")).toBe(true);
   });
 
   test("updates chapter comments when switching to a different book option", async () => {
@@ -502,6 +598,29 @@ describe("bookreader module", () => {
     expect(select.value).toBe(BOOK_ONE);
     expect(document.getElementById("commentsMeta").textContent).toBe("Chapter 1");
     expect(sessionStorage.getItem("activeChapter")).toBeNull();
+  });
+  
+  test("shows a fallback message when a chapter has no author question", async () => {
+    await initBookReader();
+    await flush();
+
+    const select = document.getElementById("bookSelect");
+    select.value = BOOK_TWO;
+    select.dispatchEvent(new Event("change"));
+    await flush();
+
+    expect(document.getElementById("pollTitle").textContent).toBe("Author Question");
+    expect(document.getElementById("pollQuestion").textContent).toBe(
+      "This chapter does not have an author question."
+    );
+    expect(document.getElementById("pollOptions").textContent).toContain(
+      "The author has not added a question for this chapter yet."
+    );
+    expect(document.getElementById("pollStatus").textContent).toBe(
+      "No voting is available for this chapter."
+    );
+    expect(document.getElementById("submitPollVote").disabled).toBe(true);
+    expect(document.getElementById("submitPollVote").classList.contains("hidden")).toBe(true);
   });
 
   test("switches between single and double page view", async () => {

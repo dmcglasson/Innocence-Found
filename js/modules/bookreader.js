@@ -1,6 +1,7 @@
 import { submitComment as submitCommentToDB, getCommentsByChapter } from "./comments.js";
 import { getSupabaseClient } from "./supabase.js";
 import { fetchBookReaderEntries } from "./chapters.js";
+import { getAuthorQuestionByChapter, submitAuthorQuestionVote } from "./author_question.js";
 import { getSubscriberStatus } from "./auth.js";
 // === PDF.js Book Viewer (SPA-friendly) ===
 const PDF_JS_SRC = "https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js";
@@ -70,23 +71,6 @@ function getCurrentChapterId() {
   return Number.isInteger(fallback) && fallback > 0 ? fallback : null;
 }
 
-function getCurrentPollKey() {
-  const meta = getCurrentSelectionMeta();
-  const chapterNum = Number(meta?.chapterNum);
-  const bookId = Number(meta?.bookId);
-  if (Number.isInteger(bookId) && bookId > 0 && Number.isInteger(chapterNum) && chapterNum > 0) {
-    return `book-${bookId}-chapter-${chapterNum}`;
-  }
-
-  if (Number.isInteger(bookId) && bookId > 0) {
-    return `book-${bookId}`;
-  }
-
-  if (currentUrl.includes("book1")) return "book-1";
-  if (currentUrl.includes("book2")) return "book-2";
-  return currentUrl;
-}
-
 let canvasLeft;
 let canvasRight;
 let ctxLeft;
@@ -110,6 +94,7 @@ let newCommentText;
 let submitComment;
 let subscriberNotice;
 let readerError;
+let chapterLoadNotice;
 let jumpToDiscussionBtn;
 let bookFrame;
 let commentsPanel;
@@ -119,37 +104,15 @@ let listenersAttached = false;
 let lastBoundCanvasLeft = null;
 let resizeListenerAttached = false;
 let touchStartX = null;
-const POLL_STORAGE_KEY = "bookreaderPollVotes.v1";
-const pollDataByBook = {
-  "book-1-chapter-1": {
-    title: "Chapter 1 Poll",
-    question: "What is motivating the lead character most in this chapter?",
-    options: [
-      "Protecting family at any cost",
-      "Seeking justice through the legal system",
-      "Escaping a painful past",
-    ],
-  },
-  "book-1": {
-    title: "Book 1 Poll",
-    question: "Which choice best describes what motivates the lead character right now?",
-    options: [
-      "Protecting family at any cost",
-      "Seeking justice through the legal system",
-      "Escaping a painful past",
-    ],
-  },
-  "book-2": {
-    title: "Book 2 Poll",
-    question: "What should the protagonist prioritize in the next chapter?",
-    options: [
-      "Reveal the hidden evidence immediately",
-      "Build trust with allies first",
-      "Confront the antagonist directly",
-    ],
-  },
-};
-let pollVoteState = loadPollVoteState();
+let pendingRenderFrame = null;
+let activeLeftRenderTask = null;
+let activeRightRenderTask = null;
+let renderCycleId = 0;
+const POLL_STORAGE_KEY = "bookreaderViewPollVotes.v1";
+let currentPollData = null;
+let pollLoadState = "idle";
+let pollLoadMessage = "";
+let pollRequestId = 0;
 
 // Demo store keyed by book URL (match the option values in book selector)
 const commentStore = {
@@ -283,19 +246,19 @@ function setPreferredViewMode(mode) {
   syncReaderLayoutMode();
 
   if (!pdfDoc) return;
-  if (previousMode !== isSinglePageMode) {
-    renderPages();
-    return;
-  }
-
-  // Re-render to apply canvas/page layout changes even if mode boolean is unchanged.
-  renderPages();
+  scheduleRenderPages(previousMode !== isSinglePageMode);
 }
 
 function setReaderErrorMessage(message = "") {
   if (!readerError) return;
   readerError.textContent = message;
   readerError.classList.toggle("hidden", !message);
+}
+
+function setChapterLoadNotice(message = "") {
+  if (!chapterLoadNotice) return;
+  chapterLoadNotice.textContent = message;
+  chapterLoadNotice.classList.toggle("hidden", !message);
 }
 
 function getPageTurnStep() {
@@ -353,6 +316,7 @@ function cacheDom() {
   pageInfo = document.getElementById("pageInfo");
   bookSelect = document.getElementById("bookSelect");
   readerError = document.getElementById("readerError");
+  chapterLoadNotice = document.getElementById("chapterLoadNotice");
   jumpToDiscussionBtn = document.getElementById("jumpToDiscussion");
   bookFrame = document.getElementById("bookFrame");
   doublePageViewBtn = document.getElementById("doublePageViewBtn");
@@ -464,6 +428,7 @@ async function loadBookOptionsFromBackend() {
   });
 
   if (!bookSelect.options.length) {
+    setChapterLoadNotice("No chapters are available right now.");
     return;
   }
 
@@ -503,7 +468,7 @@ function loadDocument(url) {
       currentUrl = url;
       syncCurrentSelectionMeta();
       syncReaderLayoutMode();
-      renderPages();
+      scheduleRenderPages(true);
     })
     .catch((err) => {
       console.error("Failed to load document", err);
@@ -512,8 +477,51 @@ function loadDocument(url) {
     });
 }
 
-function renderPage(pageNum, canvas, ctx) {
+function cancelRenderTask(task) {
+  if (!task || typeof task.cancel !== "function") return;
+  try {
+    task.cancel();
+  } catch {
+    // Ignore cancellation failures; a newer render will replace this frame.
+  }
+}
+
+function clearPendingRenderFrame() {
+  if (pendingRenderFrame == null) return;
+  cancelAnimationFrame(pendingRenderFrame);
+  pendingRenderFrame = null;
+}
+
+function cancelActiveRenderTasks() {
+  cancelRenderTask(activeLeftRenderTask);
+  cancelRenderTask(activeRightRenderTask);
+  activeLeftRenderTask = null;
+  activeRightRenderTask = null;
+}
+
+function scheduleRenderPages(waitForLayout = false) {
+  clearPendingRenderFrame();
+  const framesToWait = waitForLayout ? 2 : 1;
+
+  const run = (framesRemaining) => {
+    pendingRenderFrame = requestAnimationFrame(() => {
+      if (framesRemaining > 1) {
+        run(framesRemaining - 1);
+        return;
+      }
+
+      pendingRenderFrame = null;
+      renderPages();
+    });
+  };
+
+  run(framesToWait);
+}
+
+function renderPage(pageNum, canvas, ctx, cycleId) {
   return pdfDoc.getPage(pageNum).then((page) => {
+    if (cycleId !== renderCycleId) return;
+
     const baseViewport = page.getViewport({ scale: 1 });
     let scale = 1.5;
     let renderTransform = null;
@@ -527,8 +535,10 @@ function renderPage(pageNum, canvas, ctx) {
       const paddingY = computed
         ? (Number.parseFloat(computed.paddingTop) || 0) + (Number.parseFloat(computed.paddingBottom) || 0)
         : 0;
-      const rawWidth = container?.clientWidth || canvas.clientWidth || baseViewport.width;
-      const rawHeight = container?.clientHeight || canvas.clientHeight || baseViewport.height;
+      const containerRect = container?.getBoundingClientRect?.();
+      const rawWidth = containerRect?.width || container?.clientWidth || canvas.clientWidth || baseViewport.width;
+      const rawHeight =
+        containerRect?.height || container?.clientHeight || canvas.clientHeight || baseViewport.height;
       const availableWidth = Math.max(1, rawWidth - paddingX);
       const availableHeight = Math.max(1, rawHeight - paddingY);
       const widthScale = availableWidth / baseViewport.width;
@@ -564,22 +574,47 @@ function renderPage(pageNum, canvas, ctx) {
       viewport: viewport,
       transform: renderTransform,
     };
-    return page.render(renderContext).promise;
+
+    const renderTask = page.render(renderContext);
+    if (canvas === canvasLeft) {
+      activeLeftRenderTask = renderTask;
+    } else if (canvas === canvasRight) {
+      activeRightRenderTask = renderTask;
+    }
+
+    return renderTask.promise
+      .catch((error) => {
+        if (error?.name === "RenderingCancelledException") {
+          return;
+        }
+        throw error;
+      })
+      .finally(() => {
+        if (canvas === canvasLeft && activeLeftRenderTask === renderTask) {
+          activeLeftRenderTask = null;
+        } else if (canvas === canvasRight && activeRightRenderTask === renderTask) {
+          activeRightRenderTask = null;
+        }
+      });
   });
 }
 
 function renderPages() {
   if (!pdfDoc) return;
+  clearPendingRenderFrame();
+  cancelActiveRenderTasks();
+  renderCycleId += 1;
+  const cycleId = renderCycleId;
   normalizeCurrentPageForLayout();
 
   canvasLeft.style.opacity = "0";
   canvasRight.style.opacity = "0";
 
-  const tasks = [renderPage(currentPage, canvasLeft, ctxLeft)];
+  const tasks = [renderPage(currentPage, canvasLeft, ctxLeft, cycleId)];
 
   let rightRender = Promise.resolve();
   if (!isSinglePageMode && currentPage + 1 <= pdfDoc.numPages) {
-    rightRender = renderPage(currentPage + 1, canvasRight, ctxRight);
+    rightRender = renderPage(currentPage + 1, canvasRight, ctxRight, cycleId);
     pageInfo.textContent = `Page ${currentPage}-${currentPage + 1}`;
   } else if (isSinglePageMode) {
     ctxRight.clearRect(0, 0, canvasRight.width, canvasRight.height);
@@ -592,12 +627,15 @@ function renderPages() {
   tasks.push(rightRender);
 
   Promise.all(tasks).then(() => {
+    if (cycleId !== renderCycleId) return;
     requestAnimationFrame(() => {
+      if (cycleId !== renderCycleId) return;
       canvasLeft.style.opacity = "1";
       canvasRight.style.opacity = isSinglePageMode ? "0" : "1";
     });
     renderComments();
   }).catch((error) => {
+    if (error?.name === "RenderingCancelledException") return;
     console.error("Failed to render pages:", error);
     setReaderErrorMessage("Chapter render failed. Please refresh and try again.");
   });
@@ -614,6 +652,10 @@ function setCommentHeader() {
   commentsMeta.textContent = Number.isInteger(chapterNum) ? `Chapter ${chapterNum}` : "All pages";
 }
 
+function getPollData() {
+  return currentPollData;
+}
+
 function loadPollVoteState() {
   try {
     const raw = localStorage.getItem(POLL_STORAGE_KEY);
@@ -625,52 +667,89 @@ function loadPollVoteState() {
   }
 }
 
-function savePollVoteState() {
+function savePollVoteState(state) {
   try {
-    localStorage.setItem(POLL_STORAGE_KEY, JSON.stringify(pollVoteState));
+    localStorage.setItem(POLL_STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
     console.warn("Unable to save poll votes:", error);
   }
 }
 
-function getPollData() {
-  const pollKey = getCurrentPollKey();
-  const chapterPoll = pollDataByBook[pollKey];
-  if (chapterPoll) return chapterPoll;
-
-  const chapterMatch = /^book-(\d+)-chapter-\d+$/.exec(pollKey);
-  if (chapterMatch) {
-    return pollDataByBook[`book-${chapterMatch[1]}`] || null;
-  }
-
-  return pollDataByBook[pollKey] || null;
+function getPollStateKeyForQuestion(questionId) {
+  const safeQuestionId = Number(questionId);
+  const scope = currentUserId ? `user-${currentUserId}` : "guest";
+  return Number.isInteger(safeQuestionId) && safeQuestionId > 0
+    ? `author-question-${safeQuestionId}-${scope}`
+    : `${currentUrl}-${scope}`;
 }
 
-function ensurePollBookState(bookUrl, optionCount) {
-  const existing = pollVoteState[bookUrl];
-  const safeOptionCount = Math.max(0, Number(optionCount) || 0);
+function getSavedPollSelection(questionId, optionCount) {
+  const state = loadPollVoteState();
+  const key = getPollStateKeyForQuestion(questionId);
+  const selected = Number(state[key]);
+  return Number.isInteger(selected) && selected >= 0 && selected < optionCount ? selected : null;
+}
 
-  if (!existing || !Array.isArray(existing.counts)) {
-    const next = { counts: Array(safeOptionCount).fill(0), selected: null };
-    pollVoteState[bookUrl] = next;
-    return next;
+function savePollSelection(questionId, selectedIndex) {
+  const state = loadPollVoteState();
+  const key = getPollStateKeyForQuestion(questionId);
+  if (!Number.isInteger(selectedIndex) || selectedIndex < 0) {
+    delete state[key];
+  } else {
+    state[key] = selectedIndex;
+  }
+  savePollVoteState(state);
+}
+
+async function loadPoll() {
+  pollRequestId += 1;
+  const requestId = pollRequestId;
+  const chapterId = getCurrentChapterId();
+
+  if (!Number.isInteger(chapterId) || chapterId <= 0) {
+    currentPollData = null;
+    pollLoadState = "empty";
+    pollLoadMessage = "";
+    renderPoll();
+    return;
   }
 
-  const nextCounts = Array(safeOptionCount).fill(0);
-  for (let i = 0; i < safeOptionCount; i += 1) {
-    const value = Number(existing.counts[i]) || 0;
-    nextCounts[i] = value > 0 ? Math.floor(value) : 0;
+  pollLoadState = "loading";
+  pollLoadMessage = "";
+  currentPollData = null;
+  renderPoll();
+
+  const result = await getAuthorQuestionByChapter(chapterId);
+  if (requestId !== pollRequestId) return;
+
+  if (!result.ok) {
+    currentPollData = null;
+    pollLoadState = "error";
+    pollLoadMessage = result.message || "Author question could not be loaded right now.";
+    renderPoll();
+    return;
   }
 
-  const selected = Number.isInteger(existing.selected) &&
-    existing.selected >= 0 &&
-    existing.selected < safeOptionCount
-    ? existing.selected
-    : null;
+  if (result.data) {
+    const savedSelection = getSavedPollSelection(result.data.id, result.data.options.length);
+    currentPollData = {
+      ...result.data,
+      selectedOption: savedSelection,
+    };
+  } else {
+    currentPollData = null;
+  }
+  pollLoadState = result.data ? "ready" : "empty";
+  pollLoadMessage = "";
+  renderPoll();
+}
 
-  const normalized = { counts: nextCounts, selected };
-  pollVoteState[bookUrl] = normalized;
-  return normalized;
+function getPollVoteCounts(poll) {
+  const optionCount = Array.isArray(poll?.options) ? poll.options.length : 0;
+  return Array.from({ length: optionCount }, (_, index) => {
+    const raw = Array.isArray(poll?.voteCounts) ? poll.voteCounts[index] : 0;
+    return Math.max(0, Number(raw) || 0);
+  });
 }
 
 function getCheckedPollIndex() {
@@ -687,27 +766,52 @@ function renderPoll() {
     return;
   }
 
-  const pollKey = getCurrentPollKey();
   const poll = getPollData();
-  if (!poll) {
+  if (pollLoadState === "loading") {
     pollTitleEl.textContent = "Author Question";
-    pollQuestionEl.textContent = "No question posted for this chapter yet.";
-    pollOptionsEl.innerHTML = "";
-    pollStatusEl.textContent = "Check back soon for a chapter question.";
+    pollQuestionEl.textContent = "Loading author question...";
+    pollOptionsEl.innerHTML = '<div class="poll-empty-state">Checking whether this chapter has an author question.</div>';
+    pollStatusEl.textContent = "Loading...";
+    submitPollVoteBtn.classList.add("hidden");
     submitPollVoteBtn.disabled = true;
     return;
   }
 
+  if (pollLoadState === "error") {
+    pollTitleEl.textContent = "Author Question";
+    pollQuestionEl.textContent = "The author question could not be loaded.";
+    pollOptionsEl.innerHTML = '<div class="poll-empty-state">Please try again later or switch chapters and come back.</div>';
+    pollStatusEl.textContent = pollLoadMessage || "Author question unavailable.";
+    submitPollVoteBtn.classList.add("hidden");
+    submitPollVoteBtn.disabled = true;
+    return;
+  }
+
+  if (!poll) {
+    pollTitleEl.textContent = "Author Question";
+    pollQuestionEl.textContent = "This chapter does not have an author question.";
+    pollOptionsEl.innerHTML = '<div class="poll-empty-state">The author has not added a question for this chapter yet.</div>';
+    pollStatusEl.textContent = "No voting is available for this chapter.";
+    submitPollVoteBtn.classList.add("hidden");
+    submitPollVoteBtn.disabled = true;
+    return;
+  }
+
+  submitPollVoteBtn.classList.remove("hidden");
   submitPollVoteBtn.disabled = false;
-  pollTitleEl.textContent = poll.title;
+  pollTitleEl.textContent = poll.title || "Author Question";
   pollQuestionEl.textContent = poll.question;
 
-  const bookState = ensurePollBookState(pollKey, poll.options.length);
-  const totalVotes = bookState.counts.reduce((sum, count) => sum + count, 0);
+  const voteCounts = getPollVoteCounts(poll);
+  const totalVotes = voteCounts.reduce((sum, count) => sum + count, 0);
+  const selectedOption =
+    Number.isInteger(poll.selectedOption) && poll.selectedOption >= 0 && poll.selectedOption < poll.options.length
+      ? poll.selectedOption
+      : null;
 
   pollOptionsEl.innerHTML = "";
   poll.options.forEach((optionText, index) => {
-    const count = bookState.counts[index] || 0;
+    const count = voteCounts[index] || 0;
     const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
 
     const label = document.createElement("label");
@@ -717,8 +821,7 @@ function renderPoll() {
     input.type = "radio";
     input.name = "bookPollOption";
     input.value = String(index);
-    input.checked = bookState.selected === index;
-    input.disabled = !subscriber;
+    input.checked = selectedOption === index;
     label.appendChild(input);
 
     const copy = document.createElement("span");
@@ -739,27 +842,31 @@ function renderPoll() {
   });
 
   if (!subscriber) {
-    submitPollVoteBtn.disabled = true;
-    pollStatusEl.textContent = `Total votes: ${totalVotes} | Subscribers can vote on this question.`;
+    submitPollVoteBtn.disabled = false;
+    pollStatusEl.textContent = `Total votes: ${totalVotes} | Select an answer, then subscribe to submit your vote.`;
     return;
   }
 
   submitPollVoteBtn.disabled = false;
-  if (bookState.selected === null) {
+  if (selectedOption === null) {
     pollStatusEl.textContent = `Total votes: ${totalVotes}`;
     return;
   }
 
-  pollStatusEl.textContent = `Your vote: ${poll.options[bookState.selected]} | Total votes: ${totalVotes}`;
+  pollStatusEl.textContent = `Your vote: ${poll.options[selectedOption]} | Total votes: ${totalVotes}`;
 }
 
-function handlePollSubmit() {
-  const pollKey = getCurrentPollKey();
+async function handlePollSubmit() {
   const poll = getPollData();
   if (!poll || !pollStatusEl) return;
 
+  if (!currentUserId) {
+    pollStatusEl.textContent = "Please log in to submit a vote.";
+    return;
+  }
+
   if (!subscriber) {
-    pollStatusEl.textContent = "Subscribers only: upgrade to vote on this question.";
+    pollStatusEl.textContent = "Subscribers only: your selection is visible, but you need a subscription to submit a vote.";
     return;
   }
 
@@ -769,53 +876,33 @@ function handlePollSubmit() {
     return;
   }
 
-  const bookState = ensurePollBookState(pollKey, poll.options.length);
-  if (Number.isInteger(bookState.selected) && bookState.selected >= 0 && bookState.selected < bookState.counts.length) {
-    if (bookState.counts[bookState.selected] > 0) {
-      bookState.counts[bookState.selected] -= 1;
-    }
+  const questionId = Number(poll.id);
+  if (!Number.isInteger(questionId) || questionId <= 0) {
+    pollStatusEl.textContent = "This author question is missing a database id.";
+    return;
   }
 
-  bookState.selected = selectedIndex;
-  bookState.counts[selectedIndex] += 1;
-  savePollVoteState();
+  const previousSelectedIndex = getSavedPollSelection(questionId, poll.options.length);
+  submitPollVoteBtn.disabled = true;
+  pollStatusEl.textContent = "Submitting your vote...";
+
+  const result = await submitAuthorQuestionVote({
+    questionId,
+    selectedOptionIndex: selectedIndex,
+    previousSelectedIndex,
+  });
+
+  if (!result.ok) {
+    submitPollVoteBtn.disabled = false;
+    pollStatusEl.textContent = result.message || "Vote submission failed.";
+    return;
+  }
+
+  savePollSelection(questionId, selectedIndex);
+  currentPollData = result.data;
   renderPoll();
 }
 
-async function ensureChapterRow(bookId, chapterNum = 1) {
-  const supabase = getSupabaseClient();
-  if (!supabase) return null;
-
-  // Try to find existing chapter row
-  let { data, error } = await supabase
-    .from("Chapters")
-    .select("id")
-    .eq("book_id", bookId)
-    .eq("chapter_num", chapterNum)
-    .maybeSingle();
-
-  if (error) {
-    console.error("ensureChapterRow select error:", error);
-    return null;
-  }
-
-  // If missing, create it
-  if (!data) {
-    const insertRes = await supabase
-      .from("Chapters")
-      .insert({ book_id: bookId, chapter_num: chapterNum, free: true })
-      .select("id")
-      .single();
-
-    if (insertRes.error) {
-      console.error("ensureChapterRow insert error:", insertRes.error);
-      return null;
-    }
-    data = insertRes.data;
-  }
-
-  return data.id;
-}
 async function renderComments() {
   if (!commentsList || !noComments) return;
 
@@ -828,7 +915,11 @@ async function renderComments() {
   if (!chapterId) {
     commentsList.classList.remove("is-loading");
     commentsList.innerHTML = "";
-    noComments.classList.remove("hidden");
+    noComments.classList.add("hidden");
+    if (commentsError) {
+      commentsError.textContent = "Comments are unavailable because this chapter could not be identified.";
+      commentsError.classList.remove("hidden");
+    }
     return;
   }
 
@@ -1008,7 +1099,7 @@ function attachEventHandlers() {
     }
     currentUrl = val;
     syncCurrentSelectionMeta();
-    renderPoll();
+    loadPoll();
     renderComments();
     loadDocument(val);
   });
@@ -1072,8 +1163,8 @@ submitComment?.addEventListener("click", async () => {
     window.addEventListener("resize", () => {
       const previousMode = isSinglePageMode;
       syncReaderLayoutMode();
-      if (pdfDoc && previousMode !== isSinglePageMode) {
-        renderPages();
+      if (pdfDoc && (previousMode !== isSinglePageMode || isSinglePageMode)) {
+        scheduleRenderPages(previousMode !== isSinglePageMode);
       }
     });
     resizeListenerAttached = true;
@@ -1092,7 +1183,10 @@ export async function initBookReader() {
   syncCurrentSelectionMeta();
 
   if (!getCurrentChapterId()) {
-    currentChapterRowId = await ensureChapterRow(currentBookId, currentChapterNum);
+    currentChapterRowId = null;
+    if (!chapterLoadNotice?.textContent) {
+      setChapterLoadNotice("Chapter metadata is unavailable for the current selection.");
+    }
   }
 
   if (!listenersAttached) {
@@ -1100,7 +1194,7 @@ export async function initBookReader() {
     listenersAttached = true;
   }
 
-  renderPoll();
+  await loadPoll();
   updateCommentUIAccess();
   await renderComments();     // optional but cleaner
 
