@@ -118,6 +118,18 @@ async function init() {
   });
 }
 
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.admin-menu-btn');
+  if (!btn) return;
+
+  document.querySelectorAll('.admin-menu-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const page = btn.getAttribute('data-page');
+  if (!page) return;
+
+  window.location.hash = page;
+});
 /**
  * Set up all event listeners
  */
