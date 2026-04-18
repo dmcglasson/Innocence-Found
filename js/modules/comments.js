@@ -26,12 +26,24 @@ export async function getCommentsByChapter(chapterId) {
   const supabase = getSupabaseClient();
   if (!supabase) return { ok: false, data: [], message: "Supabase not initialized" };
 
-  const { data, error } = await supabase
+  const { data: comments, error } = await supabase
     .from("Comments")
     .select("id, message, created_at, uid, chapter_id, comment_id")
     .eq("chapter_id", Number(chapterId))
     .order("created_at", { ascending: false });
 
   if (error) return { ok: false, data: [], message: error.message };
+  if (!comments?.length) return { ok: true, data: [] };
+
+  const uids = [...new Set(comments.map((c) => c.uid).filter(Boolean))];
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("user_id, username")
+    .in("user_id", uids);
+
+  const profileMap = {};
+  (profiles || []).forEach((p) => { profileMap[p.user_id] = p.username || null; });
+
+  const data = comments.map((c) => ({ ...c, username: profileMap[c.uid] || null }));
   return { ok: true, data };
 }

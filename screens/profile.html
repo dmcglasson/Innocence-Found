@@ -83,6 +83,10 @@
                 <div class="field-label">Name</div>
                 <div class="field-value" id="viewName2">—</div>
               </div>
+              <div class="field-row">
+              <div class="field-label">Username</div>
+              <div class="field-value" id="viewUsername">—</div>
+            </div>
 
               <div class="field-row">
                 <div class="field-label">Email</div>
@@ -108,6 +112,12 @@
               <label class="field-label" for="nameInput">Name</label>
               <input class="input" id="nameInput" name="name" type="text" />
               <div class="error-text" id="nameError" style="display:none;">Name is required.</div>
+            </div>
+            <div class="form-row">
+              <label class="field-label" for="usernameInput">Username</label>
+              <input class="input" id="usernameInput" name="username" type="text" placeholder="Display name shown on comments" />
+              <div class="hint">This is what other readers see on your comments.</div>
+              <div class="error-text" id="usernameError" style="display:none;">Username must be 30 characters or fewer.</div>
             </div>
 
             <div class="form-row">

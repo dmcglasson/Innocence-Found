@@ -2011,7 +2011,7 @@ footer p {
 }
 
 .admin-controls {
-  margin-bottom: 8px;
+  margin-bottom: 18px;
 }
 
 .admin-controls__label {
@@ -2025,12 +2025,12 @@ footer p {
 .admin-select-wrap {
   position: relative;
   width: 100%;
-  max-width: 320px;
+  max-width: 560px;
 }
 
 .admin-select {
   width: 100%;
-  max-width: 240px;
+  max-width: 560px;
 
   appearance: none;
   -webkit-appearance: none;
@@ -2061,6 +2061,20 @@ footer p {
   outline: none;
   border-color: #9a5a16;
   box-shadow: 0 0 0 3px rgba(213, 140, 59, 0.2);
+}
+
+.admin-file-input {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 18px;
+  border: 2px dashed #d07a2b;
+  border-radius: 16px;
+  background: linear-gradient(to bottom, #fffaf2, #f7efe2);
+  color: #4B2E05;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px;
+  cursor: pointer;
 }
 
 .admin-select-wrap::after {

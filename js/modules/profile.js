@@ -71,6 +71,7 @@ function clearStatus() {
 function clearErrors() {
   setDisplay("nameError", "none");
   setDisplay("emailError", "none");
+  setDisplay("usernameError", "none");
 }
 
 function isValidEmail(email) {
@@ -105,16 +106,19 @@ function setActiveTab(tabId) {
 }
 
 async function populateProfile() {
+  const supabase = getSupabaseClient();
   const session = await getCurrentSession();
   const user = session?.user;
 
   if (!user) {
     setText("viewName", "Not signed in");
     setText("viewName2", "Not signed in");
+    setText("viewUsername", "—");
     setText("viewEmail", "-");
     setText("viewSubscription", "Subscription: -");
     setText("viewEnrolled", "-");
     setInputValue("nameInput", "");
+    setInputValue("usernameInput", "");
     setInputValue("emailInput", "");
     return;
   }
@@ -126,9 +130,20 @@ async function populateProfile() {
   setText("viewEmail", user.email || "-");
   setText("viewSubscription", `Subscription: ${toSubscriberLabel(user)}`);
   setText("viewEnrolled", formatDate(user.created_at));
-
   setInputValue("nameInput", displayName === "-" ? "" : displayName);
   setInputValue("emailInput", user.email || "");
+
+  if (supabase) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const username = profile?.username || "";
+    setText("viewUsername", username || "—");
+    setInputValue("usernameInput", username);
+  }
 }
 
 async function handleProfileSave(event) {
@@ -147,17 +162,24 @@ async function handleProfileSave(event) {
 
   const nameInput = document.getElementById("nameInput");
   const emailInput = document.getElementById("emailInput");
+  const usernameInput = document.getElementById("usernameInput");
   const toggleEmailEdit = document.getElementById("toggleEmailEdit");
   const saveBtn = document.getElementById("saveProfileBtn");
 
   const name = (nameInput?.value || "").trim();
   const email = (emailInput?.value || "").trim();
+  const username = (usernameInput?.value || "").trim();
   const shouldUpdateEmail = !!toggleEmailEdit?.checked;
 
   let hasError = false;
 
   if (!name) {
     setDisplay("nameError", "block");
+    hasError = true;
+  }
+
+  if (username.length > 30) {
+    setDisplay("usernameError", "block");
     hasError = true;
   }
 
@@ -174,20 +196,16 @@ async function handleProfileSave(event) {
   }
 
   try {
-    const payload = {
-      data: {
-        name,
-        full_name: name,
-      },
-    };
+    const payload = { data: { name, full_name: name } };
+    if (shouldUpdateEmail) payload.email = email;
 
-    if (shouldUpdateEmail) {
-      payload.email = email;
-    }
+    const { error: authError } = await supabase.auth.updateUser(payload);
+    if (authError) throw authError;
 
-    const { error } = await supabase.auth.updateUser(payload);
-
-    if (error) throw error;
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .upsert({ user_id: user.id, username: username || null }, { onConflict: "user_id" });
+    if (profileError) throw profileError;
 
     await populateProfile();
     setViewMode(false);
