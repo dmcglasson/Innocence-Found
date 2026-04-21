@@ -226,6 +226,10 @@ function syncReaderLayoutMode() {
   const nextMode = shouldUseSinglePageMode();
   isSinglePageMode = nextMode;
   bookFrame?.classList.toggle("single-page-mode", isSinglePageMode);
+  if (isSinglePageMode && bookFrame) {
+    bookFrame.style.width = "";
+    bookFrame.style.height = "";
+  }
   normalizeCurrentPageForLayout();
   updateViewModeControls();
 }
