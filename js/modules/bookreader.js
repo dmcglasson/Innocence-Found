@@ -23,6 +23,7 @@ const chapterMetaByUrl = new Map();
 let isSinglePageMode = false;
 let preferredViewMode = loadPreferredViewMode();
 let cachedComments = null;
+let userZoom = 1.0;
 
 async function refreshAuthState() {
   const supabase = getSupabaseClient();
@@ -527,7 +528,7 @@ function renderPage(pageNum, canvas, ctx, cycleId) {
     if (cycleId !== renderCycleId) return;
 
     const baseViewport = page.getViewport({ scale: 1 });
-    let scale = 1.5;
+    let scale = 1.5 * userZoom;
     let renderTransform = null;
 
     if (isSinglePageMode) {
@@ -549,7 +550,7 @@ function renderPage(pageNum, canvas, ctx, cycleId) {
       const heightScale = availableHeight / baseViewport.height;
       const fitScale = Math.min(widthScale, heightScale);
       if (Number.isFinite(fitScale) && fitScale > 0) {
-        scale = fitScale;
+        scale = fitScale * userZoom;
       }
     }
 
@@ -563,13 +564,18 @@ function renderPage(pageNum, canvas, ctx, cycleId) {
       canvas.style.width = `${Math.floor(viewport.width)}px`;
       canvas.style.height = `${Math.floor(viewport.height)}px`;
       renderTransform = outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0];
-    } else {
-      canvas.height = Math.floor(viewport.height);
-      canvas.width = Math.floor(viewport.width);
-      canvas.style.width = "";
-      canvas.style.height = "";
-    }
+      canvas.style.maxWidth = "";
+      } else {
+        const deviceScale = window.devicePixelRatio || 1;
+        const outputScale = Math.min(3, Math.max(1, deviceScale * 1.35));
 
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = "";
+        canvas.style.height = "";
+        canvas.style.maxWidth = "100%";
+        renderTransform = outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0];
+      }
     // Ensure previous transforms do not bleed into next render pass.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -1226,6 +1232,37 @@ function toTime(dateString) {
 function attachEventHandlers() {
   document.getElementById("nextPage")?.addEventListener("click", goToNextPage);
   document.getElementById("prevPage")?.addEventListener("click", goToPreviousPage);
+
+  const zoomSlider = document.getElementById("zoomSlider");
+document.getElementById("zoomIn")?.addEventListener("click", () => {
+  userZoom = Math.min(3, userZoom + 0.25);
+  zoomSlider.value = userZoom;
+  renderPages();
+  if (!isSinglePageMode) {
+    const bookFrame = document.getElementById("bookFrame");
+    bookFrame.style.width = `${800 * userZoom}px`;
+    bookFrame.style.height = `${500 * userZoom}px`;
+  }
+});
+document.getElementById("zoomOut")?.addEventListener("click", () => {
+  userZoom = Math.max(0.5, userZoom - 0.25);
+  zoomSlider.value = userZoom;
+  renderPages();
+  if (!isSinglePageMode) {
+    const bookFrame = document.getElementById("bookFrame");
+    bookFrame.style.width = `${800 * userZoom}px`;
+    bookFrame.style.height = `${500 * userZoom}px`;
+  }
+});
+zoomSlider?.addEventListener("input", () => {
+  userZoom = parseFloat(zoomSlider.value);
+  renderPages();
+  if (!isSinglePageMode) {
+    const bookFrame = document.getElementById("bookFrame");
+    bookFrame.style.width = `${800 * userZoom}px`;
+    bookFrame.style.height = `${500 * userZoom}px`;
+  }
+});
 
   canvasRight?.addEventListener("click", () => {
     if (!isSinglePageMode) {

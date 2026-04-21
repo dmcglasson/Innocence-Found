@@ -13,6 +13,13 @@
       <button id="singlePageViewBtn" type="button" class="reader-view-btn">Single page</button>
     </div>
 
+    <div class="reader-zoom-controls" role="group" aria-label="Text size">
+      <span class="reader-view-label">Text size:</span>
+      <button id="zoomOut" type="button" class="reader-view-btn" aria-label="Decrease text size">A−</button>
+      <input type="range" id="zoomSlider" min="0.5" max="3" step="0.25" value="1" aria-label="Text size">
+      <button id="zoomIn" type="button" class="reader-view-btn" aria-label="Increase text size">A+</button>
+    </div>
+
     <p id="chapterLoadNotice" class="reader-error hidden" role="status"></p>
 
     <section class="reader-shell" aria-label="Book reader">
