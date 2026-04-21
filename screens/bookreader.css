@@ -1013,3 +1013,25 @@ canvas {
 .continued-thread .comment-card {
   background: #f5e8d8;
 }
+.single-page-text-container {
+  display: none;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 2rem;
+  font-family: Georgia, serif;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #2d1a0b;
+  background: #fffaf3;
+  box-sizing: border-box;
+}
+
+.book.single-page-mode .single-page-text-container {
+  display: block;
+}
+
+.single-page-text-container p {
+  margin: 0 0 0.75em 0;
+  text-indent: 0;
+}

@@ -24,6 +24,8 @@ let isSinglePageMode = false;
 let preferredViewMode = loadPreferredViewMode();
 let cachedComments = null;
 let userZoom = 1.0;
+let singlePageTextEl = null;
+let zoomControls = null;
 
 async function refreshAuthState() {
   const supabase = getSupabaseClient();
@@ -232,6 +234,7 @@ function syncReaderLayoutMode() {
   }
   normalizeCurrentPageForLayout();
   updateViewModeControls();
+  if (zoomControls) zoomControls.style.display = isSinglePageMode ? "none" : "";
 }
 
 function updateViewModeControls() {
@@ -325,6 +328,8 @@ function cacheDom() {
   chapterLoadNotice = document.getElementById("chapterLoadNotice");
   jumpToDiscussionBtn = document.getElementById("jumpToDiscussion");
   bookFrame = document.getElementById("bookFrame");
+  singlePageTextEl = document.getElementById("singlePageText");
+  zoomControls = document.querySelector(".reader-zoom-controls");
   doublePageViewBtn = document.getElementById("doublePageViewBtn");
   singlePageViewBtn = document.getElementById("singlePageViewBtn");
   ensurePollMarkupExists();
@@ -612,6 +617,72 @@ function renderPage(pageNum, canvas, ctx, cycleId) {
       });
   });
 }
+async function renderSinglePageText(pageNum) {
+  if (!pdfDoc || !singlePageTextEl) return;
+  singlePageTextEl.innerHTML = "<p>Loading...</p>";
+
+  try {
+    const page = await pdfDoc.getPage(pageNum);
+    const content = await page.getTextContent();
+    const items = content.items.filter(item => item.str.trim());
+
+    if (!items.length) {
+      singlePageTextEl.innerHTML = "<p>No text found on this page.</p>";
+      return;
+    }
+
+    // Group items into lines by Y coordinate
+    const lineMap = new Map();
+    for (const item of items) {
+      const y = Math.round(item.transform[5]);
+      if (!lineMap.has(y)) lineMap.set(y, []);
+      lineMap.get(y).push(item);
+    }
+
+    // Sort lines top to bottom (PDF Y increases upward, so sort descending)
+    const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
+    const lines = sortedYs.map(y => ({
+      y,
+      text: lineMap.get(y)
+        .sort((a, b) => a.transform[4] - b.transform[4])
+        .map(i => i.str)
+        .join("")
+    }));
+
+    // Calculate average line spacing
+    const spacings = [];
+    for (let i = 1; i < lines.length; i++) {
+      spacings.push(Math.abs(lines[i - 1].y - lines[i].y));
+    }
+    const avgSpacing = spacings.length
+      ? spacings.reduce((a, b) => a + b, 0) / spacings.length
+      : 12;
+
+    // Group lines into paragraphs based on gaps larger than 1.5x average spacing
+    const paragraphs = [];
+    let currentPara = [lines[0].text];
+    for (let i = 1; i < lines.length; i++) {
+      const gap = Math.abs(lines[i - 1].y - lines[i].y);
+      if (gap > avgSpacing * 1.5) {
+        paragraphs.push(currentPara.join(" "));
+        currentPara = [lines[i].text];
+      } else {
+        currentPara.push(lines[i].text);
+      }
+    }
+    if (currentPara.length) paragraphs.push(currentPara.join(" "));
+
+    const html = paragraphs
+      .filter(p => p.trim())
+      .map(p => `<p>${p.trim()}</p>`)
+      .join("");
+
+    singlePageTextEl.innerHTML = html || "<p>No text found on this page.</p>";
+  } catch (err) {
+    singlePageTextEl.innerHTML = "<p>Failed to load page text.</p>";
+    console.error("renderSinglePageText error:", err);
+  }
+}
 
 function renderPages() {
   if (!pdfDoc) return;
@@ -621,18 +692,27 @@ function renderPages() {
   const cycleId = renderCycleId;
   normalizeCurrentPageForLayout();
 
+  if (isSinglePageMode) {
+    canvasLeft.style.display = "none";
+    canvasRight.style.opacity = "0";
+    ctxRight.clearRect(0, 0, canvasRight.width, canvasRight.height);
+    pageInfo.textContent = `Page ${currentPage} of ${pdfDoc.numPages}`;
+    renderSinglePageText(currentPage);
+    return;
+  }
+
+  canvasLeft.style.display = "";
+  singlePageTextEl.innerHTML = "";
+
   canvasLeft.style.opacity = "0";
   canvasRight.style.opacity = "0";
 
   const tasks = [renderPage(currentPage, canvasLeft, ctxLeft, cycleId)];
 
   let rightRender = Promise.resolve();
-  if (!isSinglePageMode && currentPage + 1 <= pdfDoc.numPages) {
+  if (currentPage + 1 <= pdfDoc.numPages) {
     rightRender = renderPage(currentPage + 1, canvasRight, ctxRight, cycleId);
     pageInfo.textContent = `Page ${currentPage}-${currentPage + 1}`;
-  } else if (isSinglePageMode) {
-    ctxRight.clearRect(0, 0, canvasRight.width, canvasRight.height);
-    pageInfo.textContent = `Page ${currentPage} of ${pdfDoc.numPages}`;
   } else {
     ctxRight.clearRect(0, 0, canvasRight.width, canvasRight.height);
     pageInfo.textContent = `Page ${currentPage}`;
@@ -645,7 +725,7 @@ function renderPages() {
     requestAnimationFrame(() => {
       if (cycleId !== renderCycleId) return;
       canvasLeft.style.opacity = "1";
-      canvasRight.style.opacity = isSinglePageMode ? "0" : "1";
+      canvasRight.style.opacity = "1";
     });
     renderComments();
   }).catch((error) => {
@@ -1395,7 +1475,7 @@ submitComment?.addEventListener("click", async () => {
     window.addEventListener("resize", () => {
       const previousMode = isSinglePageMode;
       syncReaderLayoutMode();
-      if (pdfDoc && (previousMode !== isSinglePageMode || isSinglePageMode)) {
+      if (pdfDoc && previousMode !== isSinglePageMode) {
         scheduleRenderPages(previousMode !== isSinglePageMode);
       }
     });
