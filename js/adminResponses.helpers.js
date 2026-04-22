@@ -19,10 +19,12 @@ export function renderResponsesTable(data, container) {
         <td>${item.uid || item.user_id || ''}</td>
         <td>${item.message || item.content || ''}</td>
         <td>${createdAt}</td>
-        <td>
-          <button type="button" class="action-btn edit-response-btn" data-id="${item.id}">Edit</button>
-          <button type="button" class="action-btn delete-response-btn" data-id="${item.id}">Delete</button>
-        </td>
+       <td>
+          <div class="action-btn-group">
+            <button type="button" class="action-btn edit-response-btn" data-id="${item.id}">Edit</button>
+            <button type="button" class="action-btn delete-response-btn" data-id="${item.id}">Delete</button>
+         </div>
+      </td>
       </tr>
     `;
   }).join('');
@@ -46,16 +48,16 @@ export async function getResponsesByChapter(chapterId) {
   try {
     const supabase = getSupabaseClient();
 
-   const { data, error } = await supabase
-  .from('Comments')
-  .select(`
+    const { data, error } = await supabase
+      .from('Comments')
+      .select(`
     id,
     message,
     created_at,
     uid
   `)
-  .eq('chapter_id', chapterId)
-  .order('created_at', { ascending: false });
+      .eq('chapter_id', chapterId)
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
