@@ -117,6 +117,14 @@ export async function signUp(email, password, firstName, lastName, parent) {
       return { success: false, message: error.message };
     }
 
+    if (data.user) {
+      await supabase.from("profiles").insert({
+        user_id: data.user.id,
+        role: "free",
+        username: null,
+      });
+    }
+
     return {
       success: true,
       data,

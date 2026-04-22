@@ -1086,7 +1086,7 @@ if (adminNavItem) {
     await initializeSubscribeScreen();
   }
 
-  if (pageId === "subscription-success") {
+  if (pageId === "payment-success") {
     await initializeSubscriptionSuccessScreen();
   }
 

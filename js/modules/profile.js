@@ -37,15 +37,10 @@ function toDisplayName(user) {
   return metadata.name || metadata.full_name || combined || user?.email || "-";
 }
 
-function toSubscriberLabel(user) {
-  const metadata = user?.user_metadata || {};
-  const raw = metadata.subscriber;
-  const subStatus = metadata.subscription;
-  const isSubscriber =
-    raw === true ||
-    String(raw).toLowerCase() === "true" ||
-    subStatus === "active";
-  return isSubscriber ? "Subscriber" : "Free";
+function toSubscriberLabel(role) {
+  if (role === "admin") return "Admin";
+  if (role === "subscriber") return "Subscriber";
+  return "Free";
 }
 
 function showStatus(message, type = "success") {
@@ -128,7 +123,6 @@ async function populateProfile() {
   setText("viewName", displayName);
   setText("viewName2", displayName);
   setText("viewEmail", user.email || "-");
-  setText("viewSubscription", `Subscription: ${toSubscriberLabel(user)}`);
   setText("viewEnrolled", formatDate(user.created_at));
   setInputValue("nameInput", displayName === "-" ? "" : displayName);
   setInputValue("emailInput", user.email || "");
@@ -136,13 +130,14 @@ async function populateProfile() {
   if (supabase) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("username")
+      .select("username, role")
       .eq("user_id", user.id)
       .maybeSingle();
 
     const username = profile?.username || "";
     setText("viewUsername", username || "—");
     setInputValue("usernameInput", username);
+    setText("viewSubscription", `Subscription: ${toSubscriberLabel(profile?.role)}`);
   }
 }
 
@@ -225,12 +220,19 @@ async function handlePasswordSave(event) {
   clearStatus();
 
   const supabase = getSupabaseClient();
+  const currentPasswordInput = document.getElementById("currentPasswordInput");
   const passwordInput = document.getElementById("newPasswordInput");
   const submitBtn = event.target.querySelector('button[type="submit"]');
+  const currentPassword = (currentPasswordInput?.value || "").trim();
   const newPassword = (passwordInput?.value || "").trim();
 
   if (!supabase) {
     showStatus("Supabase client not initialized.", "error");
+    return;
+  }
+
+  if (!currentPassword) {
+    showStatus("Please enter your current password.", "error");
     return;
   }
 
@@ -245,9 +247,19 @@ async function handlePasswordSave(event) {
   }
 
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) throw new Error("Could not retrieve your account details.");
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+    if (signInError) throw new Error("Current password is incorrect.");
+
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
 
+    if (currentPasswordInput) currentPasswordInput.value = "";
     if (passwordInput) passwordInput.value = "";
     showStatus("Password updated successfully.", "success");
   } catch (error) {
