@@ -155,22 +155,22 @@ function setupEventListeners() {
   // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
 
-  const target = e.target;
-  // HOME SUBSCRIPTION BUTTON LOGIC
-const subBtn = target.closest && target.closest('#homeSubscriptionLink');
-if (subBtn) {
-  e.preventDefault();
+    const target = e.target;
+    // HOME SUBSCRIPTION BUTTON LOGIC
+    const subBtn = target.closest && target.closest('#homeSubscriptionLink');
+    if (subBtn) {
+      e.preventDefault();
 
-  const session = await getCurrentSession();
+      const session = await getCurrentSession();
 
-  if (session) {
-    window.location.hash = 'subscribe';
-  } else {
-    sessionStorage.setItem('returnTo', '#subscribe');
-    window.location.hash = 'login';
-  }
-  return;
-}
+      if (session) {
+        window.location.hash = 'subscribe';
+      } else {
+        sessionStorage.setItem('returnTo', '#subscribe');
+        window.location.hash = 'login';
+      }
+      return;
+    }
 
     const freePlanBtn = target.closest && target.closest('#select-free-plan');
     if (freePlanBtn) {
@@ -449,14 +449,15 @@ async function handleLogin(form) {
     if (result.success) {
       showMessage('loginMessage', result.message, 'success');
 
-  const returnTo = sessionStorage.getItem('returnTo');
+      const returnTo = sessionStorage.getItem('returnTo');
 
-  if (returnTo) {
-    sessionStorage.removeItem('returnTo');
-    window.location.hash = returnTo.replace(/^#/, '');
-  } else {
-    window.location.hash = 'home';
-  }
+      if (returnTo) {
+        sessionStorage.removeItem('returnTo');
+        window.location.hash = returnTo.replace(/^#/, '');
+      } else {
+        const isAdmin = await isCurrentUserAdmin();
+        window.location.hash = isAdmin ? 'admin-dashboard' : 'home';
+      }
 
       return;
     } else {
@@ -688,26 +689,25 @@ async function handleWorksheetUpload(form) {
 async function initializeScreen(pageId) {
   syncScreenStyles(pageId);
   // ===== ADMIN NAV VISIBILITY =====
-const adminNavItem = document.getElementById('adminNavItem');
+  const adminNavItem = document.getElementById('adminNavItem');
 
-if (adminNavItem) {
-  const isAdmin = await isCurrentUserAdmin();
+  if (adminNavItem) {
+    const isAdmin = await isCurrentUserAdmin();
 
-  if (isAdmin) {
-    adminNavItem.style.display = 'block';
-  } else {
-    adminNavItem.style.display = 'none';
+    if (isAdmin && pageId !== 'admin-dashboard') {
+      adminNavItem.style.display = 'block';
+    } else {
+      adminNavItem.style.display = 'none';
+    }
   }
-}
 
-
- if (pageId === 'home') {
-  const yearEl = document.getElementById('year');
+  if (pageId === 'home') {
+    const yearEl = document.getElementById('year');
     if (yearEl) {
       yearEl.textContent = new Date().getFullYear();
     }
   }
-  
+
   if (pageId === 'profile') {
     await initializeProfileScreen();
   }
@@ -1095,7 +1095,7 @@ if (adminNavItem) {
   }
 }
 
- // CLOSE initializeScreen HERE
+// CLOSE initializeScreen HERE
 
 /**
  * Set up screen initialization callback for navigation
