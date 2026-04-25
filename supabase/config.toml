@@ -46,6 +46,12 @@ verify_jwt = true
 import_map = "./functions/create-checkout-session/deno.json"
 entrypoint = "./functions/create-checkout-session/index.ts"
 
+[functions.submit-author-question-vote]
+enabled = true
+verify_jwt = true
+import_map = "./functions/submit-author-question-vote/deno.json"
+entrypoint = "./functions/submit-author-question-vote/index.ts"
+
 [functions.stripe-webhook]
 enabled = true
 verify_jwt = false
