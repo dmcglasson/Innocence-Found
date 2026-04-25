@@ -27,6 +27,7 @@ const KNOWN_SCREENS = new Set([
   'admin-responses',
   'admin-upload',
   'bookreader',
+  'chapters',
   'chapter-reader',
   'worksheets',
   'worksheet-reader',
