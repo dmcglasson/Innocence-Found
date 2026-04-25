@@ -30,14 +30,8 @@ jest.unstable_mockModule("../js/utils/dom.js", () => ({
 const {
   fetchBookReaderEntries,
   handleLockedChapter,
-  initializeChaptersScreen,
   initializeChapterReaderScreen,
 } = await import("../js/modules/chapters.js");
-
-// Minimal DOM container used by the chapters listing screen.
-function buildChaptersListDom() {
-  document.body.innerHTML = '<div id="chapterList"></div>';
-}
 
 // Minimal DOM container used by the chapter reader screen.
 function buildChapterReaderDom() {
@@ -158,7 +152,7 @@ describe("handleLockedChapter", () => {
     await handleLockedChapter(3);
 
     expect(window.showLogin).toHaveBeenCalledTimes(1);
-    expect(sessionStorage.getItem("returnTo")).toBe("#chapters");
+    expect(sessionStorage.getItem("returnTo")).toBe("#bookreader");
     expect(sessionStorage.getItem("requestedChapter")).toBe("3");
     expect(sessionStorage.getItem("activeChapter")).toBeNull();
   });
@@ -172,40 +166,6 @@ describe("handleLockedChapter", () => {
     expect(sessionStorage.getItem("activeChapter")).toBe("3");
     expect(window.location.hash).toBe("#bookreader");
     expect(window.showLogin).not.toHaveBeenCalled();
-  });
-});
-
-// Rendering and post-render behavior for the chapters list page.
-describe("initializeChaptersScreen", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    sessionStorage.clear();
-    window.location.hash = "";
-    window.showLogin = jest.fn();
-    buildChaptersListDom();
-  });
-
-  test("renders chapter buttons for free users", async () => {
-    getCurrentSessionMock.mockResolvedValue(null);
-
-    await initializeChaptersScreen();
-
-    expect(waitForElementMock).toHaveBeenCalledWith("#chapterList", 1000);
-    const buttons = Array.from(document.querySelectorAll(".chapter-button"));
-    expect(buttons).toHaveLength(3);
-    expect(buttons[0].textContent).toContain("Read for Free");
-    expect(buttons[2].textContent).toContain("Subscribers Only");
-  });
-
-  test("handles requested chapter after rendering", async () => {
-    getCurrentSessionMock.mockResolvedValue(null);
-    sessionStorage.setItem("requestedChapter", "2");
-
-    await initializeChaptersScreen();
-
-    expect(sessionStorage.getItem("requestedChapter")).toBeNull();
-    expect(sessionStorage.getItem("activeChapter")).toBe("2");
-    expect(window.location.hash).toBe("#bookreader");
   });
 });
 
@@ -223,10 +183,10 @@ describe("initializeChapterReaderScreen", () => {
     URL.revokeObjectURL = jest.fn();
   });
 
-  test("redirects to chapters when no active chapter is selected", async () => {
+  test("redirects to bookreader when no active chapter is selected", async () => {
     await initializeChapterReaderScreen();
 
-    expect(window.location.hash).toBe("#chapters");
+    expect(window.location.hash).toBe("#bookreader");
   });
 
   test("redirects locked chapter to login for anonymous users", async () => {
@@ -236,7 +196,7 @@ describe("initializeChapterReaderScreen", () => {
     await initializeChapterReaderScreen();
 
     expect(window.showLogin).toHaveBeenCalledTimes(1);
-    expect(sessionStorage.getItem("returnTo")).toBe("chapters");
+    expect(sessionStorage.getItem("returnTo")).toBe("#bookreader");
     expect(sessionStorage.getItem("requestedChapter")).toBe("3");
   });
 
@@ -259,7 +219,7 @@ describe("initializeChapterReaderScreen", () => {
     await initializeChapterReaderScreen();
 
     expect(window.alert).toHaveBeenCalledWith("Subscribers only.");
-    expect(window.location.hash).toBe("#chapters");
+    expect(window.location.hash).toBe("#bookreader");
   });
 });
 
