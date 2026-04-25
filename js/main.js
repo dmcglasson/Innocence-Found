@@ -9,7 +9,7 @@ import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/n
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, deleteCommentById, updateCommentById, getAllUsers, deleteUserById } from './modules/auth.js';
 import { initializeProfileScreen } from './modules/profile.js';
 import { initializeChaptersScreen, initializeChapterReaderScreen, handleLockedChapter } from './modules/chapters.js';
-import { initializeWorksheetsScreen, initializeWorksheetReaderScreen, handleLockedWorksheet } from './modules/worksheets.js';
+import { initializeWorksheetsScreen, handleLockedWorksheet } from './modules/worksheets.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
@@ -455,8 +455,7 @@ async function handleLogin(form) {
         sessionStorage.removeItem('returnTo');
         window.location.hash = returnTo.replace(/^#/, '');
       } else {
-        const isAdmin = await isCurrentUserAdmin();
-        window.location.hash = isAdmin ? 'admin-dashboard' : 'home';
+        window.location.hash = 'home';
       }
 
       return;
@@ -1043,7 +1042,13 @@ async function initializeScreen(pageId) {
   }
 
   if (pageId === 'worksheet-reader') {
-    await initializeWorksheetReaderScreen();
+    const legacyWorksheetId = sessionStorage.getItem('activeWorksheetId');
+    if (legacyWorksheetId) {
+      sessionStorage.removeItem('activeWorksheetId');
+      await handleLockedWorksheet(legacyWorksheetId);
+    }
+    window.location.hash = 'worksheets';
+    return;
   }
 
   // Login / Signup screen

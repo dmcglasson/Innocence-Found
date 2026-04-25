@@ -43,6 +43,14 @@ function toSubscriberLabel(role) {
   return "Free";
 }
 
+function getFallbackSubscriberRole(user) {
+  if (user?.user_metadata?.role === "admin") return "admin";
+  if (user?.user_metadata?.subscriber === true || user?.user_metadata?.subscriber === "true") {
+    return "subscriber";
+  }
+  return "free";
+}
+
 function showStatus(message, type = "success") {
   const panel = document.getElementById("statusPanel");
   const msg = document.getElementById("statusMsg");
@@ -119,6 +127,7 @@ async function populateProfile() {
   }
 
   const displayName = toDisplayName(user);
+  const fallbackRole = getFallbackSubscriberRole(user);
 
   setText("viewName", displayName);
   setText("viewName2", displayName);
@@ -126,8 +135,10 @@ async function populateProfile() {
   setText("viewEnrolled", formatDate(user.created_at));
   setInputValue("nameInput", displayName === "-" ? "" : displayName);
   setInputValue("emailInput", user.email || "");
+  setText("viewUsername", "—");
+  setText("viewSubscription", `Subscription: ${toSubscriberLabel(fallbackRole)}`);
 
-  if (supabase) {
+  if (supabase && typeof supabase.from === "function") {
     const { data: profile } = await supabase
       .from("profiles")
       .select("username, role")
@@ -197,10 +208,12 @@ async function handleProfileSave(event) {
     const { error: authError } = await supabase.auth.updateUser(payload);
     if (authError) throw authError;
 
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .upsert({ user_id: user.id, username: username || null }, { onConflict: "user_id" });
-    if (profileError) throw profileError;
+    if (typeof supabase.from === "function") {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({ user_id: user.id, username: username || null }, { onConflict: "user_id" });
+      if (profileError) throw profileError;
+    }
 
     await populateProfile();
     setViewMode(false);
@@ -231,7 +244,7 @@ async function handlePasswordSave(event) {
     return;
   }
 
-  if (!currentPassword) {
+  if (currentPasswordInput && !currentPassword) {
     showStatus("Please enter your current password.", "error");
     return;
   }
@@ -247,16 +260,29 @@ async function handlePasswordSave(event) {
   }
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) throw new Error("Could not retrieve your account details.");
+    const authApi = supabase.auth || {};
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: currentPassword,
-    });
-    if (signInError) throw new Error("Current password is incorrect.");
+    if (
+      currentPasswordInput &&
+      typeof authApi.getUser === "function" &&
+      typeof authApi.signInWithPassword === "function"
+    ) {
+      const { data: userData } = await authApi.getUser();
+      const user = userData?.user;
+      if (!user?.email) throw new Error("Could not retrieve your account details.");
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error: signInError } = await authApi.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (signInError) throw new Error("Current password is incorrect.");
+    }
+
+    if (typeof authApi.updateUser !== "function") {
+      throw new Error("Password updates are unavailable right now.");
+    }
+
+    const { error } = await authApi.updateUser({ password: newPassword });
     if (error) throw error;
 
     if (currentPasswordInput) currentPasswordInput.value = "";

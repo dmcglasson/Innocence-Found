@@ -702,7 +702,9 @@ function renderPages() {
   }
 
   canvasLeft.style.display = "";
-  singlePageTextEl.innerHTML = "";
+  if (singlePageTextEl) {
+    singlePageTextEl.innerHTML = "";
+  }
 
   canvasLeft.style.opacity = "0";
   canvasRight.style.opacity = "0";
@@ -1056,17 +1058,24 @@ async function renderComments(forceRefresh = true) {
 }
 
 function buildTree(comments) {
-  const map = {};
+  const map = new Map();
   const roots = [];
-  comments.forEach((c) => { map[c.id] = { ...c, children: [] }; });
-  comments.forEach((c) => {
-    if (c.comment_id && map[c.comment_id]) {
-      map[c.comment_id].children.push(map[c.id]);
+  comments.forEach((c, index) => {
+    const key = c?.id ?? `__comment_${index}`;
+    map.set(key, { ...c, children: [] });
+  });
+  comments.forEach((c, index) => {
+    const key = c?.id ?? `__comment_${index}`;
+    const node = map.get(key);
+    const parentKey = c?.comment_id ?? c?.parent_id;
+
+    if (parentKey != null && map.has(parentKey)) {
+      map.get(parentKey).children.push(node);
     } else {
-      roots.push(map[c.id]);
+      roots.push(node);
     }
   });
-  Object.values(map).forEach((node) => {
+  [...map.values()].forEach((node) => {
     node.children.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   });
   return roots;
