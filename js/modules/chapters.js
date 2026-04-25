@@ -532,7 +532,7 @@ export async function initializeChapterReaderScreen() {
 
   // If someone navigates to #chapter-reader directly without selecting a chapter.
   if (!chapterNumber) {
-    window.location.hash = "chapters";
+    window.location.hash = "bookreader";
     return;
   }
 
@@ -541,7 +541,7 @@ export async function initializeChapterReaderScreen() {
 
     // Not logged in -> send to login.
     if (!session || !session.user) {
-      sessionStorage.setItem("returnTo", "chapters");
+      sessionStorage.setItem("returnTo", "#bookreader");
       sessionStorage.setItem("requestedChapter", String(chapterNumber));
       window.showLogin();
       return;
@@ -551,7 +551,7 @@ export async function initializeChapterReaderScreen() {
     const subInfo = await getSubscriberStatus();
     if (!subInfo.isSubscriber) {
       alert("Subscribers only.");
-      window.location.hash = "chapters";
+      window.location.hash = "bookreader";
       return;
     }
   }
@@ -605,7 +605,7 @@ export async function initializeChapterReaderScreen() {
         URL.revokeObjectURL(activeChapterBlobUrl);
         activeChapterBlobUrl = null;
       }
-      window.location.hash = "chapters";
+      window.location.hash = "bookreader";
     };
   }
 
@@ -688,7 +688,7 @@ export async function handleLockedChapter(chapterNumber) {
   if (!isFreeChapter) {
     const session = await getCurrentSession();
     if (!session || !session.user) {
-      sessionStorage.setItem("returnTo", "#chapters");
+      sessionStorage.setItem("returnTo", "#bookreader");
       sessionStorage.setItem("requestedChapter", String(chapterNumber));
       window.showLogin();
       return;

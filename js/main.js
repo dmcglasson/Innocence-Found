@@ -9,7 +9,7 @@ import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/n
 import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, deleteCommentById, updateCommentById, getAllUsers, deleteUserById } from './modules/auth.js';
 import { initializeProfileScreen } from './modules/profile.js';
 import { initializeChaptersScreen, initializeChapterReaderScreen, handleLockedChapter } from './modules/chapters.js';
-import { initializeWorksheetsScreen, initializeWorksheetReaderScreen, handleLockedWorksheet } from './modules/worksheets.js';
+import { initializeWorksheetsScreen, handleLockedWorksheet } from './modules/worksheets.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
@@ -155,22 +155,22 @@ function setupEventListeners() {
   // Click handlers (logout + switch between login/signup)
   document.addEventListener('click', async (e) => {
 
-  const target = e.target;
-  // HOME SUBSCRIPTION BUTTON LOGIC
-const subBtn = target.closest && target.closest('#homeSubscriptionLink');
-if (subBtn) {
-  e.preventDefault();
+    const target = e.target;
+    // HOME SUBSCRIPTION BUTTON LOGIC
+    const subBtn = target.closest && target.closest('#homeSubscriptionLink');
+    if (subBtn) {
+      e.preventDefault();
 
-  const session = await getCurrentSession();
+      const session = await getCurrentSession();
 
-  if (session) {
-    window.location.hash = 'subscribe';
-  } else {
-    sessionStorage.setItem('returnTo', '#subscribe');
-    window.location.hash = 'login';
-  }
-  return;
-}
+      if (session) {
+        window.location.hash = 'subscribe';
+      } else {
+        sessionStorage.setItem('returnTo', '#subscribe');
+        window.location.hash = 'login';
+      }
+      return;
+    }
 
     const freePlanBtn = target.closest && target.closest('#select-free-plan');
     if (freePlanBtn) {
@@ -449,14 +449,14 @@ async function handleLogin(form) {
     if (result.success) {
       showMessage('loginMessage', result.message, 'success');
 
-  const returnTo = sessionStorage.getItem('returnTo');
+      const returnTo = sessionStorage.getItem('returnTo');
 
-  if (returnTo) {
-    sessionStorage.removeItem('returnTo');
-    window.location.hash = returnTo.replace(/^#/, '');
-  } else {
-    window.location.hash = 'home';
-  }
+      if (returnTo) {
+        sessionStorage.removeItem('returnTo');
+        window.location.hash = returnTo.replace(/^#/, '');
+      } else {
+        window.location.hash = 'home';
+      }
 
       return;
     } else {
@@ -688,26 +688,25 @@ async function handleWorksheetUpload(form) {
 async function initializeScreen(pageId) {
   syncScreenStyles(pageId);
   // ===== ADMIN NAV VISIBILITY =====
-const adminNavItem = document.getElementById('adminNavItem');
+  const adminNavItem = document.getElementById('adminNavItem');
 
-if (adminNavItem) {
-  const isAdmin = await isCurrentUserAdmin();
+  if (adminNavItem) {
+    const isAdmin = await isCurrentUserAdmin();
 
-  if (isAdmin) {
-    adminNavItem.style.display = 'block';
-  } else {
-    adminNavItem.style.display = 'none';
+    if (isAdmin && pageId !== 'admin-dashboard') {
+      adminNavItem.style.display = 'block';
+    } else {
+      adminNavItem.style.display = 'none';
+    }
   }
-}
 
-
- if (pageId === 'home') {
-  const yearEl = document.getElementById('year');
+  if (pageId === 'home') {
+    const yearEl = document.getElementById('year');
     if (yearEl) {
       yearEl.textContent = new Date().getFullYear();
     }
   }
-  
+
   if (pageId === 'profile') {
     await initializeProfileScreen();
   }
@@ -1043,7 +1042,13 @@ if (adminNavItem) {
   }
 
   if (pageId === 'worksheet-reader') {
-    await initializeWorksheetReaderScreen();
+    const legacyWorksheetId = sessionStorage.getItem('activeWorksheetId');
+    if (legacyWorksheetId) {
+      sessionStorage.removeItem('activeWorksheetId');
+      await handleLockedWorksheet(legacyWorksheetId);
+    }
+    window.location.hash = 'worksheets';
+    return;
   }
 
   // Login / Signup screen
@@ -1086,7 +1091,7 @@ if (adminNavItem) {
     await initializeSubscribeScreen();
   }
 
-  if (pageId === "subscription-success") {
+  if (pageId === "payment-success") {
     await initializeSubscriptionSuccessScreen();
   }
 
@@ -1095,7 +1100,7 @@ if (adminNavItem) {
   }
 }
 
- // CLOSE initializeScreen HERE
+// CLOSE initializeScreen HERE
 
 /**
  * Set up screen initialization callback for navigation

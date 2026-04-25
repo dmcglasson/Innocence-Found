@@ -155,11 +155,10 @@
           <p class="muted">Update your password here.</p>
 
           <form id="passwordForm" class="form" novalidate>
-            <div class="form-row">
+              <label class="field-label" for="currentPasswordInput">Current Password</label>
+              <input class="input" id="currentPasswordInput" type="password" placeholder="Current password" autocomplete="current-password" />
               <label class="field-label" for="newPasswordInput">New Password</label>
-              <input class="input" id="newPasswordInput" type="password" placeholder="New password" />
-            </div>
-
+              <input class="input" id="newPasswordInput" type="password" placeholder="New password" autocomplete="new-password" />
             <div class="actions-row">
               <button class="btn btn-amber" type="submit">Update Password</button>
             </div>
