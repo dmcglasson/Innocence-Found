@@ -37,7 +37,10 @@ export async function startSubscriptionCheckout(planId) {
       Authorization: `Bearer ${session.access_token}`,
       apikey: SUPABASE_CONFIG.ANON_KEY,
     },
-    body: JSON.stringify({ plan_id: planId }),
+    body: JSON.stringify({ 
+    plan: "paid",
+    client_origin: window.location.origin,
+}),
   });
 
   const json = await res.json().catch(() => ({}));
@@ -71,7 +74,7 @@ export async function initializeSubscribeScreen() {
  */
 export async function initializeSubscriptionSuccessScreen() {
   const supabase = getSupabaseClient();
-  const statusEl = document.getElementById("subscriptionVerifyStatus");
+  const statusEl = document.getElementById("paymentSuccessStatus");
   if (!supabase) {
     if (statusEl) statusEl.textContent = "Unable to verify subscription (app not configured).";
     return;
@@ -84,16 +87,15 @@ export async function initializeSubscriptionSuccessScreen() {
   }
 
   const userId = sessionData.session.user.id;
-
   if (statusEl) statusEl.textContent = "Confirming your subscription…";
 
-  const maxAttempts = 8;
+  const maxAttempts = 10;
   for (let i = 0; i < maxAttempts; i++) {
     await supabase.auth.refreshSession();
 
     const { data: sub, error } = await supabase
       .from("subscriptions")
-      .select("plan_id, current_period_start, status")
+      .select("plan_type, current_period_start, status")
       .eq("user_id", userId)
       .eq("status", "active")
       .maybeSingle();
@@ -103,7 +105,7 @@ export async function initializeSubscriptionSuccessScreen() {
         ? new Date(sub.current_period_start).toLocaleDateString()
         : "";
       if (statusEl) {
-        statusEl.textContent = `You are subscribed (${sub.plan_id}${started ? `, started ${started}` : ""}).`;
+        statusEl.textContent = `Your subscription is now active${started ? ` (started ${started})` : ""}.`;
       }
       return;
     }
@@ -111,9 +113,20 @@ export async function initializeSubscriptionSuccessScreen() {
     await new Promise((r) => setTimeout(r, 1500));
   }
 
+  // Fallback — check profiles.role directly
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (profile?.role === "subscriber") {
+    if (statusEl) statusEl.textContent = "Your subscription is now active.";
+    return;
+  }
+
   if (statusEl) {
-    statusEl.textContent =
-      "Payment may still be processing. Refresh this page or check your profile in a minute.";
+    statusEl.innerHTML = `Payment received but still processing. <a href="#profile">Check your profile</a> in a moment or contact support.`;
   }
 }
 
