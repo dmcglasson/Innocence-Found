@@ -828,9 +828,15 @@ async function loadPoll() {
 
   if (result.data) {
     const savedSelection = getSavedPollSelection(result.data.id, result.data.options.length);
+    const serverSelection =
+      Number.isInteger(result.data.selectedOption) &&
+      result.data.selectedOption >= 0 &&
+      result.data.selectedOption < result.data.options.length
+        ? result.data.selectedOption
+        : null;
     currentPollData = {
       ...result.data,
-      selectedOption: savedSelection,
+      selectedOption: serverSelection ?? savedSelection,
     };
   } else {
     currentPollData = null;
@@ -904,6 +910,7 @@ function renderPoll() {
     Number.isInteger(poll.selectedOption) && poll.selectedOption >= 0 && poll.selectedOption < poll.options.length
       ? poll.selectedOption
       : null;
+  const hasSubmittedVote = selectedOption !== null;
 
   pollOptionsEl.innerHTML = "";
   poll.options.forEach((optionText, index) => {
@@ -918,6 +925,7 @@ function renderPoll() {
     input.name = "bookPollOption";
     input.value = String(index);
     input.checked = selectedOption === index;
+    input.disabled = hasSubmittedVote;
     label.appendChild(input);
 
     const copy = document.createElement("span");
@@ -938,12 +946,16 @@ function renderPoll() {
   });
 
   if (!subscriber) {
-    submitPollVoteBtn.disabled = false;
-    pollStatusEl.textContent = `Total votes: ${totalVotes} | Select an answer, then subscribe to submit your vote.`;
+    submitPollVoteBtn.textContent = hasSubmittedVote ? "Vote submitted" : "Submit vote";
+    submitPollVoteBtn.disabled = hasSubmittedVote ? true : false;
+    pollStatusEl.textContent = hasSubmittedVote
+      ? `Your vote: ${poll.options[selectedOption]} | Total votes: ${totalVotes}`
+      : `Total votes: ${totalVotes} | Select an answer, then subscribe to submit your vote.`;
     return;
   }
 
-  submitPollVoteBtn.disabled = false;
+  submitPollVoteBtn.textContent = hasSubmittedVote ? "Vote submitted" : "Submit vote";
+  submitPollVoteBtn.disabled = hasSubmittedVote;
   if (selectedOption === null) {
     pollStatusEl.textContent = `Total votes: ${totalVotes}`;
     return;
@@ -966,6 +978,12 @@ async function handlePollSubmit() {
     return;
   }
 
+  if (Number.isInteger(poll.selectedOption)) {
+    pollStatusEl.textContent = "You have already voted on this question.";
+    renderPoll();
+    return;
+  }
+
   const selectedIndex = getCheckedPollIndex();
   if (selectedIndex === null || selectedIndex < 0 || selectedIndex >= poll.options.length) {
     pollStatusEl.textContent = "Select one answer before submitting your vote.";
@@ -978,14 +996,12 @@ async function handlePollSubmit() {
     return;
   }
 
-  const previousSelectedIndex = getSavedPollSelection(questionId, poll.options.length);
   submitPollVoteBtn.disabled = true;
   pollStatusEl.textContent = "Submitting your vote...";
 
   const result = await submitAuthorQuestionVote({
     questionId,
     selectedOptionIndex: selectedIndex,
-    previousSelectedIndex,
   });
 
   if (!result.ok) {
@@ -995,7 +1011,12 @@ async function handlePollSubmit() {
   }
 
   savePollSelection(questionId, selectedIndex);
-  currentPollData = result.data;
+  currentPollData = result.data
+    ? result.data
+    : {
+        ...poll,
+        selectedOption: selectedIndex,
+      };
   renderPoll();
 }
 

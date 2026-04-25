@@ -37,6 +37,16 @@ function normalizeQuestionRow(row, selectedOption = null) {
   };
 }
 
+async function getQuestionRowById(supabase, questionId) {
+  const { data, error } = await supabase
+    .from(AUTHOR_QUESTIONS_TABLE)
+    .select("*")
+    .eq("id", questionId)
+    .maybeSingle();
+
+  return { data, error };
+}
+
 export async function getAuthorQuestionByChapter(chapterId, selectedOption = null) {
   const supabase = getSupabaseClient();
   if (!supabase) return { ok: false, data: null, message: "Supabase not initialized" };
@@ -67,14 +77,12 @@ export async function getAuthorQuestionByChapter(chapterId, selectedOption = nul
 export async function submitAuthorQuestionVote({
   questionId,
   selectedOptionIndex,
-  previousSelectedIndex = null,
 }) {
   const supabase = getSupabaseClient();
   if (!supabase) return { ok: false, data: null, message: "Supabase not initialized" };
 
   const safeQuestionId = Number(questionId);
   const safeSelectedIndex = Number(selectedOptionIndex);
-  const safePreviousIndex = Number.isInteger(previousSelectedIndex) ? previousSelectedIndex : null;
 
   if (!Number.isInteger(safeQuestionId) || safeQuestionId <= 0) {
     return { ok: false, data: null, message: "Invalid question id" };
@@ -84,11 +92,7 @@ export async function submitAuthorQuestionVote({
     return { ok: false, data: null, message: "Invalid vote option" };
   }
 
-  const { data: existingRow, error: fetchError } = await supabase
-    .from(AUTHOR_QUESTIONS_TABLE)
-    .select("*")
-    .eq("id", safeQuestionId)
-    .maybeSingle();
+  const { data: existingRow, error: fetchError } = await getQuestionRowById(supabase, safeQuestionId);
 
   if (fetchError) return { ok: false, data: null, message: fetchError.message };
 
@@ -102,12 +106,8 @@ export async function submitAuthorQuestionVote({
   }
 
   const nextVotes = [...normalized.voteCounts];
-  if (Number.isInteger(safePreviousIndex) && safePreviousIndex >= 0 && safePreviousIndex < nextVotes.length) {
-    if (nextVotes[safePreviousIndex] > 0) {
-      nextVotes[safePreviousIndex] -= 1;
-    }
-  }
   nextVotes[safeSelectedIndex] += 1;
+  const optimisticRow = { ...existingRow, options_votes: nextVotes };
 
   const { data: updatedRow, error: updateError } = await supabase
     .from(AUTHOR_QUESTIONS_TABLE)
@@ -117,5 +117,5 @@ export async function submitAuthorQuestionVote({
     .maybeSingle();
 
   if (updateError) return { ok: false, data: null, message: updateError.message };
-  return { ok: true, data: normalizeQuestionRow(updatedRow, safeSelectedIndex) };
+  return { ok: true, data: normalizeQuestionRow(updatedRow || optimisticRow, safeSelectedIndex) };
 }
