@@ -1,0 +1,146 @@
+/* @jest-environment node */
+import { jest } from "@jest/globals";
+
+const mockGetSupabaseClient = jest.fn();
+const mockGetSupabaseFunctionsBaseUrl = jest.fn();
+
+jest.unstable_mockModule("../js/modules/supabase.js", () => ({
+  getSupabaseClient: mockGetSupabaseClient,
+}));
+
+jest.unstable_mockModule("../js/config.js", () => ({
+  SUPABASE_CONFIG: {
+    ANON_KEY: "test-anon-key",
+  },
+  getSupabaseFunctionsBaseUrl: mockGetSupabaseFunctionsBaseUrl,
+}));
+
+const { createStripeCheckoutSession } = await import("../js/modules/checkout.js");
+
+describe("createStripeCheckoutSession", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = jest.fn();
+    delete global.window;
+  });
+
+  test("returns error if Supabase client is missing", async () => {
+    mockGetSupabaseClient.mockReturnValue(null);
+
+    const result = await createStripeCheckoutSession();
+
+    expect(result).toEqual({
+      success: false,
+      message: "App is not connected. Please try again later.",
+    });
+  });
+
+  test("returns error if session is missing", async () => {
+    mockGetSupabaseClient.mockReturnValue({
+      auth: {
+        getSession: jest.fn().mockResolvedValue({
+          data: { session: null },
+          error: null,
+        }),
+      },
+    });
+
+    const result = await createStripeCheckoutSession();
+
+    expect(result).toEqual({
+      success: false,
+      message: "Please sign in to subscribe.",
+    });
+  });
+
+  test("returns error if functions base URL is missing", async () => {
+    mockGetSupabaseClient.mockReturnValue({
+      auth: {
+        getSession: jest.fn().mockResolvedValue({
+          data: { session: { access_token: "abc123" } },
+          error: null,
+        }),
+      },
+    });
+
+    mockGetSupabaseFunctionsBaseUrl.mockReturnValue("");
+
+    const result = await createStripeCheckoutSession();
+
+    expect(result).toEqual({
+      success: false,
+      message: "Subscription service is not configured.",
+    });
+  });
+
+  test("returns success with checkout url when request succeeds", async () => {
+    mockGetSupabaseClient.mockReturnValue({
+      auth: {
+        getSession: jest.fn().mockResolvedValue({
+          data: { session: { access_token: "abc123" } },
+          error: null,
+        }),
+      },
+    });
+
+    mockGetSupabaseFunctionsBaseUrl.mockReturnValue("https://example.com");
+    global.window = { location: { origin: "http://localhost:3000" } };
+
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        url: "https://checkout.stripe.com/pay/test",
+      }),
+    });
+
+    const result = await createStripeCheckoutSession();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://example.com/create-checkout-session",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer abc123",
+          apikey: "test-anon-key",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          plan: "paid",
+          client_origin: "http://localhost:3000",
+        }),
+      }
+    );
+
+    expect(result).toEqual({
+      success: true,
+      url: "https://checkout.stripe.com/pay/test",
+    });
+  });
+
+  test("returns error message when request fails", async () => {
+    mockGetSupabaseClient.mockReturnValue({
+      auth: {
+        getSession: jest.fn().mockResolvedValue({
+          data: { session: { access_token: "abc123" } },
+          error: null,
+        }),
+      },
+    });
+
+    mockGetSupabaseFunctionsBaseUrl.mockReturnValue("https://example.com");
+
+    global.fetch.mockResolvedValue({
+      ok: false,
+      json: jest.fn().mockResolvedValue({
+        error: "Stripe failed",
+      }),
+    });
+
+    const result = await createStripeCheckoutSession();
+
+    expect(result).toEqual({
+      success: false,
+      message: "Stripe failed",
+    });
+  });
+});

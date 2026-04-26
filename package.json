@@ -27,7 +27,17 @@
     "test": "tests"
   },
   "devDependencies": {
+    "chalk": "^4.1.2",
+    "exit-x": "^0.2.2",
     "jest": "^30.3.0",
-    "jest-environment-jsdom": "^30.3.0"
+    "jest-cli": "^30.2.0",
+    "jest-environment-jsdom": "^30.3.0",
+    "napi-postinstall": "^0.3.4"
+  },
+  "dependencies": {
+    "escalade": "^3.1.1",
+    "jest-regex-util": "^30.0.1",
+    "y18n": "^5.0.8",
+    "yargs": "^17.7.2"
   }
 }
