@@ -805,11 +805,23 @@ describe("bookreader module", () => {
     );
   });
 
-  test("shows a saved poll vote without allowing another submission", async () => {
-    localStorage.setItem(
-      "bookreaderViewPollVotes.v1",
-      JSON.stringify({ "author-question-101-user-user-1": 0 })
-    );
+  test("shows an existing database poll vote without allowing another submission", async () => {
+    getAuthorQuestionByChapterMock.mockResolvedValue({
+      ok: true,
+      data: {
+        id: 101,
+        chapterId: 11,
+        title: "Author Question",
+        question: "What is motivating the lead character most in this chapter?",
+        options: [
+          "Protecting family at any cost",
+          "Seeking justice through the legal system",
+          "Escaping a painful past",
+        ],
+        selectedOption: 0,
+        voteCounts: [1, 0, 0],
+      },
+    });
 
     await initBookReader();
     await flush();

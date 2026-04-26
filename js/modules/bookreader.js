@@ -112,7 +112,6 @@ let pendingRenderFrame = null;
 let activeLeftRenderTask = null;
 let activeRightRenderTask = null;
 let renderCycleId = 0;
-const POLL_STORAGE_KEY = "bookreaderViewPollVotes.v1";
 let currentPollData = null;
 let pollLoadState = "idle";
 let pollLoadMessage = "";
@@ -752,51 +751,6 @@ function getPollData() {
   return currentPollData;
 }
 
-function loadPollVoteState() {
-  try {
-    const raw = localStorage.getItem(POLL_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function savePollVoteState(state) {
-  try {
-    localStorage.setItem(POLL_STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.warn("Unable to save poll votes:", error);
-  }
-}
-
-function getPollStateKeyForQuestion(questionId) {
-  const safeQuestionId = Number(questionId);
-  const scope = currentUserId ? `user-${currentUserId}` : "guest";
-  return Number.isInteger(safeQuestionId) && safeQuestionId > 0
-    ? `author-question-${safeQuestionId}-${scope}`
-    : `${currentUrl}-${scope}`;
-}
-
-function getSavedPollSelection(questionId, optionCount) {
-  const state = loadPollVoteState();
-  const key = getPollStateKeyForQuestion(questionId);
-  const selected = Number(state[key]);
-  return Number.isInteger(selected) && selected >= 0 && selected < optionCount ? selected : null;
-}
-
-function savePollSelection(questionId, selectedIndex) {
-  const state = loadPollVoteState();
-  const key = getPollStateKeyForQuestion(questionId);
-  if (!Number.isInteger(selectedIndex) || selectedIndex < 0) {
-    delete state[key];
-  } else {
-    state[key] = selectedIndex;
-  }
-  savePollVoteState(state);
-}
-
 async function loadPoll() {
   pollRequestId += 1;
   const requestId = pollRequestId;
@@ -827,7 +781,6 @@ async function loadPoll() {
   }
 
   if (result.data) {
-    const savedSelection = getSavedPollSelection(result.data.id, result.data.options.length);
     const serverSelection =
       Number.isInteger(result.data.selectedOption) &&
       result.data.selectedOption >= 0 &&
@@ -836,7 +789,7 @@ async function loadPoll() {
         : null;
     currentPollData = {
       ...result.data,
-      selectedOption: serverSelection ?? savedSelection,
+      selectedOption: serverSelection,
     };
   } else {
     currentPollData = null;
@@ -1010,7 +963,6 @@ async function handlePollSubmit() {
     return;
   }
 
-  savePollSelection(questionId, selectedIndex);
   currentPollData = result.data
     ? result.data
     : {
