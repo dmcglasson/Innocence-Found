@@ -6,10 +6,11 @@
  */
 import { getSupabaseClient, isSupabaseInitialized } from './modules/supabase.js';
 import { initPageFromHash, showPage, setGlobalOnLoadCallback } from './modules/navigation.js';
-import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, deleteCommentById, updateCommentById, getAllUsers, deleteUserById } from './modules/auth.js';
+import { checkAuthState, initAuthStateListener, signIn, signUp, signOut, getCurrentSession, getSubscriberStatus, isCurrentUserAdmin, getAllChapters, deleteCommentById, updateCommentById, deleteUserById } from './modules/auth.js';
 import { initializeProfileScreen } from './modules/profile.js';
 import { initializeChaptersScreen, initializeChapterReaderScreen, handleLockedChapter } from './modules/chapters.js';
 import { initializeWorksheetsScreen, handleLockedWorksheet } from './modules/worksheets.js';
+import { initializeAdminDashboard } from './modules/admin-dashboard.js';
 import { initUI, toggleAuthForm, showMessage, updateDashboardUserInfo } from './modules/ui.js';
 import { waitForElement } from './utils/dom.js';
 import { validateForm, sanitizeString } from './utils/validators.js';
@@ -111,6 +112,11 @@ async function init() {
     const btn = e.target.closest('.admin-menu-btn');
     if (!btn) return;
 
+    const tabKey = btn.getAttribute('data-admin-tab');
+    if (tabKey) {
+      sessionStorage.setItem('adminDashboardActiveTab', tabKey);
+    }
+
     const page = btn.getAttribute('data-page');
     if (!page) return;
 
@@ -121,6 +127,11 @@ async function init() {
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('.admin-menu-btn');
   if (!btn) return;
+
+  const tabKey = btn.getAttribute('data-admin-tab');
+  if (tabKey) {
+    sessionStorage.setItem('adminDashboardActiveTab', tabKey);
+  }
 
   document.querySelectorAll('.admin-menu-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -830,42 +841,7 @@ async function initializeScreen(pageId) {
       return;
     }
 
-    const adminLayout = document.getElementById('adminDashboardLayout');
-    const usersTable = document.getElementById('usersTable');
-
-    if (!adminLayout || !usersTable) {
-      console.warn('Admin dashboard elements not found');
-      return;
-    }
-
-    adminLayout.style.display = 'grid';
-    usersTable.innerHTML = `<tr><td colspan="3">Loading users...</td></tr>`;
-
-    const result = await getAllUsers();
-    if (!result.success) {
-      usersTable.innerHTML = `<tr><td colspan="3">Failed to load users.</td></tr>`;
-      return;
-    }
-
-    if (!result.data.length) {
-      usersTable.innerHTML = `<tr><td colspan="3">No users found.</td></tr>`;
-      return;
-    }
-
-    usersTable.innerHTML = result.data
-      .map(
-        (user) => `
-      <tr>
-        <td>${user.user_id}</td>
-        <td>${user.role ?? ''}</td>
-        <td>
-          <button class="action-btn view-user-btn" data-id="${user.user_id}">View</button>
-          <button class="action-btn delete-user-btn" data-id="${user.user_id}">Delete</button>
-        </td>
-      </tr>
-    `
-      )
-      .join('');
+    await initializeAdminDashboard();
   }
 
   if (pageId === 'admin-responses') {
@@ -1133,7 +1109,12 @@ function setupScreenInitialization() {
     const pageLink = e.target.closest('[data-page]');
     if (pageLink) {
       const pageId = pageLink.getAttribute('data-page');
+      const tabKey = pageLink.getAttribute('data-admin-tab');
       const href = pageLink.getAttribute('href') || '';
+
+      if (tabKey) {
+        sessionStorage.setItem('adminDashboardActiveTab', tabKey);
+      }
 
       // Handle hash links via SPA router to avoid native anchor scroll retention.
       if (href.startsWith('#')) {

@@ -266,3 +266,67 @@ describe("fetchBookReaderEntries", () => {
     expect(result.data[1].url).toContain("obj-2.pdf");
   });
 });
+
+describe("renderChapters UI", () => {
+
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <div id="chapterList"></div>
+    `;
+  });
+
+  test("renders chapters for non-subscriber with locks", async () => {
+    const { initializeChaptersScreen } = await import("../js/modules/chapters.js");
+
+    getCurrentSessionMock.mockResolvedValue(null);
+
+    await initializeChaptersScreen();
+
+    const html = document.getElementById("chapterList").innerHTML;
+
+    expect(html).toContain("Chapter 1");
+    expect(html).toContain("Chapter 2");
+    expect(html).toContain("🔒 Chapter 3");
+  });
+
+  test("renders chapters for subscriber without locks", async () => {
+    const { initializeChaptersScreen } = await import("../js/modules/chapters.js");
+
+    getCurrentSessionMock.mockResolvedValue({ user: { id: "1" } });
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: true });
+
+    await initializeChaptersScreen();
+
+    const html = document.getElementById("chapterList").innerHTML;
+
+    expect(html).toContain("Chapter 1");
+    expect(html).toContain("Chapter 2");
+    expect(html).toContain("Chapter 3");
+  });
+
+});
+
+describe("handleLockedChapter edge cases", () => {
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sessionStorage.clear();
+    window.location.hash = "";
+    window.showLogin = jest.fn();
+    global.alert = jest.fn();
+  });
+
+ test("invalid chapter number still sets NaN as string", async () => {
+  await handleLockedChapter(NaN);
+
+  expect(sessionStorage.getItem("activeChapter")).toBe("NaN");
+});
+
+  test("free chapter always allowed", async () => {
+    await handleLockedChapter(2);
+
+    expect(sessionStorage.getItem("activeChapter")).toBe("2");
+    expect(window.location.hash).toBe("#bookreader");
+  });
+
+});

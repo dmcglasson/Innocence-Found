@@ -62,6 +62,7 @@ function buildBookReaderDom() {
             <div class="page left-page"><canvas id="leftPage"></canvas></div>
             <div class="page right-page"><canvas id="rightPage"></canvas></div>
           </div>
+          <div id="singlePageText"></div>
         </section>
 
         <div class="controls">
@@ -118,6 +119,7 @@ function mockPdfJs() {
         width: 600 * scale,
         height: 900 * scale,
       }),
+      getTextContent: jest.fn(() => Promise.resolve({ items: [] })),
       render,
     })
   );
@@ -137,6 +139,8 @@ async function flush() {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 async function waitForCommentCard(maxAttempts = 8) {
@@ -148,15 +152,27 @@ async function waitForCommentCard(maxAttempts = 8) {
   return null;
 }
 
+async function waitForCommentText(text, maxAttempts = 12) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (document.getElementById("commentsList")?.textContent.includes(text)) {
+      return true;
+    }
+    await flush();
+  }
+  return false;
+}
+
 describe("bookreader module", () => {
   const chapterComments = {
     11: [
       {
+        id: 101,
         uid: "reader-b",
         message: "Newest chapter 1",
         created_at: "2026-03-12T10:00:00.000Z",
       },
       {
+        id: 102,
         uid: "user-1",
         message: "Oldest chapter 1",
         created_at: "2026-03-10T08:00:00.000Z",
@@ -164,6 +180,7 @@ describe("bookreader module", () => {
     ],
     21: [
       {
+        id: 201,
         uid: "reader-z",
         message: "Book 2 comment",
         created_at: "2026-03-11T12:00:00.000Z",
@@ -456,7 +473,7 @@ describe("bookreader module", () => {
     await initBookReader();
     await flush();
 
-    const firstBefore = document.querySelector(".comment-card .comment-text");
+    const firstBefore = await waitForCommentCard();
     expect(firstBefore.textContent).toBe("Newest chapter 1");
 
     const filter = document.getElementById("filterComments");
@@ -495,6 +512,16 @@ describe("bookreader module", () => {
         selectedOptionIndex: 1,
       })
     );
+    expect(document.querySelector('input[name="bookPollOption"][value="1"]').disabled).toBe(true);
+    expect(document.getElementById("submitPollVote").disabled).toBe(true);
+    expect(document.getElementById("submitPollVote").textContent).toBe("Vote submitted");
+    expect(
+      document
+        .querySelector('input[name="bookPollOption"][value="1"]')
+        .closest(".poll-option")
+        .querySelector(".poll-option-result")
+        .textContent
+    ).toBe("1 vote (100%)");
   });
 
   test("shows only free chapters in dropdown for free users", async () => {
@@ -651,5 +678,166 @@ describe("bookreader module", () => {
     await flush();
     expect(frame.classList.contains("single-page-mode")).toBe(false);
     expect(localStorage.getItem("bookreaderViewMode.v1")).toBe("double");
+  });
+
+  test("refresh button reloads comments from the comments module", async () => {
+    let rows = [
+      {
+        id: 1,
+        uid: "reader-a",
+        message: "Initial comment",
+        created_at: "2026-03-10T08:00:00.000Z",
+      },
+    ];
+    getCommentsByChapterMock.mockImplementation(async () => ({ ok: true, data: rows }));
+
+    await initBookReader();
+    await flush();
+    expect(document.getElementById("commentsList").textContent).toContain("Initial comment");
+
+    rows = [
+      {
+        id: 2,
+        uid: "reader-b",
+        message: "Reloaded comment",
+        created_at: "2026-03-11T08:00:00.000Z",
+      },
+    ];
+    document.getElementById("refreshComments").click();
+    await expect(waitForCommentText("Reloaded comment")).resolves.toBe(true);
+
+    expect(document.getElementById("commentsList").textContent).toContain("Reloaded comment");
+    expect(document.getElementById("commentsList").textContent).not.toContain("Initial comment");
+  });
+
+  test("popular comment sort prioritizes threads with more replies", async () => {
+    getCommentsByChapterMock.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 10,
+          uid: "reader-a",
+          message: "Older thread with replies",
+          created_at: "2026-03-10T08:00:00.000Z",
+          comment_id: null,
+        },
+        {
+          id: 11,
+          uid: "reader-b",
+          message: "Newer thread without replies",
+          created_at: "2026-03-12T08:00:00.000Z",
+          comment_id: null,
+        },
+        {
+          id: 12,
+          uid: "reader-c",
+          message: "First reply",
+          created_at: "2026-03-10T09:00:00.000Z",
+          comment_id: 10,
+        },
+        {
+          id: 13,
+          uid: "reader-d",
+          message: "Second reply",
+          created_at: "2026-03-10T10:00:00.000Z",
+          comment_id: 10,
+        },
+      ],
+    });
+
+    await initBookReader();
+    await flush();
+
+    expect(document.querySelector(".comment-card .comment-text").textContent).toBe(
+      "Newer thread without replies"
+    );
+
+    const filter = document.getElementById("filterComments");
+    filter.value = "popular";
+    filter.dispatchEvent(new Event("change"));
+    await expect(waitForCommentText("Older thread with replies")).resolves.toBe(true);
+
+    expect(document.querySelector(".comment-card .comment-text").textContent).toBe(
+      "Older thread with replies"
+    );
+  });
+
+  test("posts replies with the parent comment id", async () => {
+    getCommentsByChapterMock.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 501,
+          uid: "reader-a",
+          message: "Root comment",
+          created_at: "2026-03-10T08:00:00.000Z",
+          comment_id: null,
+        },
+      ],
+    });
+
+    await initBookReader();
+    await flush();
+
+    document.querySelector(".reply-btn").click();
+    const textarea = document.querySelector(".reply-form textarea");
+    textarea.value = "A nested thought";
+    document.querySelector(".reply-form button").click();
+    await flush();
+
+    expect(submitCommentMock).toHaveBeenCalledWith({
+      chapterId: 11,
+      message: "A nested thought",
+      parentCommentId: 501,
+    });
+  });
+
+  test("shows validation instead of submitting when no poll option is selected", async () => {
+    await initBookReader();
+    await flush();
+
+    document.getElementById("submitPollVote").click();
+    await flush();
+
+    expect(submitAuthorQuestionVoteMock).not.toHaveBeenCalled();
+    expect(document.getElementById("pollStatus").textContent).toBe(
+      "Select one answer before submitting your vote."
+    );
+  });
+
+  test("shows an existing database poll vote without allowing another submission", async () => {
+    getAuthorQuestionByChapterMock.mockResolvedValue({
+      ok: true,
+      data: {
+        id: 101,
+        chapterId: 11,
+        title: "Author Question",
+        question: "What is motivating the lead character most in this chapter?",
+        options: [
+          "Protecting family at any cost",
+          "Seeking justice through the legal system",
+          "Escaping a painful past",
+        ],
+        selectedOption: 0,
+        voteCounts: [1, 0, 0],
+      },
+    });
+
+    await initBookReader();
+    await flush();
+
+    const option = document.querySelector('input[name="bookPollOption"][value="2"]');
+    expect(document.querySelector('input[name="bookPollOption"][value="0"]').checked).toBe(true);
+    expect(document.querySelector('input[name="bookPollOption"][value="0"]').disabled).toBe(true);
+    expect(document.getElementById("submitPollVote").disabled).toBe(true);
+
+    option.click();
+    document.getElementById("submitPollVote").click();
+    await flush();
+
+    expect(submitAuthorQuestionVoteMock).not.toHaveBeenCalled();
+    expect(document.getElementById("pollStatus").textContent).toContain(
+      "Your vote: Protecting family at any cost"
+    );
   });
 });
