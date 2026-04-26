@@ -1,18 +1,16 @@
 import { getSupabaseClient } from "./supabase.js";
 import { getCurrentSession, getSubscriberStatus } from "./auth.js";
 import { waitForElement } from "../utils/dom.js";
-import { APP_CONFIG, SUPABASE_CONFIG } from "../config.js";
-
-const FREE_LIMIT = APP_CONFIG.FREE_CHAPTER_COUNT;
+import { WORKSHEETS_CONFIG as APP_WORKSHEETS_CONFIG } from "../config.js";
 const WORKSHEETS_TABLE_CANDIDATES = ["worksheets", "Worksheets"];
 const DEFAULT_WORKSHEETS_BUCKET = "Worksheets";
 let activeWorksheetBlobUrl = null;
 
 const WORKSHEETS_CONFIG = {
-  TABLE: "worksheets",
-  BUCKET: "worksheets",
-  SIGNED_URL_EXPIRES_IN: 60 * 5,
-  FUNCTIONS_BASE_URL: `${String(SUPABASE_CONFIG?.URL || "").replace(/\/+$/, "")}/functions/v1`,
+  TABLE: APP_WORKSHEETS_CONFIG?.TABLE || "worksheets",
+  BUCKET: APP_WORKSHEETS_CONFIG?.BUCKET || "worksheets",
+  SIGNED_URL_EXPIRES_IN: APP_WORKSHEETS_CONFIG?.SIGNED_URL_EXPIRES_IN || 60 * 5,
+  FUNCTIONS_BASE_URL: String(APP_WORKSHEETS_CONFIG?.FUNCTIONS_BASE_URL || "").replace(/\/+$/, ""),
 };
 
 /**
@@ -60,26 +58,6 @@ async function fetchWorksheets(supabase) {
   });
 
   return Array.isArray(data) ? data : [];
-}
-
-/**
- * Fetches a single worksheet by ID while supporting both numeric and string identifiers.
- */
-async function fetchWorksheetById(supabase, worksheetId) {
-  const idAsNumber = Number(worksheetId);
-  const isNumericId = !Number.isNaN(idAsNumber) && String(idAsNumber) === String(worksheetId);
-
-  const data = await runWorksheetsQuery((tableName) => {
-    let query = supabase
-      .from(tableName)
-      .select("id,created_at,title,description,file_path")
-      .limit(1);
-
-    query = isNumericId ? query.eq("id", idAsNumber) : query.eq("id", worksheetId);
-    return query.maybeSingle();
-  });
-
-  return data || null;
 }
 
 /**
@@ -199,6 +177,48 @@ async function getWorksheetPdfUrl(worksheet, options = {}) {
 }
 
 /**
+ * Fetches worksheet PDF bytes through the secured backend edge function.
+ */
+async function getWorksheetPdfUrlFromBackend(worksheetId) {
+  if (!WORKSHEETS_CONFIG.FUNCTIONS_BASE_URL) {
+    throw new Error("Worksheet functions endpoint is not configured.");
+  }
+
+  const endpoint = `${WORKSHEETS_CONFIG.FUNCTIONS_BASE_URL}/download-worksheet?id=${encodeURIComponent(String(worksheetId))}`;
+  const session = await getCurrentSession();
+  const headers = {
+    Accept: "application/pdf",
+  };
+
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  }
+
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = "Failed to retrieve worksheet file";
+    try {
+      const payload = await response.json();
+      if (payload?.error) {
+        message = payload.error;
+      }
+    } catch {
+      // Keep fallback error message.
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  clearActiveWorksheetBlobUrl();
+  activeWorksheetBlobUrl = URL.createObjectURL(blob);
+  return activeWorksheetBlobUrl;
+}
+
+/**
  * Escapes text for safe HTML rendering.
  */
 function escapeHtml(value) {
@@ -243,7 +263,24 @@ function renderWorksheetError(error) {
 }
 
 /**
- * Renders worksheet cards and wires click handling for opening accessible worksheets.
+ * Builds display tags for worksheet metadata cards.
+ */
+function getWorksheetTags(worksheet, updatedLabel) {
+  const tags = ["PDF", `Updated ${updatedLabel}`];
+
+  if (worksheet?.grade_level) {
+    tags.unshift(`Grade ${String(worksheet.grade_level).trim()}`);
+  }
+
+  if (worksheet?.subject) {
+    tags.unshift(String(worksheet.subject).trim());
+  }
+
+  return tags.filter(Boolean).slice(0, 4);
+}
+
+/**
+ * Renders worksheet cards and wires click handling for secured worksheet downloads.
  */
 function renderWorksheets({ worksheets, isSubscriber = false }) {
   const worksheetList = document.getElementById("worksheetList");
@@ -263,13 +300,16 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
 
   worksheets.forEach((worksheet, index) => {
     const worksheetOrder = index + 1;
-    const isLocked = !isSubscriber && worksheetOrder > FREE_LIMIT;
+    const isLocked = !isSubscriber;
     const title = escapeHtml(String(worksheet.title || "").trim() || `Worksheet ${worksheetOrder}`);
     const description = escapeHtml(String(worksheet.description || "").trim());
-    const statusText = isLocked ? "Locked" : "Available";
+    const statusText = isLocked ? "Subscribers" : "Download ready";
     const statusClass = isLocked ? "worksheet-card__status--locked" : "worksheet-card__status--available";
-    const ctaLabel = isLocked ? "Subscribers Only" : "Open Worksheet";
+    const ctaLabel = isLocked ? "Subscribers Only" : "Download PDF";
     const updatedLabel = escapeHtml(formatWorksheetDate(worksheet.created_at));
+    const tags = getWorksheetTags(worksheet, updatedLabel)
+      .map((tag) => `<span class="worksheet-card__tag">${escapeHtml(tag)}</span>`)
+      .join("");
 
     html += `
       <article class="worksheet-card ${isLocked ? "worksheet-card--locked" : ""}">
@@ -279,8 +319,7 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
         </div>
 
         <div class="worksheet-card__tags" aria-label="Worksheet metadata">
-          <span class="worksheet-card__tag">PDF</span>
-          <span class="worksheet-card__tag">Updated ${updatedLabel}</span>
+          ${tags}
         </div>
 
         ${description ? `<p class="worksheet-card__description">${description}</p>` : ""}
@@ -290,7 +329,6 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
           class="worksheet-button worksheet-card__cta"
           data-worksheet-id="${worksheet.id}"
           data-worksheet-order="${worksheetOrder}"
-          ${isLocked ? "disabled aria-disabled=\"true\"" : ""}
         >
           ${ctaLabel}
         </button>
@@ -301,15 +339,31 @@ function renderWorksheets({ worksheets, isSubscriber = false }) {
   worksheetList.innerHTML = html;
 
   if (!worksheetList.dataset.listenerAttached) {
-    worksheetList.addEventListener("click", (e) => {
+    worksheetList.addEventListener("click", async (e) => {
       const btn = e.target.closest(".worksheet-button");
       if (!btn || btn.disabled) return;
 
       const worksheetId = btn.dataset.worksheetId;
-      const worksheetOrder = Number(btn.dataset.worksheetOrder || "1");
       if (!worksheetId) return;
 
-      handleLockedWorksheet(worksheetId, worksheetOrder);
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Preparing...";
+
+      try {
+        const result = await handleLockedWorksheet(worksheetId);
+        if (result?.success) {
+          btn.textContent = "Download Again";
+          return;
+        }
+
+        btn.textContent = originalLabel;
+        if (result?.message) {
+          alert(result.message);
+        }
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     worksheetList.dataset.listenerAttached = "true";
@@ -347,12 +401,7 @@ export async function getWorksheetFileUrl(worksheetId, options = {}) {
   }
 
   try {
-    const worksheet = await fetchWorksheetById(supabase, worksheetId);
-    if (!worksheet || !worksheet.file_path) {
-      return { success: false, message: "Worksheet file not found" };
-    }
-
-    const url = await getWorksheetPdfUrl(worksheet, options);
+    const url = await getWorksheetPdfUrlFromBackend(worksheetId, options);
     return { success: true, data: { url } };
   } catch (error) {
     return {
@@ -371,94 +420,24 @@ export async function downloadWorksheet(worksheetId) {
     return { success: false, message: result.message || "Failed to create download link" };
   }
 
-  window.open(result.data.url, "_blank");
+  const link = document.createElement("a");
+  link.href = result.data.url;
+  link.download = "";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
   return { success: true, message: "Download started" };
 }
 
 /**
- * Initializes the worksheet reader screen and enforces worksheet access rules.
+ * Worksheet reader page is deprecated and now forwards to worksheets.
  */
 export async function initializeWorksheetReaderScreen() {
-  await waitForElement("#worksheetTitle", 1000);
-
-  const worksheetId = sessionStorage.getItem("activeWorksheetId");
-  if (!worksheetId) {
-    window.location.hash = "worksheets";
-    return;
-  }
-
-  const supabase = getSupabaseClient();
-  if (!supabase) {
-    throw new Error("Supabase client is not initialized.");
-  }
-
-  const worksheet = await fetchWorksheetById(supabase, worksheetId);
-  if (!worksheet) {
-    window.location.hash = "worksheets";
-    return;
-  }
-
-  const allWorksheets = await fetchWorksheets(supabase);
-  const worksheetIndex = allWorksheets.findIndex((item) => String(item.id) === String(worksheet.id));
-  const worksheetOrder = worksheetIndex >= 0 ? worksheetIndex + 1 : 1;
-
-  if (worksheetOrder > FREE_LIMIT) {
-    const session = await getCurrentSession();
-
-    if (!session || !session.user) {
-      sessionStorage.setItem("returnTo", "worksheets");
-      sessionStorage.setItem("requestedWorksheetId", String(worksheet.id));
-      window.showLogin();
-      return;
-    }
-
-    const subInfo = await getSubscriberStatus();
-    if (!subInfo.isSubscriber) {
-      alert("Subscribers only.");
-      window.location.hash = "worksheets";
-      return;
-    }
-  }
-
-  const titleEl = document.getElementById("worksheetTitle");
-  const bodyEl = document.getElementById("worksheetBody");
-  const backBtn = document.getElementById("backToWorksheetsBtn");
-
-  const worksheetTitle = String(worksheet.title || "").trim() || `Worksheet ${worksheetOrder}`;
-  if (titleEl) titleEl.textContent = worksheetTitle;
-
-  if (bodyEl) {
-    bodyEl.textContent = "Loading worksheet...";
-
-    try {
-      const pdfUrl = await getWorksheetPdfUrl(worksheet);
-      bodyEl.innerHTML = `
-        <iframe
-          title="${worksheetTitle} PDF"
-          src="${pdfUrl}#toolbar=1&navpanes=0"
-        ></iframe>
-        <p class="worksheet-reader-page__fallbackLink">
-          Having trouble viewing this file?
-          <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer">Open worksheet PDF in a new tab</a>.
-        </p>
-      `;
-    } catch (error) {
-      console.error(`Failed to load worksheet ${worksheetTitle} from storage:`, error);
-      bodyEl.innerHTML = `
-        <article class="worksheet-state worksheet-state--error" role="alert">
-          <h3>${worksheetTitle}</h3>
-          <p>This worksheet PDF is not available yet. Please check back later.</p>
-        </article>
-      `;
-    }
-  }
-
-  if (backBtn) {
-    backBtn.onclick = () => {
-      clearActiveWorksheetBlobUrl();
-      window.location.hash = "worksheets";
-    };
-  }
+  clearActiveWorksheetBlobUrl();
+  window.location.hash = "worksheets";
 }
 
 /**
@@ -502,35 +481,30 @@ export async function initializeWorksheetsScreen() {
   const requestedWorksheetId = sessionStorage.getItem("requestedWorksheetId");
   if (requestedWorksheetId) {
     sessionStorage.removeItem("requestedWorksheetId");
-
-    const requestedIndex = worksheets.findIndex((item) => String(item.id) === String(requestedWorksheetId));
-    const requestedOrder = requestedIndex >= 0 ? requestedIndex + 1 : 1;
-    await handleLockedWorksheet(requestedWorksheetId, requestedOrder);
+    await handleLockedWorksheet(requestedWorksheetId);
   }
 }
 
 /**
- * Handles worksheet navigation and access control for free and subscriber-only worksheets.
+ * Handles worksheet download and access control for free and subscriber-only worksheets.
  */
-export async function handleLockedWorksheet(worksheetId, worksheetOrder = 1) {
-  const isFreeWorksheet = worksheetOrder <= FREE_LIMIT;
-
-  if (!isFreeWorksheet) {
-    const session = await getCurrentSession();
-    if (!session || !session.user) {
-      sessionStorage.setItem("returnTo", "#worksheets");
-      sessionStorage.setItem("requestedWorksheetId", String(worksheetId));
-      window.showLogin();
-      return;
-    }
-
-    const subInfo = await getSubscriberStatus();
-    if (!subInfo?.isSubscriber) {
-      alert("Subscribers only.");
-      return;
-    }
+export async function handleLockedWorksheet(worksheetId) {
+  if (!worksheetId) {
+    return { success: false, message: "Worksheet ID is missing." };
   }
 
-  sessionStorage.setItem("activeWorksheetId", String(worksheetId));
-  window.location.hash = "worksheet-reader";
+  const session = await getCurrentSession();
+  if (!session || !session.user) {
+    sessionStorage.setItem("returnTo", "#worksheets");
+    sessionStorage.setItem("requestedWorksheetId", String(worksheetId));
+    window.showLogin();
+    return { success: false };
+  }
+
+  const subInfo = await getSubscriberStatus();
+  if (!subInfo?.isSubscriber) {
+    return { success: false, message: "Subscribers only." };
+  }
+
+  return downloadWorksheet(worksheetId);
 }

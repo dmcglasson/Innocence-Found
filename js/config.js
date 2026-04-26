@@ -16,12 +16,26 @@ export const SUPABASE_CONFIG = {
   ANON_KEY: envVars.SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY_HERE",
 };
 
+/**
+ * Base URL for Supabase Edge Functions (same project as SUPABASE_CONFIG.URL).
+ */
+export function getSupabaseFunctionsBaseUrl() {
+  const url = (SUPABASE_CONFIG.URL || "").replace(/\/+$/, "");
+  if (!url) return "";
+  return `${url}/functions/v1`;
+}
+
+
+
+
+
 // Application Settings
 export const APP_CONFIG = {
   DEFAULT_PAGE: "home",
   SCREENS_PATH: "screens/",
-  CACHE_ENABLED: !IS_LOCAL_DEV,
-  FREE_CHAPTER_COUNT: 2,
+  CACHE_ENABLED: false,
+  FREE_CHAPTER_COUNT: 6,
+  FREE_WORKSHEET_COUNT: 1,
   TOTAL_CHAPTERS: 10,
 };
 
@@ -30,7 +44,7 @@ export const WORKSHEETS_CONFIG = {
   TABLE: "worksheets",
   BUCKET: envVars.SUPABASE_WORKSHEETS_BUCKET || "worksheets",
   SIGNED_URL_EXPIRES_IN: 60 * 5, // 5 minutes
-  FUNCTIONS_BASE_URL: "https://khiwkbnqjjycmwonbhqu.supabase.co/functions/v1",
+  FUNCTIONS_BASE_URL: envVars.SUPABASE_FUNCTIONS_BASE_URL || getSupabaseFunctionsBaseUrl(),
 };
 
 // Validation for debugging (does not break the app)

@@ -464,6 +464,13 @@ export async function fetchBookReaderEntries() {
     return { ok: false, data: [], message: "Supabase client not initialized." };
   }
 
+  const session = await getCurrentSession();
+  let canAccessLockedChapters = false;
+  if (session?.user) {
+    const subInfo = await getSubscriberStatus();
+    canAccessLockedChapters = !!subInfo?.isSubscriber;
+  }
+
   const { data: rows, error } = await supabase
     .from(CHAPTERS_TABLE)
     .select("id,chapter_num,book_id,chapter_id,free")
@@ -478,6 +485,13 @@ export async function fetchBookReaderEntries() {
   for (const row of rows || []) {
     if (!row?.chapter_id) continue;
 
+    const chapterNum = Number(row.chapter_num) || 1;
+    const isFreeChapter = chapterNum <= FREE_LIMIT;
+
+    if (!isFreeChapter && !canAccessLockedChapters) {
+      continue;
+    }
+
     try {
       const objectRef = await fetchStorageObjectById(supabase, row.chapter_id);
       if (!objectRef) continue;
@@ -490,14 +504,13 @@ export async function fetchBookReaderEntries() {
       if (!url) continue;
 
       const bookId = Number(row.book_id) || 1;
-      const chapterNum = Number(row.chapter_num) || 1;
       entries.push({
         chapterId: row.id ?? null,
         chapterNum,
         bookId,
-        free: !!row.free,
+        free: isFreeChapter,
         url,
-        label: `Book ${bookId} - Chapter ${chapterNum}${row.free ? "" : " (Subscribers)"}`,
+        label: `Book ${bookId} - Chapter ${chapterNum}${isFreeChapter ? "" : " (Subscribers)"}`,
       });
     } catch (entryError) {
       console.warn("Skipping chapter entry due to URL resolution error:", entryError);
@@ -519,7 +532,7 @@ export async function initializeChapterReaderScreen() {
 
   // If someone navigates to #chapter-reader directly without selecting a chapter.
   if (!chapterNumber) {
-    window.location.hash = "chapters";
+    window.location.hash = "bookreader";
     return;
   }
 
@@ -528,7 +541,7 @@ export async function initializeChapterReaderScreen() {
 
     // Not logged in -> send to login.
     if (!session || !session.user) {
-      sessionStorage.setItem("returnTo", "chapters");
+      sessionStorage.setItem("returnTo", "#bookreader");
       sessionStorage.setItem("requestedChapter", String(chapterNumber));
       window.showLogin();
       return;
@@ -538,7 +551,7 @@ export async function initializeChapterReaderScreen() {
     const subInfo = await getSubscriberStatus();
     if (!subInfo.isSubscriber) {
       alert("Subscribers only.");
-      window.location.hash = "chapters";
+      window.location.hash = "bookreader";
       return;
     }
   }
@@ -592,7 +605,7 @@ export async function initializeChapterReaderScreen() {
         URL.revokeObjectURL(activeChapterBlobUrl);
         activeChapterBlobUrl = null;
       }
-      window.location.hash = "chapters";
+      window.location.hash = "bookreader";
     };
   }
 
@@ -675,9 +688,15 @@ export async function handleLockedChapter(chapterNumber) {
   if (!isFreeChapter) {
     const session = await getCurrentSession();
     if (!session || !session.user) {
-      sessionStorage.setItem("returnTo", "#chapters");
+      sessionStorage.setItem("returnTo", "#bookreader");
       sessionStorage.setItem("requestedChapter", String(chapterNumber));
       window.showLogin();
+      return;
+    }
+
+    const subInfo = await getSubscriberStatus();
+    if (!subInfo?.isSubscriber) {
+      alert("Subscribers only.");
       return;
     }
   }

@@ -1,425 +1,96 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login - Innocence Found</title>
+<section class="auth-scene">
+  <img src="frontend/images/loginbg.png" class="auth-scene__bgImg" alt="">
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+  <div class="auth-scene__overlay"></div>
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      min-height: 100%;
-      overflow-x: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f4e4c9;
-      color: #5a3b2e;
-    }
+  <div class="auth-box auth-box--storybook" id="loginBox">
+    <h1 class="auth-title">Welcome Back to Innocence Found</h1>
+    <p class="auth-subtitle">Open your next chapter.</p>
 
-    body {
-      min-height: 100vh;
-    }
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="loginEmail">Email address</label>
+        <input
+          type="email"
+          id="loginEmail"
+          placeholder="Email address"
+          required
+          autocomplete="email"
+        >
+      </div>
 
-    .auth-scene {
-      position: relative;
-      min-height: 100vh;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 32px 16px;
-      overflow: hidden;
-    }
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <input
+          type="password"
+          id="loginPassword"
+          placeholder="Password"
+          required
+          autocomplete="current-password"
+        >
+        <a class="auth-link auth-link--forgot" href="#" id="forgotPasswordLink">Forgot Password?</a>
+      </div>
 
-    .auth-scene__bgImg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 0;
-    }
+      <button type="submit" class="btn btn-amber btn--block auth-btn" id="loginBtn">
+        Open the Book
+      </button>
+    </form>
 
-    .auth-scene__overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(66, 42, 25, 0.38);
-      z-index: 1;
-    }
+    <div class="message" id="loginMessage"></div>
 
-    .auth-box {
-      position: relative;
-      z-index: 2;
-      width: 100%;
-      max-width: 460px;
-      background: rgba(250, 242, 230, 0.96);
-      border: 2px solid #d8a96c;
-      border-radius: 18px;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
-      padding: 28px 24px;
-    }
+    <p class="switch-text">
+      New here?
+      <a href="#" id="signupSwitchLink">Create an account</a>
+    </p>
+  </div>
 
-    .auth-title {
-      margin: 0 0 8px;
-      font-size: 2rem;
-      line-height: 1.15;
-      text-align: center;
-      color: #5a3b2e;
-      font-family: "Playfair Display", "Times New Roman", serif;
-    }
+  <div class="auth-box auth-box--storybook" id="signupBox" style="display:none;">
+    <h1 class="auth-title">Create Account</h1>
+    <p class="auth-subtitle">Begin your story.</p>
 
-    .auth-subtitle {
-      margin: 0 0 22px;
-      text-align: center;
-      color: #7b5c3f;
-      font-size: 0.98rem;
-    }
+    <form id="signupForm">
+      <div class="form-group">
+        <label for="signupFirstName">First Name</label>
+        <input type="text" id="signupFirstName" placeholder="First Name" required autocomplete="given-name">
+      </div>
 
-    .form-group {
-      margin-bottom: 16px;
-    }
+      <div class="form-group">
+        <label for="signupLastName">Last Name</label>
+        <input type="text" id="signupLastName" placeholder="Last Name" required autocomplete="family-name">
+      </div>
 
-    label {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 6px;
-      color: #5a3b2e;
-    }
+      <div class="form-group">
+        <label for="signupParent">Are you a parent or guardian?</label>
+        <input type="checkbox" id="signupParent" name="signupParent" placeholder="Test">
+      </div>
 
-    input[type="text"],
-    input[type="email"],
-    input[type="password"] {
-      width: 100%;
-      max-width: 100%;
-      padding: 12px 12px;
-      border-radius: 10px;
-      border: 1px solid #d8a96c;
-      background-color: #fff8ed;
-      font-size: 16px;
-      color: #5a3b2e;
-    }
+      <div class="form-group">
+        <label for="signupEmail">Email</label>
+        <input type="email" id="signupEmail" placeholder="Email address" required autocomplete="email">
+      </div>
 
-    input[type="text"]:focus,
-    input[type="email"]:focus,
-    input[type="password"]:focus {
-      outline: none;
-      border-color: #c27b32;
-      box-shadow: 0 0 0 3px rgba(194, 123, 50, 0.18);
-    }
+      <div class="form-group">
+        <label for="signupPassword">Password</label>
+        <input
+          type="password"
+          id="signupPassword"
+          placeholder="Create a password"
+          required
+          minlength="8"
+          autocomplete="new-password"
+        >
+      </div>
 
-    input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: #d18a2b;
-    }
+      <button type="submit" class="btn btn-amber btn--block auth-btn" id="signupBtn">
+        Create Account
+      </button>
+    </form>
 
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
+    <div class="message" id="signupMessage"></div>
 
-    .checkbox-row label {
-      margin: 0;
-      font-weight: 500;
-    }
-
-    .auth-link {
-      color: #8a5a33;
-      text-decoration: none;
-      font-size: 14px;
-    }
-
-    .auth-link:hover {
-      text-decoration: underline;
-    }
-
-    .auth-link--forgot {
-      display: inline-block;
-      margin-top: 8px;
-    }
-
-    .btn {
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 16px;
-      transition: background-color 0.15s ease, transform 0.08s ease;
-    }
-
-    .btn-amber {
-      background-color: #d18a2b;
-      color: #ffffff;
-      box-shadow: 0 4px 0 #b6731a;
-    }
-
-    .btn-amber:hover {
-      background-color: #e39833;
-    }
-
-    .btn-amber:active {
-      transform: translateY(2px);
-      box-shadow: 0 2px 0 #b6731a;
-    }
-
-    .btn--block,
-    .auth-btn {
-      display: block;
-      width: 100%;
-      padding: 13px 14px;
-      margin-top: 8px;
-    }
-
-    .message {
-      min-height: 20px;
-      margin-top: 14px;
-      font-size: 14px;
-      text-align: center;
-      color: #b3261e;
-      word-break: break-word;
-    }
-
-    .switch-text {
-      margin: 18px 0 0;
-      text-align: center;
-      font-size: 14px;
-      line-height: 1.5;
-      color: #6a4632;
-    }
-
-    .switch-text a {
-      color: #8a5a33;
-      font-weight: 700;
-      text-decoration: none;
-    }
-
-    .switch-text a:hover {
-      text-decoration: underline;
-    }
-
-    @media (max-width: 768px) {
-      .auth-scene {
-        padding: 24px 12px;
-        align-items: flex-start;
-      }
-
-      .auth-box {
-        max-width: 100%;
-        padding: 22px 16px;
-        border-radius: 16px;
-      }
-
-      .auth-title {
-        font-size: 1.55rem;
-      }
-
-      .auth-subtitle {
-        font-size: 0.95rem;
-        margin-bottom: 18px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .auth-scene {
-        padding: 16px 10px 24px;
-      }
-
-      .auth-box {
-        padding: 18px 14px;
-      }
-
-      .auth-title {
-        font-size: 1.35rem;
-      }
-
-      label,
-      .auth-link,
-      .switch-text,
-      .message {
-        font-size: 13px;
-      }
-
-      input[type="text"],
-      input[type="email"],
-      input[type="password"] {
-        padding: 11px 10px;
-        font-size: 16px;
-      }
-
-      .btn--block,
-      .auth-btn {
-        padding: 12px;
-        font-size: 15px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <section class="auth-scene">
-    <img src="../frontend/images/loginbg.png" class="auth-scene__bgImg" alt="" aria-hidden="true">
-    <div class="auth-scene__overlay"></div>
-
-    <div class="auth-box auth-box--storybook" id="loginBox">
-      <h1 class="auth-title">Welcome Back to Innocence Found</h1>
-      <p class="auth-subtitle">Open your next chapter.</p>
-
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="loginEmail">Email address</label>
-          <input
-            type="email"
-            id="loginEmail"
-            placeholder="Email address"
-            required
-            autocomplete="email"
-          >
-        </div>
-
-        <div class="form-group">
-          <label for="loginPassword">Password</label>
-          <input
-            type="password"
-            id="loginPassword"
-            placeholder="Password"
-            required
-            autocomplete="current-password"
-          >
-          <a class="auth-link auth-link--forgot" href="#" id="forgotPasswordLink">Forgot Password?</a>
-        </div>
-
-        <button type="submit" class="btn btn-amber btn--block auth-btn" id="loginBtn">
-          Open the Book
-        </button>
-      </form>
-
-      <div class="message" id="loginMessage"></div>
-
-      <p class="switch-text">
-        New here?
-        <a href="#" id="signupSwitchLink">Create an account</a>
-      </p>
-    </div>
-
-    <div class="auth-box auth-box--storybook" id="signupBox" style="display:none;">
-      <h1 class="auth-title">Create Account</h1>
-      <p class="auth-subtitle">Begin your story.</p>
-
-      <form id="signupForm">
-        <div class="form-group">
-          <label for="signupFirstName">First Name</label>
-          <input type="text" id="signupFirstName" placeholder="First Name" required autocomplete="given-name">
-        </div>
-
-        <div class="form-group">
-          <label for="signupLastName">Last Name</label>
-          <input type="text" id="signupLastName" placeholder="Last Name" required autocomplete="family-name">
-        </div>
-
-        <div class="checkbox-row">
-          <input type="checkbox" id="signupParent" name="signupParent">
-          <label for="signupParent">Are you a parent or guardian?</label>
-        </div>
-
-        <div class="form-group">
-          <label for="signupEmail">Email</label>
-          <input type="email" id="signupEmail" placeholder="Email address" required autocomplete="email">
-        </div>
-
-        <div class="form-group">
-          <label for="signupPassword">Password</label>
-          <input
-            type="password"
-            id="signupPassword"
-            placeholder="Create a password"
-            required
-            minlength="8"
-            autocomplete="new-password"
-          >
-        </div>
-
-        <button type="submit" class="btn btn-amber btn--block auth-btn" id="signupBtn">
-          Create Account
-        </button>
-      </form>
-
-      <div class="message" id="signupMessage"></div>
-
-      <p class="switch-text">
-        Already have an account?
-        <a href="#" id="loginSwitchLink">Sign in</a>
-      </p>
-    </div>
-  </section>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const loginBox = document.getElementById("loginBox");
-      const signupBox = document.getElementById("signupBox");
-
-      const signupSwitchLink = document.getElementById("signupSwitchLink");
-      const loginSwitchLink = document.getElementById("loginSwitchLink");
-      const forgotPasswordLink = document.getElementById("forgotPasswordLink");
-
-      const loginMessage = document.getElementById("loginMessage");
-      const signupMessage = document.getElementById("signupMessage");
-
-      const loginForm = document.getElementById("loginForm");
-      const signupForm = document.getElementById("signupForm");
-
-      if (signupSwitchLink) {
-        signupSwitchLink.addEventListener("click", function (e) {
-          e.preventDefault();
-          loginBox.style.display = "none";
-          signupBox.style.display = "block";
-          loginMessage.textContent = "";
-          signupMessage.textContent = "";
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        });
-      }
-
-      if (loginSwitchLink) {
-        loginSwitchLink.addEventListener("click", function (e) {
-          e.preventDefault();
-          signupBox.style.display = "none";
-          loginBox.style.display = "block";
-          loginMessage.textContent = "";
-          signupMessage.textContent = "";
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        });
-      }
-
-      if (forgotPasswordLink) {
-        forgotPasswordLink.addEventListener("click", function (e) {
-          e.preventDefault();
-          loginMessage.style.color = "#8a5a33";
-          loginMessage.textContent = "Forgot password flow is not connected yet.";
-        });
-      }
-
-      if (loginForm) {
-        loginForm.addEventListener("submit", function (e) {
-          e.preventDefault();
-          loginMessage.style.color = "#8a5a33";
-          loginMessage.textContent = "Login form submitted.";
-        });
-      }
-
-      if (signupForm) {
-        signupForm.addEventListener("submit", function (e) {
-          e.preventDefault();
-          signupMessage.style.color = "#8a5a33";
-          signupMessage.textContent = "Signup form submitted.";
-        });
-      }
-    });
-  </script>
-</body>
-</html>
+    <p class="switch-text">
+      Already have an account?
+      <a href="#" id="loginSwitchLink">Sign in</a>
+    </p>
+  </div>
+</section>

@@ -37,11 +37,18 @@ function toDisplayName(user) {
   return metadata.name || metadata.full_name || combined || user?.email || "-";
 }
 
-function toSubscriberLabel(user) {
-  const metadata = user?.user_metadata || {};
-  const raw = metadata.subscriber;
-  const isSubscriber = raw === true || String(raw).toLowerCase() === "true";
-  return isSubscriber ? "Subscriber" : "Free";
+function toSubscriberLabel(role) {
+  if (role === "admin") return "Admin";
+  if (role === "subscriber") return "Subscriber";
+  return "Free";
+}
+
+function getFallbackSubscriberRole(user) {
+  if (user?.user_metadata?.role === "admin") return "admin";
+  if (user?.user_metadata?.subscriber === true || user?.user_metadata?.subscriber === "true") {
+    return "subscriber";
+  }
+  return "free";
 }
 
 function showStatus(message, type = "success") {
@@ -67,6 +74,7 @@ function clearStatus() {
 function clearErrors() {
   setDisplay("nameError", "none");
   setDisplay("emailError", "none");
+  setDisplay("usernameError", "none");
 }
 
 function isValidEmail(email) {
@@ -101,30 +109,47 @@ function setActiveTab(tabId) {
 }
 
 async function populateProfile() {
+  const supabase = getSupabaseClient();
   const session = await getCurrentSession();
   const user = session?.user;
 
   if (!user) {
     setText("viewName", "Not signed in");
     setText("viewName2", "Not signed in");
+    setText("viewUsername", "—");
     setText("viewEmail", "-");
     setText("viewSubscription", "Subscription: -");
     setText("viewEnrolled", "-");
     setInputValue("nameInput", "");
+    setInputValue("usernameInput", "");
     setInputValue("emailInput", "");
     return;
   }
 
   const displayName = toDisplayName(user);
+  const fallbackRole = getFallbackSubscriberRole(user);
 
   setText("viewName", displayName);
   setText("viewName2", displayName);
   setText("viewEmail", user.email || "-");
-  setText("viewSubscription", `Subscription: ${toSubscriberLabel(user)}`);
   setText("viewEnrolled", formatDate(user.created_at));
-
   setInputValue("nameInput", displayName === "-" ? "" : displayName);
   setInputValue("emailInput", user.email || "");
+  setText("viewUsername", "—");
+  setText("viewSubscription", `Subscription: ${toSubscriberLabel(fallbackRole)}`);
+
+  if (supabase && typeof supabase.from === "function") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("username, role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const username = profile?.username || "";
+    setText("viewUsername", username || "—");
+    setInputValue("usernameInput", username);
+    setText("viewSubscription", `Subscription: ${toSubscriberLabel(profile?.role)}`);
+  }
 }
 
 async function handleProfileSave(event) {
@@ -143,17 +168,24 @@ async function handleProfileSave(event) {
 
   const nameInput = document.getElementById("nameInput");
   const emailInput = document.getElementById("emailInput");
+  const usernameInput = document.getElementById("usernameInput");
   const toggleEmailEdit = document.getElementById("toggleEmailEdit");
   const saveBtn = document.getElementById("saveProfileBtn");
 
   const name = (nameInput?.value || "").trim();
   const email = (emailInput?.value || "").trim();
+  const username = (usernameInput?.value || "").trim();
   const shouldUpdateEmail = !!toggleEmailEdit?.checked;
 
   let hasError = false;
 
   if (!name) {
     setDisplay("nameError", "block");
+    hasError = true;
+  }
+
+  if (username.length > 30) {
+    setDisplay("usernameError", "block");
     hasError = true;
   }
 
@@ -170,20 +202,18 @@ async function handleProfileSave(event) {
   }
 
   try {
-    const payload = {
-      data: {
-        name,
-        full_name: name,
-      },
-    };
+    const payload = { data: { name, full_name: name } };
+    if (shouldUpdateEmail) payload.email = email;
 
-    if (shouldUpdateEmail) {
-      payload.email = email;
+    const { error: authError } = await supabase.auth.updateUser(payload);
+    if (authError) throw authError;
+
+    if (typeof supabase.from === "function") {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({ user_id: user.id, username: username || null }, { onConflict: "user_id" });
+      if (profileError) throw profileError;
     }
-
-    const { error } = await supabase.auth.updateUser(payload);
-
-    if (error) throw error;
 
     await populateProfile();
     setViewMode(false);
@@ -203,12 +233,19 @@ async function handlePasswordSave(event) {
   clearStatus();
 
   const supabase = getSupabaseClient();
+  const currentPasswordInput = document.getElementById("currentPasswordInput");
   const passwordInput = document.getElementById("newPasswordInput");
   const submitBtn = event.target.querySelector('button[type="submit"]');
+  const currentPassword = (currentPasswordInput?.value || "").trim();
   const newPassword = (passwordInput?.value || "").trim();
 
   if (!supabase) {
     showStatus("Supabase client not initialized.", "error");
+    return;
+  }
+
+  if (currentPasswordInput && !currentPassword) {
+    showStatus("Please enter your current password.", "error");
     return;
   }
 
@@ -223,9 +260,32 @@ async function handlePasswordSave(event) {
   }
 
   try {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const authApi = supabase.auth || {};
+
+    if (
+      currentPasswordInput &&
+      typeof authApi.getUser === "function" &&
+      typeof authApi.signInWithPassword === "function"
+    ) {
+      const { data: userData } = await authApi.getUser();
+      const user = userData?.user;
+      if (!user?.email) throw new Error("Could not retrieve your account details.");
+
+      const { error: signInError } = await authApi.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (signInError) throw new Error("Current password is incorrect.");
+    }
+
+    if (typeof authApi.updateUser !== "function") {
+      throw new Error("Password updates are unavailable right now.");
+    }
+
+    const { error } = await authApi.updateUser({ password: newPassword });
     if (error) throw error;
 
+    if (currentPasswordInput) currentPasswordInput.value = "";
     if (passwordInput) passwordInput.value = "";
     showStatus("Password updated successfully.", "success");
   } catch (error) {

@@ -1,6 +1,7 @@
 import { submitComment as submitCommentToDB, getCommentsByChapter } from "./comments.js";
 import { getSupabaseClient } from "./supabase.js";
 import { fetchBookReaderEntries } from "./chapters.js";
+import { getAuthorQuestionByChapter, submitAuthorQuestionVote } from "./author_question.js";
 import { getSubscriberStatus } from "./auth.js";
 // === PDF.js Book Viewer (SPA-friendly) ===
 const PDF_JS_SRC = "https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js";
@@ -21,6 +22,10 @@ let currentChapterNum = 1;
 const chapterMetaByUrl = new Map();
 let isSinglePageMode = false;
 let preferredViewMode = loadPreferredViewMode();
+let cachedComments = null;
+let userZoom = 1.0;
+let singlePageTextEl = null;
+let zoomControls = null;
 
 async function refreshAuthState() {
   const supabase = getSupabaseClient();
@@ -70,23 +75,6 @@ function getCurrentChapterId() {
   return Number.isInteger(fallback) && fallback > 0 ? fallback : null;
 }
 
-function getCurrentPollKey() {
-  const meta = getCurrentSelectionMeta();
-  const chapterNum = Number(meta?.chapterNum);
-  const bookId = Number(meta?.bookId);
-  if (Number.isInteger(bookId) && bookId > 0 && Number.isInteger(chapterNum) && chapterNum > 0) {
-    return `book-${bookId}-chapter-${chapterNum}`;
-  }
-
-  if (Number.isInteger(bookId) && bookId > 0) {
-    return `book-${bookId}`;
-  }
-
-  if (currentUrl.includes("book1")) return "book-1";
-  if (currentUrl.includes("book2")) return "book-2";
-  return currentUrl;
-}
-
 let canvasLeft;
 let canvasRight;
 let ctxLeft;
@@ -110,6 +98,7 @@ let newCommentText;
 let submitComment;
 let subscriberNotice;
 let readerError;
+let chapterLoadNotice;
 let jumpToDiscussionBtn;
 let bookFrame;
 let commentsPanel;
@@ -119,37 +108,14 @@ let listenersAttached = false;
 let lastBoundCanvasLeft = null;
 let resizeListenerAttached = false;
 let touchStartX = null;
-const POLL_STORAGE_KEY = "bookreaderPollVotes.v1";
-const pollDataByBook = {
-  "book-1-chapter-1": {
-    title: "Chapter 1 Poll",
-    question: "What is motivating the lead character most in this chapter?",
-    options: [
-      "Protecting family at any cost",
-      "Seeking justice through the legal system",
-      "Escaping a painful past",
-    ],
-  },
-  "book-1": {
-    title: "Book 1 Poll",
-    question: "Which choice best describes what motivates the lead character right now?",
-    options: [
-      "Protecting family at any cost",
-      "Seeking justice through the legal system",
-      "Escaping a painful past",
-    ],
-  },
-  "book-2": {
-    title: "Book 2 Poll",
-    question: "What should the protagonist prioritize in the next chapter?",
-    options: [
-      "Reveal the hidden evidence immediately",
-      "Build trust with allies first",
-      "Confront the antagonist directly",
-    ],
-  },
-};
-let pollVoteState = loadPollVoteState();
+let pendingRenderFrame = null;
+let activeLeftRenderTask = null;
+let activeRightRenderTask = null;
+let renderCycleId = 0;
+let currentPollData = null;
+let pollLoadState = "idle";
+let pollLoadMessage = "";
+let pollRequestId = 0;
 
 // Demo store keyed by book URL (match the option values in book selector)
 const commentStore = {
@@ -261,8 +227,13 @@ function syncReaderLayoutMode() {
   const nextMode = shouldUseSinglePageMode();
   isSinglePageMode = nextMode;
   bookFrame?.classList.toggle("single-page-mode", isSinglePageMode);
+  if (isSinglePageMode && bookFrame) {
+    bookFrame.style.width = "";
+    bookFrame.style.height = "";
+  }
   normalizeCurrentPageForLayout();
   updateViewModeControls();
+  if (zoomControls) zoomControls.style.display = isSinglePageMode ? "none" : "";
 }
 
 function updateViewModeControls() {
@@ -283,19 +254,19 @@ function setPreferredViewMode(mode) {
   syncReaderLayoutMode();
 
   if (!pdfDoc) return;
-  if (previousMode !== isSinglePageMode) {
-    renderPages();
-    return;
-  }
-
-  // Re-render to apply canvas/page layout changes even if mode boolean is unchanged.
-  renderPages();
+  scheduleRenderPages(previousMode !== isSinglePageMode);
 }
 
 function setReaderErrorMessage(message = "") {
   if (!readerError) return;
   readerError.textContent = message;
   readerError.classList.toggle("hidden", !message);
+}
+
+function setChapterLoadNotice(message = "") {
+  if (!chapterLoadNotice) return;
+  chapterLoadNotice.textContent = message;
+  chapterLoadNotice.classList.toggle("hidden", !message);
 }
 
 function getPageTurnStep() {
@@ -353,8 +324,11 @@ function cacheDom() {
   pageInfo = document.getElementById("pageInfo");
   bookSelect = document.getElementById("bookSelect");
   readerError = document.getElementById("readerError");
+  chapterLoadNotice = document.getElementById("chapterLoadNotice");
   jumpToDiscussionBtn = document.getElementById("jumpToDiscussion");
   bookFrame = document.getElementById("bookFrame");
+  singlePageTextEl = document.getElementById("singlePageText");
+  zoomControls = document.querySelector(".reader-zoom-controls");
   doublePageViewBtn = document.getElementById("doublePageViewBtn");
   singlePageViewBtn = document.getElementById("singlePageViewBtn");
   ensurePollMarkupExists();
@@ -430,17 +404,35 @@ async function loadBookOptionsFromBackend() {
   if (!bookSelect) return;
 
   const currentSelection = bookSelect.value || currentUrl;
+  const requestedChapterNum = Number.parseInt(
+    sessionStorage.getItem("activeChapter") || "",
+    10
+  );
   const response = await fetchBookReaderEntries();
   if (!response?.ok || !Array.isArray(response.data) || response.data.length === 0) {
+    setChapterLoadNotice("Chapter list could not be loaded. Using fallback chapters where available.");
+    return;
+  }
+
+  setChapterLoadNotice("");
+
+  const visibleEntries = response.data.filter((entry) => {
+    if (!entry?.url) return false;
+    const isFreeEntry =
+      entry.free === true ||
+      entry.free === 1 ||
+      String(entry.free).toLowerCase() === "true";
+    return subscriber || isFreeEntry;
+  });
+
+  if (!visibleEntries.length) {
     return;
   }
 
   chapterMetaByUrl.clear();
   bookSelect.innerHTML = "";
 
-  response.data.forEach((entry) => {
-    if (!entry?.url) return;
-
+  visibleEntries.forEach((entry) => {
     const option = document.createElement("option");
     option.value = entry.url;
     option.textContent = entry.label || `Book ${entry.bookId || 1} - Chapter ${entry.chapterNum || 1}`;
@@ -449,14 +441,29 @@ async function loadBookOptionsFromBackend() {
   });
 
   if (!bookSelect.options.length) {
+    setChapterLoadNotice("No chapters are available right now.");
     return;
   }
 
   const firstValue = bookSelect.options[0].value;
-  const nextValue = chapterMetaByUrl.has(currentSelection) ? currentSelection : firstValue;
+  const requestedEntry = Number.isInteger(requestedChapterNum) && requestedChapterNum > 0
+    ? visibleEntries.find((entry) => Number(entry?.chapterNum) === requestedChapterNum)
+    : null;
+
+  let nextValue = firstValue;
+  if (requestedEntry?.url && chapterMetaByUrl.has(requestedEntry.url)) {
+    nextValue = requestedEntry.url;
+  } else if (chapterMetaByUrl.has(currentSelection)) {
+    nextValue = currentSelection;
+  }
+
   bookSelect.value = nextValue;
   currentUrl = nextValue;
   syncCurrentSelectionMeta();
+
+  if (requestedEntry?.url) {
+    sessionStorage.removeItem("activeChapter");
+  }
 }
 
 function loadDocument(url) {
@@ -474,7 +481,7 @@ function loadDocument(url) {
       currentUrl = url;
       syncCurrentSelectionMeta();
       syncReaderLayoutMode();
-      renderPages();
+      scheduleRenderPages(true);
     })
     .catch((err) => {
       console.error("Failed to load document", err);
@@ -483,10 +490,53 @@ function loadDocument(url) {
     });
 }
 
-function renderPage(pageNum, canvas, ctx) {
+function cancelRenderTask(task) {
+  if (!task || typeof task.cancel !== "function") return;
+  try {
+    task.cancel();
+  } catch {
+    // Ignore cancellation failures; a newer render will replace this frame.
+  }
+}
+
+function clearPendingRenderFrame() {
+  if (pendingRenderFrame == null) return;
+  cancelAnimationFrame(pendingRenderFrame);
+  pendingRenderFrame = null;
+}
+
+function cancelActiveRenderTasks() {
+  cancelRenderTask(activeLeftRenderTask);
+  cancelRenderTask(activeRightRenderTask);
+  activeLeftRenderTask = null;
+  activeRightRenderTask = null;
+}
+
+function scheduleRenderPages(waitForLayout = false) {
+  clearPendingRenderFrame();
+  const framesToWait = waitForLayout ? 2 : 1;
+
+  const run = (framesRemaining) => {
+    pendingRenderFrame = requestAnimationFrame(() => {
+      if (framesRemaining > 1) {
+        run(framesRemaining - 1);
+        return;
+      }
+
+      pendingRenderFrame = null;
+      renderPages();
+    });
+  };
+
+  run(framesToWait);
+}
+
+function renderPage(pageNum, canvas, ctx, cycleId) {
   return pdfDoc.getPage(pageNum).then((page) => {
+    if (cycleId !== renderCycleId) return;
+
     const baseViewport = page.getViewport({ scale: 1 });
-    let scale = 1.5;
+    let scale = 1.5 * userZoom;
     let renderTransform = null;
 
     if (isSinglePageMode) {
@@ -498,15 +548,17 @@ function renderPage(pageNum, canvas, ctx) {
       const paddingY = computed
         ? (Number.parseFloat(computed.paddingTop) || 0) + (Number.parseFloat(computed.paddingBottom) || 0)
         : 0;
-      const rawWidth = container?.clientWidth || canvas.clientWidth || baseViewport.width;
-      const rawHeight = container?.clientHeight || canvas.clientHeight || baseViewport.height;
+      const containerRect = container?.getBoundingClientRect?.();
+      const rawWidth = containerRect?.width || container?.clientWidth || canvas.clientWidth || baseViewport.width;
+      const rawHeight =
+        containerRect?.height || container?.clientHeight || canvas.clientHeight || baseViewport.height;
       const availableWidth = Math.max(1, rawWidth - paddingX);
       const availableHeight = Math.max(1, rawHeight - paddingY);
       const widthScale = availableWidth / baseViewport.width;
       const heightScale = availableHeight / baseViewport.height;
       const fitScale = Math.min(widthScale, heightScale);
       if (Number.isFinite(fitScale) && fitScale > 0) {
-        scale = fitScale;
+        scale = fitScale * userZoom;
       }
     }
 
@@ -520,13 +572,18 @@ function renderPage(pageNum, canvas, ctx) {
       canvas.style.width = `${Math.floor(viewport.width)}px`;
       canvas.style.height = `${Math.floor(viewport.height)}px`;
       renderTransform = outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0];
-    } else {
-      canvas.height = Math.floor(viewport.height);
-      canvas.width = Math.floor(viewport.width);
-      canvas.style.width = "";
-      canvas.style.height = "";
-    }
+      canvas.style.maxWidth = "";
+      } else {
+        const deviceScale = window.devicePixelRatio || 1;
+        const outputScale = Math.min(3, Math.max(1, deviceScale * 1.35));
 
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = "";
+        canvas.style.height = "";
+        canvas.style.maxWidth = "100%";
+        renderTransform = outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0];
+      }
     // Ensure previous transforms do not bleed into next render pass.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -535,26 +592,128 @@ function renderPage(pageNum, canvas, ctx) {
       viewport: viewport,
       transform: renderTransform,
     };
-    return page.render(renderContext).promise;
+
+    const renderTask = page.render(renderContext);
+    if (canvas === canvasLeft) {
+      activeLeftRenderTask = renderTask;
+    } else if (canvas === canvasRight) {
+      activeRightRenderTask = renderTask;
+    }
+
+    return renderTask.promise
+      .catch((error) => {
+        if (error?.name === "RenderingCancelledException") {
+          return;
+        }
+        throw error;
+      })
+      .finally(() => {
+        if (canvas === canvasLeft && activeLeftRenderTask === renderTask) {
+          activeLeftRenderTask = null;
+        } else if (canvas === canvasRight && activeRightRenderTask === renderTask) {
+          activeRightRenderTask = null;
+        }
+      });
   });
+}
+async function renderSinglePageText(pageNum) {
+  if (!pdfDoc || !singlePageTextEl) return;
+  singlePageTextEl.innerHTML = "<p>Loading...</p>";
+
+  try {
+    const page = await pdfDoc.getPage(pageNum);
+    const content = await page.getTextContent();
+    const items = content.items.filter(item => item.str.trim());
+
+    if (!items.length) {
+      singlePageTextEl.innerHTML = "<p>No text found on this page.</p>";
+      return;
+    }
+
+    // Group items into lines by Y coordinate
+    const lineMap = new Map();
+    for (const item of items) {
+      const y = Math.round(item.transform[5]);
+      if (!lineMap.has(y)) lineMap.set(y, []);
+      lineMap.get(y).push(item);
+    }
+
+    // Sort lines top to bottom (PDF Y increases upward, so sort descending)
+    const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
+    const lines = sortedYs.map(y => ({
+      y,
+      text: lineMap.get(y)
+        .sort((a, b) => a.transform[4] - b.transform[4])
+        .map(i => i.str)
+        .join("")
+    }));
+
+    // Calculate average line spacing
+    const spacings = [];
+    for (let i = 1; i < lines.length; i++) {
+      spacings.push(Math.abs(lines[i - 1].y - lines[i].y));
+    }
+    const avgSpacing = spacings.length
+      ? spacings.reduce((a, b) => a + b, 0) / spacings.length
+      : 12;
+
+    // Group lines into paragraphs based on gaps larger than 1.5x average spacing
+    const paragraphs = [];
+    let currentPara = [lines[0].text];
+    for (let i = 1; i < lines.length; i++) {
+      const gap = Math.abs(lines[i - 1].y - lines[i].y);
+      if (gap > avgSpacing * 1.5) {
+        paragraphs.push(currentPara.join(" "));
+        currentPara = [lines[i].text];
+      } else {
+        currentPara.push(lines[i].text);
+      }
+    }
+    if (currentPara.length) paragraphs.push(currentPara.join(" "));
+
+    const html = paragraphs
+      .filter(p => p.trim())
+      .map(p => `<p>${p.trim()}</p>`)
+      .join("");
+
+    singlePageTextEl.innerHTML = html || "<p>No text found on this page.</p>";
+  } catch (err) {
+    singlePageTextEl.innerHTML = "<p>Failed to load page text.</p>";
+    console.error("renderSinglePageText error:", err);
+  }
 }
 
 function renderPages() {
   if (!pdfDoc) return;
+  clearPendingRenderFrame();
+  cancelActiveRenderTasks();
+  renderCycleId += 1;
+  const cycleId = renderCycleId;
   normalizeCurrentPageForLayout();
+
+  if (isSinglePageMode) {
+    canvasLeft.style.display = "none";
+    canvasRight.style.opacity = "0";
+    ctxRight.clearRect(0, 0, canvasRight.width, canvasRight.height);
+    pageInfo.textContent = `Page ${currentPage} of ${pdfDoc.numPages}`;
+    renderSinglePageText(currentPage);
+    return;
+  }
+
+  canvasLeft.style.display = "";
+  if (singlePageTextEl) {
+    singlePageTextEl.innerHTML = "";
+  }
 
   canvasLeft.style.opacity = "0";
   canvasRight.style.opacity = "0";
 
-  const tasks = [renderPage(currentPage, canvasLeft, ctxLeft)];
+  const tasks = [renderPage(currentPage, canvasLeft, ctxLeft, cycleId)];
 
   let rightRender = Promise.resolve();
-  if (!isSinglePageMode && currentPage + 1 <= pdfDoc.numPages) {
-    rightRender = renderPage(currentPage + 1, canvasRight, ctxRight);
+  if (currentPage + 1 <= pdfDoc.numPages) {
+    rightRender = renderPage(currentPage + 1, canvasRight, ctxRight, cycleId);
     pageInfo.textContent = `Page ${currentPage}-${currentPage + 1}`;
-  } else if (isSinglePageMode) {
-    ctxRight.clearRect(0, 0, canvasRight.width, canvasRight.height);
-    pageInfo.textContent = `Page ${currentPage} of ${pdfDoc.numPages}`;
   } else {
     ctxRight.clearRect(0, 0, canvasRight.width, canvasRight.height);
     pageInfo.textContent = `Page ${currentPage}`;
@@ -563,12 +722,15 @@ function renderPages() {
   tasks.push(rightRender);
 
   Promise.all(tasks).then(() => {
+    if (cycleId !== renderCycleId) return;
     requestAnimationFrame(() => {
+      if (cycleId !== renderCycleId) return;
       canvasLeft.style.opacity = "1";
-      canvasRight.style.opacity = isSinglePageMode ? "0" : "1";
+      canvasRight.style.opacity = "1";
     });
     renderComments();
   }).catch((error) => {
+    if (error?.name === "RenderingCancelledException") return;
     console.error("Failed to render pages:", error);
     setReaderErrorMessage("Chapter render failed. Please refresh and try again.");
   });
@@ -585,63 +747,64 @@ function setCommentHeader() {
   commentsMeta.textContent = Number.isInteger(chapterNum) ? `Chapter ${chapterNum}` : "All pages";
 }
 
-function loadPollVoteState() {
-  try {
-    const raw = localStorage.getItem(POLL_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function savePollVoteState() {
-  try {
-    localStorage.setItem(POLL_STORAGE_KEY, JSON.stringify(pollVoteState));
-  } catch (error) {
-    console.warn("Unable to save poll votes:", error);
-  }
-}
-
 function getPollData() {
-  const pollKey = getCurrentPollKey();
-  const chapterPoll = pollDataByBook[pollKey];
-  if (chapterPoll) return chapterPoll;
-
-  const chapterMatch = /^book-(\d+)-chapter-\d+$/.exec(pollKey);
-  if (chapterMatch) {
-    return pollDataByBook[`book-${chapterMatch[1]}`] || null;
-  }
-
-  return pollDataByBook[pollKey] || null;
+  return currentPollData;
 }
 
-function ensurePollBookState(bookUrl, optionCount) {
-  const existing = pollVoteState[bookUrl];
-  const safeOptionCount = Math.max(0, Number(optionCount) || 0);
+async function loadPoll() {
+  pollRequestId += 1;
+  const requestId = pollRequestId;
+  const chapterId = getCurrentChapterId();
 
-  if (!existing || !Array.isArray(existing.counts)) {
-    const next = { counts: Array(safeOptionCount).fill(0), selected: null };
-    pollVoteState[bookUrl] = next;
-    return next;
+  if (!Number.isInteger(chapterId) || chapterId <= 0) {
+    currentPollData = null;
+    pollLoadState = "empty";
+    pollLoadMessage = "";
+    renderPoll();
+    return;
   }
 
-  const nextCounts = Array(safeOptionCount).fill(0);
-  for (let i = 0; i < safeOptionCount; i += 1) {
-    const value = Number(existing.counts[i]) || 0;
-    nextCounts[i] = value > 0 ? Math.floor(value) : 0;
+  pollLoadState = "loading";
+  pollLoadMessage = "";
+  currentPollData = null;
+  renderPoll();
+
+  const result = await getAuthorQuestionByChapter(chapterId);
+  if (requestId !== pollRequestId) return;
+
+  if (!result.ok) {
+    currentPollData = null;
+    pollLoadState = "error";
+    pollLoadMessage = result.message || "Author question could not be loaded right now.";
+    renderPoll();
+    return;
   }
 
-  const selected = Number.isInteger(existing.selected) &&
-    existing.selected >= 0 &&
-    existing.selected < safeOptionCount
-    ? existing.selected
-    : null;
+  if (result.data) {
+    const serverSelection =
+      Number.isInteger(result.data.selectedOption) &&
+      result.data.selectedOption >= 0 &&
+      result.data.selectedOption < result.data.options.length
+        ? result.data.selectedOption
+        : null;
+    currentPollData = {
+      ...result.data,
+      selectedOption: serverSelection,
+    };
+  } else {
+    currentPollData = null;
+  }
+  pollLoadState = result.data ? "ready" : "empty";
+  pollLoadMessage = "";
+  renderPoll();
+}
 
-  const normalized = { counts: nextCounts, selected };
-  pollVoteState[bookUrl] = normalized;
-  return normalized;
+function getPollVoteCounts(poll) {
+  const optionCount = Array.isArray(poll?.options) ? poll.options.length : 0;
+  return Array.from({ length: optionCount }, (_, index) => {
+    const raw = Array.isArray(poll?.voteCounts) ? poll.voteCounts[index] : 0;
+    return Math.max(0, Number(raw) || 0);
+  });
 }
 
 function getCheckedPollIndex() {
@@ -658,27 +821,53 @@ function renderPoll() {
     return;
   }
 
-  const pollKey = getCurrentPollKey();
   const poll = getPollData();
-  if (!poll) {
+  if (pollLoadState === "loading") {
     pollTitleEl.textContent = "Author Question";
-    pollQuestionEl.textContent = "No question posted for this chapter yet.";
-    pollOptionsEl.innerHTML = "";
-    pollStatusEl.textContent = "Check back soon for a chapter question.";
+    pollQuestionEl.textContent = "Loading author question...";
+    pollOptionsEl.innerHTML = '<div class="poll-empty-state">Checking whether this chapter has an author question.</div>';
+    pollStatusEl.textContent = "Loading...";
+    submitPollVoteBtn.classList.add("hidden");
     submitPollVoteBtn.disabled = true;
     return;
   }
 
+  if (pollLoadState === "error") {
+    pollTitleEl.textContent = "Author Question";
+    pollQuestionEl.textContent = "The author question could not be loaded.";
+    pollOptionsEl.innerHTML = '<div class="poll-empty-state">Please try again later or switch chapters and come back.</div>';
+    pollStatusEl.textContent = pollLoadMessage || "Author question unavailable.";
+    submitPollVoteBtn.classList.add("hidden");
+    submitPollVoteBtn.disabled = true;
+    return;
+  }
+
+  if (!poll) {
+    pollTitleEl.textContent = "Author Question";
+    pollQuestionEl.textContent = "This chapter does not have an author question.";
+    pollOptionsEl.innerHTML = '<div class="poll-empty-state">The author has not added a question for this chapter yet.</div>';
+    pollStatusEl.textContent = "No voting is available for this chapter.";
+    submitPollVoteBtn.classList.add("hidden");
+    submitPollVoteBtn.disabled = true;
+    return;
+  }
+
+  submitPollVoteBtn.classList.remove("hidden");
   submitPollVoteBtn.disabled = false;
-  pollTitleEl.textContent = poll.title;
+  pollTitleEl.textContent = poll.title || "Author Question";
   pollQuestionEl.textContent = poll.question;
 
-  const bookState = ensurePollBookState(pollKey, poll.options.length);
-  const totalVotes = bookState.counts.reduce((sum, count) => sum + count, 0);
+  const voteCounts = getPollVoteCounts(poll);
+  const totalVotes = voteCounts.reduce((sum, count) => sum + count, 0);
+  const selectedOption =
+    Number.isInteger(poll.selectedOption) && poll.selectedOption >= 0 && poll.selectedOption < poll.options.length
+      ? poll.selectedOption
+      : null;
+  const hasSubmittedVote = selectedOption !== null;
 
   pollOptionsEl.innerHTML = "";
   poll.options.forEach((optionText, index) => {
-    const count = bookState.counts[index] || 0;
+    const count = voteCounts[index] || 0;
     const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
 
     const label = document.createElement("label");
@@ -688,8 +877,8 @@ function renderPoll() {
     input.type = "radio";
     input.name = "bookPollOption";
     input.value = String(index);
-    input.checked = bookState.selected === index;
-    input.disabled = !subscriber;
+    input.checked = selectedOption === index;
+    input.disabled = hasSubmittedVote;
     label.appendChild(input);
 
     const copy = document.createElement("span");
@@ -710,27 +899,41 @@ function renderPoll() {
   });
 
   if (!subscriber) {
-    submitPollVoteBtn.disabled = true;
-    pollStatusEl.textContent = `Total votes: ${totalVotes} | Subscribers can vote on this question.`;
+    submitPollVoteBtn.textContent = hasSubmittedVote ? "Vote submitted" : "Submit vote";
+    submitPollVoteBtn.disabled = hasSubmittedVote ? true : false;
+    pollStatusEl.textContent = hasSubmittedVote
+      ? `Your vote: ${poll.options[selectedOption]} | Total votes: ${totalVotes}`
+      : `Total votes: ${totalVotes} | Select an answer, then subscribe to submit your vote.`;
     return;
   }
 
-  submitPollVoteBtn.disabled = false;
-  if (bookState.selected === null) {
+  submitPollVoteBtn.textContent = hasSubmittedVote ? "Vote submitted" : "Submit vote";
+  submitPollVoteBtn.disabled = hasSubmittedVote;
+  if (selectedOption === null) {
     pollStatusEl.textContent = `Total votes: ${totalVotes}`;
     return;
   }
 
-  pollStatusEl.textContent = `Your vote: ${poll.options[bookState.selected]} | Total votes: ${totalVotes}`;
+  pollStatusEl.textContent = `Your vote: ${poll.options[selectedOption]} | Total votes: ${totalVotes}`;
 }
 
-function handlePollSubmit() {
-  const pollKey = getCurrentPollKey();
+async function handlePollSubmit() {
   const poll = getPollData();
   if (!poll || !pollStatusEl) return;
 
+  if (!currentUserId) {
+    pollStatusEl.textContent = "Please log in to submit a vote.";
+    return;
+  }
+
   if (!subscriber) {
-    pollStatusEl.textContent = "Subscribers only: upgrade to vote on this question.";
+    pollStatusEl.textContent = "Subscribers only: your selection is visible, but you need a subscription to submit a vote.";
+    return;
+  }
+
+  if (Number.isInteger(poll.selectedOption)) {
+    pollStatusEl.textContent = "You have already voted on this question.";
+    renderPoll();
     return;
   }
 
@@ -740,117 +943,297 @@ function handlePollSubmit() {
     return;
   }
 
-  const bookState = ensurePollBookState(pollKey, poll.options.length);
-  if (Number.isInteger(bookState.selected) && bookState.selected >= 0 && bookState.selected < bookState.counts.length) {
-    if (bookState.counts[bookState.selected] > 0) {
-      bookState.counts[bookState.selected] -= 1;
-    }
+  const questionId = Number(poll.id);
+  if (!Number.isInteger(questionId) || questionId <= 0) {
+    pollStatusEl.textContent = "This author question is missing a database id.";
+    return;
   }
 
-  bookState.selected = selectedIndex;
-  bookState.counts[selectedIndex] += 1;
-  savePollVoteState();
+  submitPollVoteBtn.disabled = true;
+  pollStatusEl.textContent = "Submitting your vote...";
+
+  const result = await submitAuthorQuestionVote({
+    questionId,
+    selectedOptionIndex: selectedIndex,
+  });
+
+  if (!result.ok) {
+    submitPollVoteBtn.disabled = false;
+    pollStatusEl.textContent = result.message || "Vote submission failed.";
+    return;
+  }
+
+  currentPollData = result.data
+    ? result.data
+    : {
+        ...poll,
+        selectedOption: selectedIndex,
+      };
   renderPoll();
 }
 
-async function ensureChapterRow(bookId, chapterNum = 1) {
-  const supabase = getSupabaseClient();
-  if (!supabase) return null;
-
-  // Try to find existing chapter row
-  let { data, error } = await supabase
-    .from("Chapters")
-    .select("id")
-    .eq("book_id", bookId)
-    .eq("chapter_num", chapterNum)
-    .maybeSingle();
-
-  if (error) {
-    console.error("ensureChapterRow select error:", error);
-    return null;
-  }
-
-  // If missing, create it
-  if (!data) {
-    const insertRes = await supabase
-      .from("Chapters")
-      .insert({ book_id: bookId, chapter_num: chapterNum, free: true })
-      .select("id")
-      .single();
-
-    if (insertRes.error) {
-      console.error("ensureChapterRow insert error:", insertRes.error);
-      return null;
-    }
-    data = insertRes.data;
-  }
-
-  return data.id;
-}
-async function renderComments() {
+async function renderComments(forceRefresh = true) {
   if (!commentsList || !noComments) return;
 
   setCommentHeader();
   noComments.classList.add("hidden");
   commentsError?.classList.add("hidden");
-  renderCommentSkeleton();
 
-  const chapterId = getCurrentChapterId();
-  if (!chapterId) {
-    commentsList.classList.remove("is-loading");
-    commentsList.innerHTML = "";
-    noComments.classList.remove("hidden");
-    return;
-  }
-
-  const result = await getCommentsByChapter(chapterId);
-  commentsList.classList.remove("is-loading");
-
-  if (!result.ok) {
-    commentsList.innerHTML = "";
-    if (commentsError) {
-      commentsError.textContent = "Comments could not be loaded. Tap refresh to try again.";
-      commentsError.classList.remove("hidden");
+  if (forceRefresh) {
+    renderCommentSkeleton();
+    const chapterId = getCurrentChapterId();
+    if (!chapterId) {
+      commentsList.classList.remove("is-loading");
+      commentsList.innerHTML = "";
+      if (commentsError) {
+        commentsError.textContent = "Comments are unavailable because this chapter could not be identified.";
+        commentsError.classList.remove("hidden");
+      }
+      return;
     }
-    return;
+    const result = await getCommentsByChapter(chapterId);
+    commentsList.classList.remove("is-loading");
+    if (!result.ok) {
+      commentsList.innerHTML = "";
+      if (commentsError) {
+        commentsError.textContent = "Comments could not be loaded. Tap refresh to try again.";
+        commentsError.classList.remove("hidden");
+      }
+      return;
+    }
+    cachedComments = result.data ?? [];
   }
 
-  if (!result.data?.length) {
+  if (!cachedComments?.length) {
     commentsList.innerHTML = "";
     noComments.classList.remove("hidden");
     return;
   }
+
   noComments.classList.add("hidden");
   commentsList.innerHTML = "";
 
   const selected = filterComments?.value || "desc";
-  const rows = [...result.data];
+  const roots = buildTree(cachedComments);
 
-  // Sort by created_at
-  rows.sort((a, b) => {
+  roots.sort((a, b) => {
+    if (selected === "popular") {
+      return (b.children?.length || 0) - (a.children?.length || 0);
+    }
     const ta = new Date(a.created_at).getTime();
     const tb = new Date(b.created_at).getTime();
     return selected === "asc" ? ta - tb : tb - ta;
   });
 
-  rows.forEach((row) => {
-    const card = document.createElement("article");
-    card.className = "comment-card";
-
-    const meta = document.createElement("div");
-    meta.className = "comment-meta";
-    const who = formatCommentAuthor(row);
-    const when = formatCommentTimestamp(row.created_at);
-    meta.textContent = `${who} | ${when}`;
-    card.appendChild(meta);
-
-    const body = document.createElement("p");
-    body.className = "comment-text";
-    body.textContent = row.message; // ✅ XSS-safe
-    card.appendChild(body);
-
-    commentsList.appendChild(card);
+  roots.forEach((node) => {
+    commentsList.appendChild(buildCommentCard(node, 0));
   });
+}
+
+function buildTree(comments) {
+  const map = new Map();
+  const roots = [];
+  comments.forEach((c, index) => {
+    const key = c?.id ?? `__comment_${index}`;
+    map.set(key, { ...c, children: [] });
+  });
+  comments.forEach((c, index) => {
+    const key = c?.id ?? `__comment_${index}`;
+    const node = map.get(key);
+    const parentKey = c?.comment_id ?? c?.parent_id;
+
+    if (parentKey != null && map.has(parentKey)) {
+      map.get(parentKey).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  [...map.values()].forEach((node) => {
+    node.children.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  });
+  return roots;
+}
+
+const MAX_DEPTH = 3;
+
+function buildCommentCard(node, depth) {
+  const card = document.createElement("article");
+  card.className = "comment-card";
+  if (depth > 0) card.dataset.depth = depth;
+
+  const meta = document.createElement("div");
+  meta.className = "comment-meta";
+  meta.textContent = `${formatCommentAuthor(node)} | ${formatCommentTimestamp(node.created_at)}`;
+  card.appendChild(meta);
+
+  const body = document.createElement("p");
+  body.className = "comment-text";
+  body.textContent = node.message;
+  card.appendChild(body);
+
+  const actions = document.createElement("div");
+  actions.className = "comment-actions";
+
+  if (subscriber) {
+    const replyBtn = document.createElement("button");
+    replyBtn.className = "reply-btn";
+    replyBtn.textContent = node.children?.length ? `↩ Reply (${node.children.length})` : "↩ Reply";
+    replyBtn.addEventListener("click", () => {
+      const existing = card.querySelector(":scope > .reply-form");
+      if (existing) { existing.remove(); return; }
+      const form = buildReplyForm(node.id);
+      card.appendChild(form);
+      form.querySelector("textarea").focus();
+    });
+    actions.appendChild(replyBtn);
+  } else if (node.children?.length > 0) {
+    const countLabel = document.createElement("span");
+    countLabel.className = "reply-count-label";
+    countLabel.textContent = `${node.children.length} ${node.children.length === 1 ? "reply" : "replies"}`;
+    actions.appendChild(countLabel);
+  }
+
+  card.appendChild(actions);
+
+  if (node.children?.length > 0) {
+    const repliesEl = document.createElement("div");
+    repliesEl.className = "replies";
+    const nextDepth = depth + 1;
+
+    if (depth >= MAX_DEPTH) {
+      const continueBtn = document.createElement("button");
+      continueBtn.className = "continue-thread-btn";
+      continueBtn.textContent = "↪ Continue this thread";
+      continueBtn.addEventListener("click", () => {
+        continueBtn.remove();
+        const threadContainer = document.createElement("div");
+        threadContainer.className = "continued-thread";
+        node.children.forEach((child) => {
+          threadContainer.appendChild(buildCommentCard(child, 0));
+        });
+        repliesEl.appendChild(threadContainer);
+      });
+      repliesEl.appendChild(continueBtn);
+    } else {
+      const SHOW_INITIAL = 5;
+      const visible = node.children.slice(0, SHOW_INITIAL);
+      const hidden = node.children.slice(SHOW_INITIAL);
+
+      visible.forEach((child) => {
+        repliesEl.appendChild(buildCommentCard(child, nextDepth));
+      });
+
+      if (hidden.length > 0) {
+        const showMoreBtn = document.createElement("button");
+        showMoreBtn.className = "show-more-replies-btn";
+        showMoreBtn.textContent = `Show ${hidden.length} more ${hidden.length === 1 ? "reply" : "replies"}`;
+        showMoreBtn.addEventListener("click", () => {
+          hidden.forEach((child) => {
+            repliesEl.insertBefore(buildCommentCard(child, nextDepth), showMoreBtn);
+          });
+          showMoreBtn.remove();
+        });
+        repliesEl.appendChild(showMoreBtn);
+      }
+    }
+
+    card.appendChild(repliesEl);
+  }
+  
+  return card;
+}
+function buildReplyForm(parentId) {
+  const form = document.createElement("div");
+  form.className = "reply-form";
+
+  const ta = document.createElement("textarea");
+  ta.placeholder = "Write a reply…";
+  ta.rows = 2;
+
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "button";
+  submitBtn.textContent = "Post reply";
+
+  submitBtn.addEventListener("click", async () => {
+    const text = ta.value.trim();
+    if (!text) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Posting…";
+    const chapterId = getCurrentChapterId();
+    const res = await submitCommentToDB({ chapterId, message: text, parentCommentId: parentId });
+    if (!res.ok) {
+      alert(res.message || "Failed to post reply.");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Post reply";
+      return;
+    }
+    await renderComments(true);
+  });
+
+  form.appendChild(ta);
+  form.appendChild(submitBtn);
+  return form;
+}
+
+function buildRepliesSection(commentId, replies) {
+  const pageIdx = replyPageState.get(commentId) || 0;
+  const totalPages = Math.ceil(replies.length / REPLIES_PER_PAGE);
+  const pageReplies = replies.slice(pageIdx * REPLIES_PER_PAGE, (pageIdx + 1) * REPLIES_PER_PAGE);
+
+  const container = document.createElement("div");
+  container.className = "replies";
+
+  pageReplies.forEach((reply) => {
+    const r = document.createElement("div");
+    r.className = "reply";
+
+    const rMeta = document.createElement("div");
+    rMeta.className = "comment-meta";
+    rMeta.textContent = `${formatCommentAuthor(reply)} | ${formatCommentTimestamp(reply.created_at)}`;
+
+    const rBody = document.createElement("p");
+    rBody.className = "comment-text";
+    rBody.textContent = reply.message;
+
+    r.appendChild(rMeta);
+    r.appendChild(rBody);
+    container.appendChild(r);
+  });
+
+  if (totalPages > 1) {
+    const pagination = document.createElement("div");
+    pagination.className = "reply-pagination";
+
+    if (pageIdx > 0) {
+      const prev = document.createElement("button");
+      prev.className = "reply-page-btn";
+      prev.textContent = "← Prev";
+      prev.addEventListener("click", () => {
+        replyPageState.set(commentId, pageIdx - 1);
+        renderComments(false);
+      });
+      pagination.appendChild(prev);
+    }
+
+    const pageLabel = document.createElement("span");
+    pageLabel.textContent = `${pageIdx + 1} / ${totalPages}`;
+    pagination.appendChild(pageLabel);
+
+    if (pageIdx < totalPages - 1) {
+      const next = document.createElement("button");
+      next.className = "reply-page-btn";
+      next.textContent = "Next →";
+      next.addEventListener("click", () => {
+        replyPageState.set(commentId, pageIdx + 1);
+        renderComments(false);
+      });
+      pagination.appendChild(next);
+    }
+
+    container.appendChild(pagination);
+  }
+
+  return container;
 }
 
 function updateCommentUIAccess() {
@@ -916,6 +1299,37 @@ function attachEventHandlers() {
   document.getElementById("nextPage")?.addEventListener("click", goToNextPage);
   document.getElementById("prevPage")?.addEventListener("click", goToPreviousPage);
 
+  const zoomSlider = document.getElementById("zoomSlider");
+document.getElementById("zoomIn")?.addEventListener("click", () => {
+  userZoom = Math.min(3, userZoom + 0.25);
+  zoomSlider.value = userZoom;
+  renderPages();
+  if (!isSinglePageMode) {
+    const bookFrame = document.getElementById("bookFrame");
+    bookFrame.style.width = `${800 * userZoom}px`;
+    bookFrame.style.height = `${500 * userZoom}px`;
+  }
+});
+document.getElementById("zoomOut")?.addEventListener("click", () => {
+  userZoom = Math.max(0.5, userZoom - 0.25);
+  zoomSlider.value = userZoom;
+  renderPages();
+  if (!isSinglePageMode) {
+    const bookFrame = document.getElementById("bookFrame");
+    bookFrame.style.width = `${800 * userZoom}px`;
+    bookFrame.style.height = `${500 * userZoom}px`;
+  }
+});
+zoomSlider?.addEventListener("input", () => {
+  userZoom = parseFloat(zoomSlider.value);
+  renderPages();
+  if (!isSinglePageMode) {
+    const bookFrame = document.getElementById("bookFrame");
+    bookFrame.style.width = `${800 * userZoom}px`;
+    bookFrame.style.height = `${500 * userZoom}px`;
+  }
+});
+
   canvasRight?.addEventListener("click", () => {
     if (!isSinglePageMode) {
       goToNextPage();
@@ -979,7 +1393,7 @@ function attachEventHandlers() {
     }
     currentUrl = val;
     syncCurrentSelectionMeta();
-    renderPoll();
+    loadPoll();
     renderComments();
     loadDocument(val);
   });
@@ -1044,7 +1458,7 @@ submitComment?.addEventListener("click", async () => {
       const previousMode = isSinglePageMode;
       syncReaderLayoutMode();
       if (pdfDoc && previousMode !== isSinglePageMode) {
-        renderPages();
+        scheduleRenderPages(previousMode !== isSinglePageMode);
       }
     });
     resizeListenerAttached = true;
@@ -1053,6 +1467,18 @@ submitComment?.addEventListener("click", async () => {
 
 export async function initBookReader() {
   if (!cacheDom()) return;
+  // Reset module-level state so each initialization is deterministic.
+  pdfDoc = null;
+  currentPage = 1;
+  currentUserId = null;
+  currentBookId = 1;
+  currentChapterRowId = null;
+  currentChapterNum = 1;
+  currentPollData = null;
+  pollLoadState = "idle";
+  pollLoadMessage = "";
+  chapterMetaByUrl.clear();
+
   syncReaderLayoutMode();
 
   await refreshAuthState();
@@ -1063,7 +1489,10 @@ export async function initBookReader() {
   syncCurrentSelectionMeta();
 
   if (!getCurrentChapterId()) {
-    currentChapterRowId = await ensureChapterRow(currentBookId, currentChapterNum);
+    currentChapterRowId = null;
+    if (!chapterLoadNotice?.textContent) {
+      setChapterLoadNotice("Chapter metadata is unavailable for the current selection.");
+    }
   }
 
   if (!listenersAttached) {
@@ -1071,7 +1500,7 @@ export async function initBookReader() {
     listenersAttached = true;
   }
 
-  renderPoll();
+  await loadPoll();
   updateCommentUIAccess();
   await renderComments();     // optional but cleaner
 

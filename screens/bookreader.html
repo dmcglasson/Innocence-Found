@@ -3,12 +3,7 @@
     <div class="book-selector">
       <label for="bookSelect">Choose a book:</label>
       <select id="bookSelect">
-        <!-- for testing purposes the only options are book1 and book2,
-         once the backend is established the book selector should
-         fetch book and chapter options from the back end -->
-        <option value="../book reader/books/book1.pdf">Book 1 (PDF)</option>
-        <option value="../book reader/books/book2.pdf">Book 2 (PDF)</option>
-        <option value="locked">Locked Chapter</option>
+        <option value="" selected disabled>Loading available chapters...</option>
       </select>
     </div>
 
@@ -18,12 +13,22 @@
       <button id="singlePageViewBtn" type="button" class="reader-view-btn">Single page</button>
     </div>
 
+    <div class="reader-zoom-controls" role="group" aria-label="Text size">
+      <span class="reader-view-label">Text size:</span>
+      <button id="zoomOut" type="button" class="reader-view-btn" aria-label="Decrease text size">A−</button>
+      <input type="range" id="zoomSlider" min="0.5" max="3" step="0.25" value="1" aria-label="Text size">
+      <button id="zoomIn" type="button" class="reader-view-btn" aria-label="Increase text size">A+</button>
+    </div>
+
+    <p id="chapterLoadNotice" class="reader-error hidden" role="status"></p>
+
     <section class="reader-shell" aria-label="Book reader">
       <p id="readerError" class="reader-error hidden" role="alert"></p>
 
       <div class="book" id="bookFrame">
         <div class="page left-page">
           <canvas id="leftPage"></canvas>
+          <div id="singlePageText" class="single-page-text-container"></div>
         </div>
         <div class="page right-page">
           <canvas id="rightPage"></canvas>

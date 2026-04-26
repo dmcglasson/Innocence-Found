@@ -19,9 +19,16 @@ jest.unstable_mockModule("../js/modules/supabase.js", () => ({
 
 jest.unstable_mockModule("../js/config.js", () => ({
   APP_CONFIG: {
-    FREE_CHAPTER_COUNT: 2,
+    FREE_CHAPTER_COUNT: 6,
+    FREE_WORKSHEET_COUNT: 1,
     TOTAL_CHAPTERS: 10,
     SUPABASE_URL: "https://example.supabase.co",
+  },
+  WORKSHEETS_CONFIG: {
+    TABLE: "worksheets",
+    BUCKET: "worksheets",
+    SIGNED_URL_EXPIRES_IN: 300,
+    FUNCTIONS_BASE_URL: "https://example.supabase.co/functions/v1",
   },
   SUPABASE_CONFIG: {
     URL: "https://example.supabase.co",
@@ -45,18 +52,7 @@ function buildWorksheetsListDom() {
   document.body.innerHTML = '<div id="worksheetList"></div>';
 }
 
-// Minimal DOM for the worksheet reader screen.
-// Includes title/body targets and the back button target.
-function buildWorksheetReaderDom() {
-  document.body.innerHTML = `
-    <h1 id="worksheetTitle"></h1>
-    <div id="worksheetBody"></div>
-    <button id="backToWorksheetsBtn" type="button">Back</button>
-  `;
-}
-
-// Mocks table reads and storage download used by worksheet list/reader logic.
-// This simulates both data-table queries and file retrieval without network calls.
+// Mocks table reads for worksheet list rendering.
 function createSupabaseStub({ worksheets } = {}) {
   const listData =
     worksheets ||
@@ -89,78 +85,84 @@ function createSupabaseStub({ worksheets } = {}) {
     error: null,
   });
 
-  // maybeSingle mimics lookup for a single worksheet by id.
-  const maybeSingleMock = jest.fn((filterId) => {
-    const row = listData.find((item) => String(item.id) === String(filterId));
-    return Promise.resolve({ data: row || null, error: null });
-  });
-
-  const eqMock = jest.fn((column, filterId) => ({
-    maybeSingle: () => maybeSingleMock(filterId),
-  }));
-
-  const limitMock = jest.fn(() => ({ eq: eqMock }));
-  const selectMock = jest.fn(() => ({ order: orderMock, limit: limitMock }));
+  const selectMock = jest.fn(() => ({ order: orderMock }));
 
   const fromTableMock = jest.fn(() => ({
     select: selectMock,
   }));
 
-  const downloadMock = jest.fn().mockResolvedValue({
-    data: new Blob(["pdf"], { type: "application/pdf" }),
-    error: null,
-  });
-
-  const createSignedUrlMock = jest.fn().mockResolvedValue({
-    data: { signedUrl: "https://example.com/fallback.pdf" },
-    error: null,
-  });
-
-  const getPublicUrlMock = jest.fn(() => ({
-    data: { publicUrl: "https://example.com/public.pdf" },
-  }));
-
-  const fromBucketMock = jest.fn(() => ({
-    download: downloadMock,
-    createSignedUrl: createSignedUrlMock,
-    getPublicUrl: getPublicUrlMock,
-  }));
-
   return {
     from: fromTableMock,
-    storage: {
-      from: fromBucketMock,
-    },
   };
 }
 
-// Access-control tests for direct worksheet navigation logic.
+// Access-control tests for direct worksheet download flow.
 describe("handleLockedWorksheet", () => {
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  const anchorClickMock = jest.fn();
+
   beforeEach(() => {
     jest.clearAllMocks();
     sessionStorage.clear();
     window.location.hash = "";
     window.showLogin = jest.fn();
+    getSupabaseClientMock.mockReturnValue({});
+
+    URL.createObjectURL = jest.fn(() => "blob:worksheet");
+    URL.revokeObjectURL = jest.fn();
+    HTMLAnchorElement.prototype.click = anchorClickMock;
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(["pdf"], { type: "application/pdf" }),
+    });
   });
 
-  test("opens a free worksheet without login", async () => {
-    await handleLockedWorksheet(1, 1);
-
-    // Free worksheets should navigate directly to reader.
-    expect(sessionStorage.getItem("activeWorksheetId")).toBe("1");
-    expect(window.location.hash).toBe("#worksheet-reader");
+  afterAll(() => {
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
-  test("redirects locked worksheet to login when user is not signed in", async () => {
+  test("redirects worksheet to login when user is not signed in", async () => {
     getCurrentSessionMock.mockResolvedValue(null);
 
-    await handleLockedWorksheet(3, 3);
+    const result = await handleLockedWorksheet(3);
 
-    // Locked worksheets should preserve intent and route to login flow.
+    // Worksheet access should preserve intent and route to login flow.
+    expect(result).toEqual({ success: false });
     expect(window.showLogin).toHaveBeenCalledTimes(1);
     expect(sessionStorage.getItem("returnTo")).toBe("#worksheets");
     expect(sessionStorage.getItem("requestedWorksheetId")).toBe("3");
     expect(sessionStorage.getItem("activeWorksheetId")).toBeNull();
+  });
+
+  test("blocks worksheet download for signed-in non-subscriber", async () => {
+    getCurrentSessionMock.mockResolvedValue({ user: { id: "user-1" } });
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: false });
+
+    const result = await handleLockedWorksheet(2);
+
+    expect(result).toEqual({ success: false, message: "Subscribers only." });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test("downloads worksheet for signed-in subscriber", async () => {
+    getCurrentSessionMock.mockResolvedValue({
+      user: { id: "user-1" },
+      access_token: "session-token",
+    });
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: true });
+
+    const result = await handleLockedWorksheet(1);
+
+    expect(result).toEqual({ success: true, message: "Download started" });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://example.supabase.co/functions/v1/download-worksheet?id=1",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(anchorClickMock).toHaveBeenCalledTimes(1);
+    expect(window.location.hash).not.toBe("#worksheet-reader");
   });
 });
 
@@ -174,78 +176,63 @@ describe("initializeWorksheetsScreen", () => {
     buildWorksheetsListDom();
   });
 
-  test("renders worksheet buttons for free users", async () => {
+  test("renders worksheet buttons as subscriber-only for free users", async () => {
     getCurrentSessionMock.mockResolvedValue(null);
     getSupabaseClientMock.mockReturnValue(createSupabaseStub());
 
     await initializeWorksheetsScreen();
 
-    // First two are free, third is locked based on FREE_CHAPTER_COUNT=2.
+    // All worksheets should be locked when the user is not a subscriber.
     expect(waitForElementMock).toHaveBeenCalledWith("#worksheetList", 1000);
     const buttons = Array.from(document.querySelectorAll(".worksheet-button"));
     expect(buttons).toHaveLength(3);
-    expect(buttons[0].textContent).toContain("Open Worksheet");
+    expect(buttons[0].textContent).toContain("Subscribers Only");
     expect(buttons[2].textContent).toContain("Subscribers Only");
+
+    const tags = Array.from(document.querySelectorAll(".worksheet-card__tag")).map((el) => el.textContent || "");
+    expect(tags.some((tag) => tag.includes("PDF"))).toBe(true);
+  });
+
+  test("renders download buttons for subscribers", async () => {
+    getCurrentSessionMock.mockResolvedValue({ user: { id: "user-1" } });
+    getSubscriberStatusMock.mockResolvedValue({ isSubscriber: true });
+    getSupabaseClientMock.mockReturnValue(createSupabaseStub());
+
+    await initializeWorksheetsScreen();
+
+    const buttons = Array.from(document.querySelectorAll(".worksheet-button"));
+    expect(buttons).toHaveLength(3);
+    expect(buttons[0].textContent).toContain("Download PDF");
+    expect(buttons[1].textContent).toContain("Download PDF");
   });
 
   test("handles requested worksheet after rendering", async () => {
     getCurrentSessionMock.mockResolvedValue(null);
     getSupabaseClientMock.mockReturnValue(createSupabaseStub());
-    sessionStorage.setItem("requestedWorksheetId", "2");
+    sessionStorage.setItem("requestedWorksheetId", "1");
 
     await initializeWorksheetsScreen();
 
-    // A saved request should be consumed and forwarded to worksheet routing.
-    expect(sessionStorage.getItem("requestedWorksheetId")).toBeNull();
-    expect(sessionStorage.getItem("activeWorksheetId")).toBe("2");
-    expect(window.location.hash).toBe("#worksheet-reader");
+    // Anonymous access should re-stage the request for post-login continuation.
+    expect(sessionStorage.getItem("requestedWorksheetId")).toBe("1");
+    expect(window.showLogin).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem("activeWorksheetId")).toBeNull();
   });
 });
 
-// Tests reader route guards and PDF embed rendering behavior.
+// Reader route is deprecated and should immediately redirect.
 describe("initializeWorksheetReaderScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     sessionStorage.clear();
-    window.location.hash = "";
+    window.location.hash = "worksheet-reader";
     window.showLogin = jest.fn();
-    buildWorksheetReaderDom();
-
-    URL.createObjectURL = jest.fn(() => "blob:worksheet");
     URL.revokeObjectURL = jest.fn();
   });
 
-  test("redirects to worksheets when no active worksheet is selected", async () => {
-    getSupabaseClientMock.mockReturnValue(createSupabaseStub());
-
+  test("redirects immediately to worksheets", async () => {
     await initializeWorksheetReaderScreen();
-
-    // Reader route requires a selected worksheet id in session storage.
     expect(window.location.hash).toBe("#worksheets");
-  });
-
-  test("redirects locked worksheet to login for anonymous users", async () => {
-    sessionStorage.setItem("activeWorksheetId", "3");
-    getCurrentSessionMock.mockResolvedValue(null);
-    getSupabaseClientMock.mockReturnValue(createSupabaseStub());
-
-    await initializeWorksheetReaderScreen();
-
-    // Locked worksheet access for anonymous users should force login.
-    expect(window.showLogin).toHaveBeenCalledTimes(1);
-    expect(sessionStorage.getItem("returnTo")).toBe("worksheets");
-    expect(sessionStorage.getItem("requestedWorksheetId")).toBe("3");
-  });
-
-  test("renders worksheet PDF iframe for accessible worksheet", async () => {
-    sessionStorage.setItem("activeWorksheetId", "1");
-    getSupabaseClientMock.mockReturnValue(createSupabaseStub());
-
-    await initializeWorksheetReaderScreen();
-
-    // Accessible worksheet should render an iframe pointing to the resolved blob URL.
-    expect(document.getElementById("worksheetTitle").textContent).toBe("Worksheet 1");
-    expect(document.querySelector("#worksheetBody iframe")).not.toBeNull();
-    expect(document.getElementById("worksheetBody").innerHTML).toContain("blob:worksheet");
+    expect(waitForElementMock).not.toHaveBeenCalled();
   });
 });
