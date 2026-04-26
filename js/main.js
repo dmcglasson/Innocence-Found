@@ -31,7 +31,7 @@ const SCREEN_STYLES = {
   bookreader: "screens/bookreader.css",
 };
 
-function syncScreenStyles(pageId) {
+export function syncScreenStyles(pageId) {
   const href = SCREEN_STYLES[pageId];
   let link = document.getElementById(SCREEN_STYLE_ID);
 
@@ -423,7 +423,7 @@ function setupEventListeners() {
  * Handle login form submission
  * @param {HTMLFormElement} form - Login form element
  */
-async function handleLogin(form) {
+export async function handleLogin(form) {
   const emailInput = form.querySelector('#loginEmail');
   const passwordInput = form.querySelector('#loginPassword');
   const loginBtn = form.querySelector('#loginBtn');
@@ -485,7 +485,7 @@ async function handleLogin(form) {
  * Handle signup form submission
  * @param {HTMLFormElement} form - Signup form element
  */
-async function handleSignup(form) {
+export async function handleSignup(form) {
   const fNameInput = form.querySelector('#signupFirstName');
   const lNameInput = form.querySelector('#signupLastName');
   const emailInput = form.querySelector('#signupEmail');
@@ -553,7 +553,7 @@ async function handleSignup(form) {
 /**
  * Handle logout
  */
-async function handleLogout() {
+export async function handleLogout() {
 
   try {
     const result = await signOut();
@@ -566,7 +566,7 @@ async function handleLogout() {
   }
 }
 
-async function handleWorksheetUpload(form) {
+export async function handleWorksheetUpload(form) {
   const titleInput = form.querySelector('#worksheetTitle');
   const descriptionInput = form.querySelector('#worksheetDescription');
   const fileInput = form.querySelector('#worksheetFile');
@@ -696,7 +696,7 @@ async function handleWorksheetUpload(form) {
  */
 
 
-async function initializeScreen(pageId) {
+export async function initializeScreen(pageId) {
   syncScreenStyles(pageId);
   // ===== ADMIN NAV VISIBILITY =====
   const adminNavItem = document.getElementById('adminNavItem');
@@ -1081,7 +1081,7 @@ async function initializeScreen(pageId) {
 /**
  * Set up screen initialization callback for navigation
  */
-function navigateToPage(pageId) {
+export function navigateToPage(pageId) {
   const safePage = String(pageId || '').replace(/[^a-zA-Z0-9_-]/g, '');
   if (!safePage) return;
 
