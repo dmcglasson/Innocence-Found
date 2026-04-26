@@ -142,4 +142,49 @@ describe("comments module", () => {
       message: "permission denied",
     });
   });
-});
+  test("submitComment returns 500 when supabase is not initialized", async () => {
+    getSupabaseClientMock.mockReturnValue(null);
+
+    const result = await submitComment({ chapterId: 1, message: "hello" });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 500,
+      message: "Supabase not initialized",
+    });
+  });
+
+  test("submitComment returns 403 when insert fails", async () => {
+    const insert = jest.fn().mockResolvedValue({
+      error: { message: "permission denied" },
+    });
+    getSupabaseClientMock.mockReturnValue({
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: "reader-123" } },
+        }),
+      },
+      from: jest.fn(() => ({ insert })),
+    });
+
+    const result = await submitComment({ chapterId: 1, message: "hi" });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      message: "permission denied",
+    });
+  });
+
+  test("getCommentsByChapter returns error when supabase is not initialized", async () => {
+    getSupabaseClientMock.mockReturnValue(null);
+
+    const result = await getCommentsByChapter(1);
+
+    expect(result).toEqual({
+      ok: false,
+      data: [],
+      message: "Supabase not initialized",
+    });
+  });
+}); 
