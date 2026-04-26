@@ -44,6 +44,9 @@ const {
   handleLockedWorksheet,
   initializeWorksheetsScreen,
   initializeWorksheetReaderScreen,
+  fetchWorksheetMetadata,
+  getWorksheetFileUrl,
+  downloadWorksheet,
 } = await import("../js/modules/worksheets.js");
 
 // Minimal DOM for the worksheet list screen.
@@ -234,5 +237,129 @@ describe("initializeWorksheetReaderScreen", () => {
     await initializeWorksheetReaderScreen();
     expect(window.location.hash).toBe("#worksheets");
     expect(waitForElementMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchWorksheetMetadata", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("returns failure when supabase client is not initialized", async () => {
+    getSupabaseClientMock.mockReturnValue(null);
+
+    const result = await fetchWorksheetMetadata();
+
+    expect(result).toEqual({
+      success: false,
+      data: [],
+      message: "Supabase client not initialized",
+    });
+  });
+
+  test("returns worksheet list on success", async () => {
+    getSupabaseClientMock.mockReturnValue(createSupabaseStub());
+
+    const result = await fetchWorksheetMetadata();
+
+    expect(result.success).toBe(true);
+    expect(Array.isArray(result.data)).toBe(true);
+    expect(result.data).toHaveLength(3);
+  });
+
+  test("returns failure when query throws", async () => {
+    const orderMock = jest.fn().mockResolvedValue({
+      data: null,
+      error: { message: "relation does not exist", code: "42P01" },
+    });
+    getSupabaseClientMock.mockReturnValue({
+      from: jest.fn(() => ({ select: jest.fn(() => ({ order: orderMock })) })),
+    });
+
+    const result = await fetchWorksheetMetadata();
+
+    expect(result.success).toBe(false);
+    expect(result.data).toEqual([]);
+    expect(result.message).toBeTruthy();
+  });
+});
+
+describe("getWorksheetFileUrl", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    URL.createObjectURL = jest.fn(() => "blob:worksheet");
+    URL.revokeObjectURL = jest.fn();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(["pdf"], { type: "application/pdf" }),
+    });
+  });
+
+  test("returns failure when supabase client is not initialized", async () => {
+    getSupabaseClientMock.mockReturnValue(null);
+
+    const result = await getWorksheetFileUrl(1);
+
+    expect(result).toEqual({
+      success: false,
+      message: "Supabase client not initialized",
+    });
+  });
+
+  test("returns signed url on success", async () => {
+    getSupabaseClientMock.mockReturnValue({});
+    getCurrentSessionMock.mockResolvedValue({ access_token: "tok" });
+
+    const result = await getWorksheetFileUrl(1);
+
+    expect(result.success).toBe(true);
+    expect(result.data.url).toBe("blob:worksheet");
+  });
+
+  test("returns failure when backend fetch fails", async () => {
+    getSupabaseClientMock.mockReturnValue({});
+    getCurrentSessionMock.mockResolvedValue(null);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: "Not found" }),
+    });
+
+    const result = await getWorksheetFileUrl(99);
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBeTruthy();
+  });
+});
+
+describe("downloadWorksheet", () => {
+  const anchorClickMock = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    URL.createObjectURL = jest.fn(() => "blob:worksheet");
+    URL.revokeObjectURL = jest.fn();
+    HTMLAnchorElement.prototype.click = anchorClickMock;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(["pdf"], { type: "application/pdf" }),
+    });
+    getSupabaseClientMock.mockReturnValue({});
+    getCurrentSessionMock.mockResolvedValue({ access_token: "tok" });
+  });
+
+  test("triggers anchor download on success", async () => {
+    const result = await downloadWorksheet(1);
+
+    expect(result).toEqual({ success: true, message: "Download started" });
+    expect(anchorClickMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("returns failure when file url cannot be resolved", async () => {
+    getSupabaseClientMock.mockReturnValue(null);
+
+    const result = await downloadWorksheet(1);
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBeTruthy();
   });
 });
