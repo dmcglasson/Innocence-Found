@@ -33,7 +33,7 @@ export function getSupabaseFunctionsBaseUrl() {
 export const APP_CONFIG = {
   DEFAULT_PAGE: "home",
   SCREENS_PATH: "screens/",
-  CACHE_ENABLED: !IS_LOCAL_DEV,
+  CACHE_ENABLED: false,
   FREE_CHAPTER_COUNT: 6,
   FREE_WORKSHEET_COUNT: 1,
   TOTAL_CHAPTERS: 10,

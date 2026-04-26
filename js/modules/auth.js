@@ -118,11 +118,21 @@ export async function signUp(email, password, firstName, lastName, parent) {
     }
 
     if (data.user) {
-      await supabase.from("profiles").insert({
+      const profileEmail = String(email || '').trim();
+      if (!profileEmail) {
+        return { success: false, message: "Email is required to create a profile" };
+      }
+
+      const { error: profileError } = await supabase.from("profiles").insert({
         user_id: data.user.id,
+        email: profileEmail,
         role: "free",
         username: null,
       });
+
+      if (profileError) {
+        return { success: false, message: profileError.message };
+      }
     }
 
     return {
@@ -431,15 +441,36 @@ export async function getAllUsers() {
     return { success: false, data: [], message: "No client" };
   }
 
-  const { data, error } = await supabase
+  const primary = await supabase
+    .from('profiles')
+    .select('user_id, role, email');
+
+  if (!primary.error) {
+    return { success: true, data: primary.data || [] };
+  }
+
+  const message = String(primary.error?.message || '').toLowerCase();
+  const missingEmailColumn =
+    message.includes('email') &&
+    (message.includes('column') || message.includes('does not exist'));
+
+  if (!missingEmailColumn) {
+    return { success: false, data: [], message: primary.error.message };
+  }
+
+  const fallback = await supabase
     .from('profiles')
     .select('user_id, role');
 
-  if (error) {
-    return { success: false, data: [], message: error.message };
+  if (!fallback.error) {
+    const rows = (fallback.data || []).map((row) => ({
+      ...row,
+      email: '',
+    }));
+    return { success: true, data: rows };
   }
 
-  return { success: true, data };
+  return { success: false, data: [], message: fallback.error.message };
 }
 
 export async function deleteUserById(userId) {

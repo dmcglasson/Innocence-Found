@@ -1,52 +1,44 @@
 <div class="admin-layout" id="adminDashboardLayout" style="display: none;">
-
-
   <aside class="admin-sidebar">
- <div class="admin-menu-card">
-  <h3>Menu</h3>
+    <div class="admin-menu-card" id="adminDashboardTabs">
+      <h3>Menu</h3>
 
-  <button class="admin-menu-btn" data-page="chapters">Chapters</button>
-  <button class="admin-menu-btn" data-page="worksheets">Worksheets / Documents</button>
-  <button class="admin-menu-btn" data-page="admin-dashboard">Users</button>
-  <button class="admin-menu-btn" data-page="subscribe">Subscriptions</button>
-  <button class="admin-menu-btn" data-page="admin-upload">Upload Documents</button>
-  <button class="admin-menu-btn" data-page="admin-responses">Comments</button>
-</div>
+      <button type="button" class="admin-menu-btn" data-admin-tab="chapters">Chapters</button>
+      <button type="button" class="admin-menu-btn" data-admin-tab="worksheets">Worksheets</button>
+      <button type="button" class="admin-menu-btn" data-admin-tab="users">Users</button>
+      <button type="button" class="admin-menu-btn" data-admin-tab="comments">Comments</button>
+      <button type="button" class="admin-menu-btn" data-page="admin-upload">Upload Documents</button>
+    </div>
   </aside>
 
-  
   <section class="admin-main">
     <div>
-
-    
       <div class="admin-panel__header">
         <h1>Admin Dashboard</h1>
-        <p>Manage users and data.</p>
+        <p id="adminPanelSubtitle">Manage chapter visibility and publication details.</p>
       </div>
 
-      
-      
-      <div class="admin-table-wrap">
-        <h2>Users</h2>
+      <p id="adminDashboardStatus" class="admin-message admin-dashboard-status"></p>
+
+      <div class="admin-controls" id="adminTabControls"></div>
+
+      <div class="admin-table-wrap" id="adminTableWrap">
+        <h2 id="adminTableTitle">Chapters</h2>
 
         <table class="responses-table">
           <thead>
-            <tr>
-              <th>User ID</th>
-              <th>Role</th>
-              <th>Actions</th>
+            <tr id="adminTableHeader">
+              <th>Loading...</th>
             </tr>
           </thead>
 
-          <tbody id="usersTable">
+          <tbody id="adminTableBody">
             <tr>
-              <td colspan="3">Loading users...</td>
+              <td>Loading...</td>
             </tr>
           </tbody>
         </table>
       </div>
-
     </div>
   </section>
-
 </div>
