@@ -249,8 +249,8 @@ export async function showPage(pageId, onLoadCallback = null) {
     pageContainer.innerHTML = screenHtml;
 
     // Hide current page nav button
-    const worksheetBtn = document.querySelector('[data-page="dashboard"]');
-    const uploadBtn = document.querySelector('[data-page="admin-upload"]');
+    const worksheetBtn = document.querySelector('[data-page="dashboard"]:not(.admin-menu-btn)');
+    const uploadBtn = document.querySelector('[data-page="admin-upload"]:not(.admin-menu-btn)');
 
     if (worksheetBtn) worksheetBtn.style.display = 'inline-block';
     if (uploadBtn) uploadBtn.style.display = 'inline-block';
