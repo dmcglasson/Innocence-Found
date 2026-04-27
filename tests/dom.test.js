@@ -1,22 +1,48 @@
-import { JSDOM } from "jsdom";
 import { TextEncoder, TextDecoder } from "util";
-
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
-describe("DOM Module Tests", () => {
-  test("should select element by ID", () => {
-    const dom = new JSDOM(`<div id="test">Hello</div>`);
-    const document = dom.window.document;
 
-    const el = document.getElementById("test");
-    expect(el.textContent).toBe("Hello");
+import { JSDOM } from "jsdom";
+
+describe("DOM Tests", () => {
+  let document;
+
+  beforeEach(() => {
+    const dom = new JSDOM(`
+      <!DOCTYPE html>
+      <html>
+        <body>
+          <h1 id="title">Hello World</h1>
+          <button id="btn">Click Me</button>
+        </body>
+      </html>
+    `);
+
+    document = dom.window.document;
   });
 
-  test("should return null if element not found", () => {
-    const dom = new JSDOM(`<div></div>`);
-    const document = dom.window.document;
+  test("should find the title element", () => {
+    const title = document.getElementById("title");
+    expect(title).not.toBeNull();
+    expect(title.textContent).toBe("Hello World");
+  });
 
-    const el = document.getElementById("missing");
-    expect(el).toBeNull();
+  test("should update text content", () => {
+    const title = document.getElementById("title");
+    title.textContent = "Updated Text";
+    expect(title.textContent).toBe("Updated Text");
+  });
+
+  test("should handle button click", () => {
+    const button = document.getElementById("btn");
+
+    let clicked = false;
+    button.addEventListener("click", () => {
+      clicked = true;
+    });
+
+    button.click();
+
+    expect(clicked).toBe(true);
   });
 });
