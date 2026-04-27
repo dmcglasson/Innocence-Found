@@ -1,5 +1,8 @@
 import { JSDOM } from "jsdom";
+import { TextEncoder, TextDecoder } from "util";
 
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
 describe("DOM Module Tests", () => {
   test("should select element by ID", () => {
     const dom = new JSDOM(`<div id="test">Hello</div>`);
