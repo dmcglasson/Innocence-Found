@@ -19,22 +19,22 @@ The app was built to give families and educators a safe, structured place to rea
 ## Screenshots
 
 ### Homepage
-![Homepage](images\Homepage.png)
+![Homepage](images/Homepage.png)
 
 Main landing page showing featured stories, navigation, and the overall look and feel of the application.
 
 ### Admin Dashboard
-![Admin Dashboard](images\AdminDashboard.png)
+![Admin Dashboard](images/AdminDashboard.png)
 
 Tools for managing content, users, and moderating comments from the admin CMS.
 
 ### Chapter Reader
-![Chapter Reader](images\BookReader.png)
+![Chapter Reader](images/BookReader.png)
 
 The reading interface with chapter navigation, reflection questions, and comment interaction.
 
 ### Printable Worksheet
-![Worksheet](images\Worksheets.png)
+![Worksheet](images/Worksheets.png)
 
 Downloadable and printable materials that support chapter learning and guided activities.
 
