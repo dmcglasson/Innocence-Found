@@ -29,3 +29,10 @@ describe('Auth Module', () => {
     expect(isAdmin).toBe(false);
   });
 });
+
+test('signIn returns an object with success and message fields', async () => {
+  const result = await auth.signIn('test@example.com', 'password123');
+
+  expect(result).toHaveProperty('success');
+  expect(result).toHaveProperty('message');
+});
