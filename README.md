@@ -1,215 +1,135 @@
-# Innocence Found  
-*A storytelling and educational platform created for author Cynthia Davies.*
+# Innocence Found
 
----
+![Logo](images/logo.png)
 
-### Project Title & Logo
-**Innocence Found** is a storytelling platform designed for families, children, and educators.
+Innocence Found is a family-focused storytelling and educational web application created for author Cynthia Davies. It provides an inviting, kid-friendly reading experience with per-chapter reflection questions, author–reader interaction, printable worksheets, and subscription-based access to premium content.
 
-![Logo](images/logo.png)  
+## What this project does
 
-The logo represents the warm, family-focused nature of the project—emphasizing reading, imagination, and learning.
+- Hosts stories and chapters with a light, accessible reader UI.
+- Provides per-chapter advice/reflection questions and a comment system.
+- Offers printable worksheets and gated chapters for subscribers.
+- Implements role-based access (free, subscriber, admin) and a subscription paywall for premium content.
+- Ships an admin dashboard to upload/manage chapters, audio, worksheets, and moderate content.
 
----
+## Why this was created
 
-### Synopsis / Overview
-Innocence Found is an online platform where author **Cynthia Davies** can share her original stories, worksheets, audio content, and blog posts.  
-It provides a **safe, simple, and engaging experience** for readers, parents, and educators.
+The app was built to give families and educators a safe, structured place to read original stories, guide reflection, and provide teaching materials that support discussion and learning, all while providing a family safe environment.
 
-The platform solves the challenge of offering:
-- Wholesome, structured storytelling
-- Guided self-reflection through advice questions
-- Secure access to premium worksheets and answer keys
-- Author–reader interaction in a controlled environment
-- A manageable CMS for chapter uploads, audio, and worksheets
+## Screenshots
 
----
+### Homepage
+![Homepage](images/homepage.png)
 
-## Table of Contents
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [ERD / System Architecture](#erd--system-architecture)
-- [Setup Instructions](#setup-instructions)
-- [Developer Instructions (CSC 191 Placeholder)](#developer-instructions-csc-191-placeholder)
-- [Testing (CSC 191 Placeholder)](#testing-csc-191-placeholder)
-- [Deployment (CSC 191 Placeholder)](#deployment-csc-191-placeholder)
-- [Timeline / Milestones](#timeline--milestones)
-- [Screenshots / Prototypes](#screenshots--prototypes)
-- [Team Members](#team-members)
-- [Client Information](#client-information)
----
-
-## Features
-
-### Interactive Reading Viewer
-- Clear chapter layout with smooth navigation  
-- Per-chapter advice/reflection questions
-- Comment section for user engagement
-- Subscriber-only **audio playback**
-
-### Worksheets & Gated Answer Keys
-- Printable worksheets for guided learning 
-- Answer keys only accessible to parents
-
-### Subscription & Access Control
-- Secure login and role-based permissions  
-- Paywall lock/unlock logic  
-- Parent/subscriber verification  
+Main landing page showing featured stories, navigation, and the overall look and feel of the application.
 
 ### Admin Dashboard
-- Manage chapters, audio, worksheets
-- Update and manage users
-- Moderate comments and content submissions
-- Analyze user traffic and activity on the website
-  
+![Admin Dashboard](images/AdminDashboard.png)
 
----
+Tools for managing content, users, and moderating comments from the admin CMS.
+
+### Chapter Reader
+![Chapter Reader](images/BookReader.png)
+
+The reading interface with chapter navigation, reflection questions, and comment interaction.
+
+### Printable Worksheet
+![Worksheet](images/Worksheets.png)
+
+Downloadable and printable materials that support chapter learning and guided activities.
 
 ## Tech Stack
 
-**Frontend:**  
-- HTML  
-- CSS  
-- JavaScript  
+- Frontend: HTML, CSS, JavaScript
+- Backend / Services: Supabase (Auth, Database, Storage), Stripe (Payments)
+- Hosting / Deployment: Vercel
 
-**Backend / Services:**  
-- Supabase (Auth, Database, Storage)
+## Download, Setup, Run, and Deploy
 
-**Hosting:**  
-- Vercel  
+1. Download the repository:
 
-**Tools:**  
-- VSCode  
-- GitHub  
-- Jira  
-- Figma  
+```bash
+git clone https://github.com/dmcglasson/Innocence-Found.git
+cd Innocence-Found
+```
 
----
+2. Set up the project dependencies:
 
-## ERD / System Architecture
+```bash
+npm install
+```
 
-![ERD Diagram](images/ERD.png)
+3. Run the site locally (static files). Options:
 
----
+- Quick via Python 3 built-in server:
 
-## Setup Instructions
+```bash
+python -m http.server 8000
+# then open http://localhost:8000
+```
 
-1. **Clone the Repository**  
-   ```bash
-   git clone https://github.com/dmcglasson/Innocence-Found.git
-   ```
-   ```bash 
-   cd Innocence-Found
-    ```
-2. **Request Environment Variables**  
-   Contact the team lead to obtain the necessary environment variables for Supabase and other services.
-
-3. **Run the Server**  
-   ```bash
-   python3 -m http.server <port>
-    ```
-4. **Access the Application**  
-   Open your web browser and navigate to `http://localhost:<port>`.
-
-## Developer Instructions *(CSC 191 Placeholder)*
-
----
+4. Deploy and configure environment variables: Contact the project lead for Supabase keys. When deploying, add them to `env.js` or the hosting provider's environment settings per `env-loader.js`.
 
 ## Testing
 
-1. Install dev dependencies:
-   ```bash
-   npm install
-   ```
-2. Run tests:
-   ```bash
-   npm test
-   ```
+The project uses Jest, and all test files live in the `tests/` folder.
 
-Current automated tests cover the `bookreader` comment/reply workflow (`tests/bookreader.test.js`).
+1. Install the dev dependencies:
 
----
+```bash
+npm install
+```
 
-## Deployment *(CSC 191 Placeholder)*
+2. Run the full test suite in serial mode:
 
----
+```bash
+npm run test:serial
+```
 
-## Timeline / Milestones
+3. Run the suite with coverage output when you need a test report:
 
-### **Sprint 5: Core Reading System**
-- Book reader prototype  
-- Chapter uploading (admin)  
-- Page-turn animation  
-- Comment system  
+```bash
+npm run test:coverage
+```
 
-### **Sprint 6: Subscription System**
-- Auth + user roles  
-- Paywall lock/unlock logic  
-- Parent verification system  
+Test notes:
+- The Jest config is set to use `jsdom` and automatically picks up `*.test.js` and `*.test.mjs` files inside `tests/`.
+- Common coverage areas include the book reader, comments, auth flows, validators, and utility helpers.
 
-### **Sprint 7: Worksheets System**
-- Upload & download  
-- Answer key gating  
-- PDF viewer / print flow  
+## Deployment
 
-### **Sprint 8: Admin Dashboard**
-- CMS controls  
-- Comment moderation  
-- Contest module  
+This project is a static frontend app with `index.html` as the entry point, shared UI assets in `screens/`, `frontend/`, `js/`, and `styles.css`. Backend features are handled by Supabase and Stripe.
 
-### **Sprint 9: Polishing & UAT**
-- Bug fixes  
-- Feedback integration  
-- Client review & adjustments  
+Recommended deployment flow:
 
----
+1. Deploy the static frontend to a host such as Vercel.
+2. Provide the public runtime values used by the browser app, including `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_WORKSHEETS_BUCKET`.
+3. Make sure `env.js` or your hosting platform’s environment setup supplies those public values before the app loads.
+4. Deploy the Supabase Edge Functions in `supabase/functions/` so features like checkout, uploads, worksheet downloads, and author question voting are available.
+5. Configure the Stripe webhook function (`stripe-webhook`) and any required Supabase secrets before turning on payments.
+6. Verify the storage bucket for worksheets and chapters exists and that the public client keys can access the expected data.
 
-## Screenshots / Prototypes
+For local testing, the same structure can be served as static files from `index.html` with a simple local server.
 
-### Figma Design
+## Contributors
 
-#### Homepage
-![Homepage](images/home.jpg)
+| Name | Role | Contact |
+|------|------|---------|
+| David McGlasson | Team Lead / Developer | mcglasson@csus.edu |
+| Iftekhar Ahmad | Developer | iahmad@csus.edu |
+| Mandee Jauregui | Developer | mandeejauregu@csus.edu |
+| Mohammad Mustafa Shams | Developer | mshams@csus.edu |
+| Nisha Joshi | Developer | nishajoshi@csus.edu |
+| Suyesh Shrestha | Developer | sshrestha3@csus.edu |
+| Wilson Luong | Developer | wluong@csus.edu |
+| Samir Saqib | Developer | samirsaqib@csus.edu |
 
-#### Admin Dashboard
-![Admin Dashboard](images/admin-dash.png)
 
-#### Chapter Reader
-![Chapter Reader](images/chapter-reader.jpg)
 
-## Prototype
-#### Homepage Title and Content
-![Homepage Title](images/home-proto-ss.png)
+## Client
 
-![Homepage Content](images/home-proto-ss2.png)
-
-## Team ByteBusters
-
-| Name | Role | Email |
-|------|------|--------|
-| **David McGlasson** | Team Leader/Developer | mcglasson@csus.edu |
-| **Iftekhar Ahmad** | Developer | iahmad@csus.edu |
-| **Mandee Jauregui** | Developer | mandeejauregu@csus.edu |
-| **Mohammad Mustafa Shams** | Developer | mshams@csus.edu |
-| **Nisha Joshi** | Developer | nishajoshi@csus.edu |
-| **Suyesh Shrestha** | Developer | sshrestha3@csus.edu |
-| **Wilson Luong** | Developer | wluong@csus.edu |
-| **Samir Saqib** | Developer | samirsaqib@csus.edu |
+**Cynthia Davies** — Author and Educator. Innocence Found aims to support children, families, and educators with wholesome storytelling and guided learning materials.
 
 ---
 
-## Client Information
-
-**Cynthia Davies — Author and Educator**
-
-Cynthia Davies is an author focused on creating engaging and educational stories for children and families. Her work emphasizes moral lessons, self-reflection, and community values.
-
-Innocence Found is a developing digital storytelling platform designed to guide young readers through meaningful and reflective stories.
-
-The platform encourages:
-- **Self-reflection**  
-- **Dialogue**  
-- **Community engagement**
-- **Interactive Learning**
-
-The long-term goal is to provide a space where readers can learn, reflect, and participate in a supportive storytelling experience as well as a safe learning environment.
+For more developer details, see the `js/`, `modules/`, and `tests/` folders in the repository.
